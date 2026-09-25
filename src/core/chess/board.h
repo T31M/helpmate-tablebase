@@ -20,6 +20,7 @@ public:
     Color stm() const;
     int ep_square() const;  // -1 if none
     std::vector<PlacedPiece> pieces() const;
+    void pieces(std::vector<PlacedPiece>& out) const;  // fills reusable caller-owned storage
     bool in_check() const;             // side to move
     bool opponent_in_check() const;    // true => position illegal
     PosState state() const;            // for side to move

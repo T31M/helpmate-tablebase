@@ -142,17 +142,13 @@ TEST_CASE("a short final block is cached at its own length") {
 }
 
 TEST_CASE("the cache is safe under concurrent byte_at from multiple threads, with forced eviction") {
-    // Capacity (4) is deliberately smaller than the working set (32 distinct
-    // indices), so eviction is constant while threads race on the same
-    // cache. byte_at never hands out a pointer, so there is nothing to
-    // dangle -- this is exactly the scenario a pointer-returning cache API
-    // could not survive. Each block's contents are a deterministic function of its
-    // index (every byte == index & 0xFF), so a byte read back from the wrong
-    // entry (cross-contamination between a fresh insert and a stale one, or
-    // between two threads' concurrent fills of the same index) is caught.
+    // Exercise the many-shard case with a working set larger than capacity.
+    // byte_at never hands out a pointer, so eviction cannot leave a dangling
+    // one. Each block's contents depend on its index, catching cross-
+    // contamination between concurrent fills and evictions.
     constexpr size_t kIters = 5000;
-    constexpr uint64_t kNumIndices = 32;
-    BlockCache c(4, 32);
+    constexpr uint64_t kNumIndices = 256;
+    BlockCache c(64, 32);
     std::atomic<bool> mismatch{false};
 
     auto worker = [&](unsigned seed) {
@@ -169,14 +165,9 @@ TEST_CASE("the cache is safe under concurrent byte_at from multiple threads, wit
         }
     };
 
-    std::thread t1([&] { worker(1); });
-    std::thread t2([&] { worker(2); });
-    std::thread t3([&] { worker(3); });
-    std::thread t4([&] { worker(4); });
-    t1.join();
-    t2.join();
-    t3.join();
-    t4.join();
+    std::vector<std::thread> workers;
+    for (unsigned seed = 1; seed <= 16; ++seed) workers.emplace_back(worker, seed);
+    for (auto& thread : workers) thread.join();
 
     CHECK_FALSE(mismatch.load());
     CHECK(c.fills() > kNumIndices);  // capacity < working set forces repeated refills

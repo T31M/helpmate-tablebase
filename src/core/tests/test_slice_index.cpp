@@ -63,4 +63,31 @@ TEST_CASE("encode rejects garbage") {
         {{Color::White, PieceType::King}, 0}, {{Color::White, PieceType::Queen}, 30},
         {{Color::Black, PieceType::King}, 1}};
     CHECK(!idx.encode(adj));                          // adjacent kings
+    adj[0].square = 64;
+    CHECK(!idx.encode(adj));                          // malformed square is not a table index
+}
+
+TEST_CASE("canonical numeric indices retain the existing table layout") {
+    // The a1/c3 kings permit identity and transpose. The queen position makes
+    // transpose the lower complete index, so both choices must be considered.
+    SliceIndex pawnless(*Material::parse("KQvkr"));
+    std::vector<PlacedPiece> two_choices = {
+        {{Color::White, PieceType::King}, 0},
+        {{Color::White, PieceType::Queen}, 17},
+        {{Color::Black, PieceType::King}, 18},
+        {{Color::Black, PieceType::Rook}, 41}};
+    auto pawnless_index = pawnless.encode(two_choices);
+    REQUIRE(pawnless_index);
+    CHECK(*pawnless_index == 49805);
+
+    SliceIndex pawns(*Material::parse("KPvkp"));
+    std::vector<PlacedPiece> mirrored = {
+        {{Color::White, PieceType::King}, 4},
+        {{Color::White, PieceType::Pawn}, 28},
+        {{Color::Black, PieceType::King}, 20},
+        {{Color::Black, PieceType::Pawn}, 35}};
+    auto pawn_index = pawns.encode(mirrored);
+    REQUIRE(pawn_index);
+    CHECK(*pawn_index == 436396);
+    CHECK(pawns.encode(transform_pos(mirrored, 1)) == pawn_index);
 }

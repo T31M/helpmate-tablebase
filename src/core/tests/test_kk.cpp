@@ -38,3 +38,29 @@ TEST_CASE("every king square reaches the canonical region") {
         CHECK(hits >= 1);
     }
 }
+
+TEST_CASE("packed king choices match transform enumeration for every square pair") {
+    for (bool pawns : {false, true}) {
+        const auto& table = pawns ? KKTable::with_pawns() : KKTable::pawnless();
+        int one_choice = 0, two_choices = 0;
+        for (int wk = 0; wk < 64; ++wk) {
+            for (int bk = 0; bk < 64; ++bk) {
+                const auto& choices = table.choices_of[wk * 64 + bk];
+                size_t count = 0;
+                for (int transform = 0; transform < (pawns ? 2 : 8); ++transform) {
+                    int kk = table.index_of[transform_sq(wk, transform) * 64 +
+                                            transform_sq(bk, transform)];
+                    if (kk < 0) continue;
+                    REQUIRE(count < choices.size());
+                    CHECK(choices[count++] == static_cast<uint16_t>((kk << 3) | transform));
+                }
+                for (size_t i = count; i < choices.size(); ++i)
+                    CHECK(choices[i] == KKTable::kNoChoice);
+                one_choice += count == 1;
+                two_choices += count == 2;
+            }
+        }
+        CHECK(one_choice == (pawns ? 3612 : 3528));
+        CHECK(two_choices == (pawns ? 0 : 84));
+    }
+}

@@ -76,7 +76,7 @@ bool slice_has_any_mate(const Material& m) {
     uint64_t n = idx.size();
     for (uint64_t c = 0; c < n; ++c) {
         if (!idx.decode(c, pp)) continue;
-        auto e = idx.encode(pp);
+        auto e = idx.encode_for_material(pp, m);
         if (!e || *e != c) continue;          // non-canonical duplicate
         b.reset(pp, Color::Black);            // mates are black-to-move
         if (b.opponent_in_check()) continue;  // illegal for this stm
@@ -106,7 +106,7 @@ void SliceGen::init_pass() {
                 dtm_[0][c] = dtm_[1][c] = DTM_INVALID;
                 continue;
             }
-            auto e = idx_.encode(pp);
+            auto e = idx_.encode_for_material(pp, mat_);
             if (!e || *e != c) {
                 dtm_[0][c] = dtm_[1][c] = DTM_INVALID;
                 continue;
@@ -151,7 +151,7 @@ void SliceGen::count_sweep() {
                 try {
                     for (const Move& m : b.legal_moves()) {
                         b.make(m);
-                        ValuePair v = eval_board(b, [this](Board& x) { return lookup_epless(x); });
+                        ValuePair v = eval_board(b, [this, &pp](Board& x) { return lookup_epless(x, pp); });
                         b.unmake(m);
                         if (v.dtm == d - 1) total = std::min(255u, total + (unsigned)v.count);
                     }
@@ -176,11 +176,12 @@ const std::vector<uint8_t>& SliceGen::cnt(Color stm) const { return cnt_[(int)st
 const SliceIndex& SliceGen::index() const { return idx_; }
 int SliceGen::max_dtm() const { return max_dtm_; }
 
-ValuePair SliceGen::lookup_epless(Board& b) {
-    auto pp = b.pieces();
+ValuePair SliceGen::lookup_epless(Board& b, std::vector<PlacedPiece>& piece_scratch) {
+    b.pieces(piece_scratch);
+    const auto& pp = piece_scratch;
     Material m = Material::of(pp);
     if (m == mat_) {
-        auto e = idx_.encode(pp);
+        auto e = idx_.encode_for_material(pp, m);
         int s = (int)b.stm();
         // encode() is disengaged for positions this slice cannot hold (kings adjacent/equal).
         // Dereferencing it unchecked read uninitialised stack, and since vec[i] is
@@ -195,7 +196,7 @@ ValuePair SliceGen::lookup_epless(Board& b) {
                                        describe_position(pp, b.stm()));
         return {dtm_[s][*e], cnt_[s][*e]};
     }
-    return subs_.lookup(m, pp, b.stm());
+    return subs_.lookup_for_material(m, pp, b.stm());
 }
 
 bool SliceGen::scan_pass(int d) {
@@ -231,7 +232,7 @@ bool SliceGen::scan_pass(int d) {
             try {
                 for (const Move& m : b.legal_moves()) {
                     b.make(m);
-                    ValuePair v = eval_board(b, [this](Board& x) { return lookup_epless(x); });
+                    ValuePair v = eval_board(b, [this, &pp](Board& x) { return lookup_epless(x, pp); });
                     b.unmake(m);
                     if (v.dtm == d - 1) {
                         dtm_[s][c] = (uint8_t)d;

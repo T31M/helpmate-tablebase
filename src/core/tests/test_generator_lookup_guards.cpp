@@ -74,6 +74,14 @@ TEST_CASE("SubTables::lookup reports an unencodable position instead of derefere
     REQUIRE_THROWS_AS(subs.lookup(Material::of(pp), pp, Color::White), GeneratorLookupError);
     REQUIRE_THROWS_WITH(subs.lookup(Material::of(pp), pp, Color::White),
                         ContainsSubstring("not encodable"));
+
+    // The public SubTables API still validates the supplied material against the pieces.
+    std::vector<PlacedPiece> mismatched{{{Color::White, PieceType::King}, 4},
+                                        {{Color::Black, PieceType::King}, 60},
+                                        {{Color::White, PieceType::Queen}, 0}};
+    REQUIRE(Material::of(mismatched) == *Material::parse("KQvk"));
+    REQUIRE_THROWS_WITH(subs.lookup(*Material::parse("Kvk"), mismatched, Color::White),
+                        ContainsSubstring("not encodable"));
 }
 
 TEST_CASE("TableReader::get rejects an out-of-range cell") {

@@ -1,5 +1,6 @@
 #include "indexing/slice_index.h"
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 
 namespace hm {
@@ -22,23 +23,34 @@ uint64_t SliceIndex::size() const { return size_; }
 int SliceIndex::num_transforms() const { return pawns_ ? 2 : 8; }
 
 std::optional<uint64_t> SliceIndex::encode(const std::vector<PlacedPiece>& pp) const {
-    if (!(Material::of(pp) == mat_)) return std::nullopt;
+    return encode_for_material(pp, Material::of(pp));
+}
+
+std::optional<uint64_t> SliceIndex::encode_for_material(const std::vector<PlacedPiece>& pp,
+                                                        const Material& material) const {
+    if (!(material == mat_)) return std::nullopt;
     int wk = -1, bk = -1;
     for (auto& p : pp) if (p.piece.type == PieceType::King)
         (p.piece.color == Color::White ? wk : bk) = p.square;
+    if (wk < 0 || wk >= 64 || bk < 0 || bk >= 64) return std::nullopt;
     uint64_t best = UINT64_MAX;
-    for (int t = 0; t < num_transforms(); ++t) {
-        int kk = kk_->index_of[transform_sq(wk, t) * 64 + transform_sq(bk, t)];
-        if (kk < 0) continue;
-        uint64_t idx = (uint64_t)kk; bool ok = true;
+    for (uint16_t choice : kk_->choices_of[wk * 64 + bk]) {
+        if (choice == KKTable::kNoChoice) break;
+        int t = choice & 7;
+        uint64_t idx = choice >> 3; bool ok = true;
         size_t i = 0;
         while (i < slots_.size() && ok) {
             size_t j = i;                             // run of identical slots
             while (j < slots_.size() && slots_[j].piece == slots_[i].piece) j++;
-            std::vector<int> sqs;
+            std::array<int, 64> sqs;
+            size_t n = 0;
             for (auto& p : pp)
-                if (p.piece == slots_[i].piece) sqs.push_back(transform_sq(p.square, t));
-            std::sort(sqs.begin(), sqs.end());
+                if (p.piece == slots_[i].piece) {
+                    if (n == sqs.size()) return std::nullopt;
+                    sqs[n++] = transform_sq(p.square, t);
+                }
+            if (n != j - i) { ok = false; break; }
+            std::sort(sqs.begin(), sqs.begin() + n);
             for (size_t k = i; k < j; ++k) {
                 int digit = sqs[k - i] - (slots_[k].radix == 48 ? 8 : 0);
                 if (digit < 0 || digit >= slots_[k].radix) { ok = false; break; }

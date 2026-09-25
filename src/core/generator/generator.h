@@ -97,13 +97,25 @@ struct SubTables {
     // generated are loaded, and encode() is disengaged for positions no slice can hold (e.g.
     // adjacent kings), so an unexpected post-move position must fail loudly and locally.
     ValuePair lookup(const Material& m, const std::vector<PlacedPiece>& pp, Color stm) const {
+        return lookup_impl(m, pp, stm, false);
+    }
+
+private:
+    friend class SliceGen;
+
+    ValuePair lookup_for_material(const Material& m, const std::vector<PlacedPiece>& pp, Color stm) const {
+        return lookup_impl(m, pp, stm, true);
+    }
+
+    ValuePair lookup_impl(const Material& m, const std::vector<PlacedPiece>& pp, Color stm,
+                          bool material_is_known) const {
         auto it = t_.find(m.name());
         if (it == t_.end())
             throw GeneratorLookupError("no sub-table loaded for material " + m.name() +
                                        " (only direct successors are loaded); position after move " +
                                        describe_position(pp, stm));
         auto& [rd, si] = it->second;
-        auto e = si.encode(pp);
+        auto e = material_is_known ? si.encode_for_material(pp, m) : si.encode(pp);
         if (!e)
             throw GeneratorLookupError("position not encodable in sub-table " + m.name() +
                                        "; position after move " + describe_position(pp, stm));
@@ -131,7 +143,7 @@ public:
     int max_dtm() const;
 
 private:
-    ValuePair lookup_epless(Board& b);  // Task 10: routes to own table or a sub-table
+    ValuePair lookup_epless(Board& b, std::vector<PlacedPiece>& piece_scratch);
 
     Material mat_;
     GenOptions opt_;

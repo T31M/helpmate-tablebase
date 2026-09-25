@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <algorithm>
 #include "chess/board.h"
 using namespace hm;
 
@@ -29,6 +30,47 @@ TEST_CASE("from_pieces / pieces round trip and state") {
     CHECK(b.pieces().size() == 3);
     Board w = Board::from_pieces(pp, Color::White);
     CHECK(w.opponent_in_check());               // black in check, white to move => illegal
+}
+TEST_CASE("pieces can fill and reuse caller-owned storage") {
+    auto b = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
+    REQUIRE(b);
+
+    std::vector<PlacedPiece> storage;
+    storage.reserve(16);
+    auto* buffer = storage.data();
+    b->pieces(storage);
+    CHECK(storage.data() == buffer);
+    REQUIRE(storage.size() == 10);
+
+    const std::vector<PlacedPiece> before = {
+        {{Color::White, PieceType::Pawn}, 12}, {{Color::White, PieceType::Pawn}, 14},
+        {{Color::Black, PieceType::Pawn}, 29}, {{Color::Black, PieceType::King}, 31},
+        {{Color::White, PieceType::King}, 32}, {{Color::White, PieceType::Pawn}, 33},
+        {{Color::Black, PieceType::Rook}, 39}, {{Color::Black, PieceType::Pawn}, 43},
+        {{Color::Black, PieceType::Pawn}, 50}, {{Color::White, PieceType::Rook}, 25}};
+    // Board::pieces is square ordered; compare after sorting the independently listed fixture.
+    auto by_square = [](const PlacedPiece& a, const PlacedPiece& b) { return a.square < b.square; };
+    auto expected = before;
+    std::sort(expected.begin(), expected.end(), by_square);
+    REQUIRE(storage.size() == expected.size());
+    for (size_t i = 0; i < storage.size(); ++i) {
+        CHECK(storage[i].square == expected[i].square);
+        CHECK(storage[i].piece == expected[i].piece);
+    }
+
+    Move capture{};
+    for (const Move& m : b->legal_moves()) if (m.uci() == "b4f4") capture = m;
+    REQUIRE(capture.uci() == "b4f4");
+    b->make(capture);
+    b->pieces(storage);
+    CHECK(storage.data() == buffer);
+    CHECK(storage.size() == 9);
+    auto moved_rook = std::find_if(storage.begin(), storage.end(), [](const PlacedPiece& p) {
+        return p.square == 29;
+    });
+    REQUIRE(moved_rook != storage.end());
+    CHECK((moved_rook->piece == Piece{Color::White, PieceType::Rook}));
+    CHECK(std::none_of(storage.begin(), storage.end(), [](const PlacedPiece& p) { return p.square == 25; }));
 }
 TEST_CASE("stalemate detection") {
     auto b = Board::from_fen("7k/5K2/6Q1/8/8/8/8/8 b - - 0 1");  // k h8, K f7?? -> use classic: k a8, Q b6, K c7? btm
