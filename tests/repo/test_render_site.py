@@ -399,17 +399,39 @@ def test_themes_page_distinguishes_unique_from_dual_problems():
 def test_themes_page_says_how_many_themes_the_engine_implements():
     """Three different numbers, none of which may be confused for another:
     how many themes this site's problems show (2, from THEMES), how many the
-    engine's registry can detect (26), and how many the glossary names (295).
+    engine's registry can detect (28), and how many the glossary names (295).
     The old wording claimed the engine "detects directly from the tables"
     only the ones shown here, which is false -- 24 is how many the selected
     problems happen to exhibit, not the engine's ceiling."""
     m = _load()
     out = m.themes_page(THEMES, INDEX)
     assert "2 themes" in out           # this site's problems
-    assert "26 themes" in out          # the engine's registry
+    assert "28 themes" in out          # the engine's registry
     assert "295" in out                # the glossary
-    assert "30 registry entries" in out
+    assert "33 registry entries" in out
 
+
+
+def test_engine_theme_counts_match_usage():
+    """The constants are copied by hand from docs/USAGE.md, which states them
+    in words; a new theme that updates USAGE but not render_site.py drifted
+    once already (30/26 after the registry grew to 33/28)."""
+    import re
+    words = {w: i for i, w in enumerate(
+        "zero one two three four five six seven eight nine ten eleven twelve "
+        "thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split())}
+    tens = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50}
+
+    def number(w):
+        head, _, unit = w.lower().partition("-")
+        return tens[head] + (words[unit] if unit else 0) if head in tens else words[head]
+
+    usage = (ROOT / "docs" / "USAGE.md").read_text()
+    found = re.search(r"([A-Z][a-z-]+) registry entries cover ([a-z-]+) themes", usage)
+    assert found, "USAGE.md no longer states the registry size"
+    m = _load()
+    assert (m.ENGINE_THEME_ENTRIES, m.ENGINE_THEMES) == (
+        number(found.group(1)), number(found.group(2)))
 
 def test_themes_page_uses_the_actual_problem_count_not_the_stored_one():
     """entry["count"] can drift from len(entry["problems"]) if something

@@ -22,7 +22,7 @@ adversarial tablebases never needed: the **number of distinct optimal
 solutions**. For every legal position in a material class the table stores
 distance to mate and how many shortest mating lines tie. `count = 1` is a
 sound problem; anything else is a dual. The corpus is currently complete
-through five pieces, with 16 of the 645 six-piece classes done.
+through five pieces, with 31 of the 645 six-piece classes done.
 
 ```
 $ helpmate mine KQvk --dtm 2 --count 1 --max 3
@@ -98,12 +98,16 @@ plane scan about 2.3×.
 
 ## What the data says
 
-Across the 302 tables there are 343.0 billion plane cells. Just over half are
-illegal positions the dense index has to reserve room for, 20.7 % are legal
-but unsolvable, 27.7 % have a helpmate, and of those only 2.9 % have a unique
-solution.
+Across the 317 tables there are 713.9 billion plane cells. Just over half are
+illegal positions the dense index has to reserve room for, 10.0 % are legal
+but unsolvable, 39.3 % have a helpmate, and of those 6.4 % have a unique
+solution. The fifteen KRB six-piece tables are more than half of all cells,
+so they pull these shares their way: with the extra white pieces far more
+positions can be mated. Across the first 302 tables the figures were
+343.0 billion cells, 20.7 % unsolvable, 27.7 % with a helpmate, and 2.9 %
+of those unique.
 
-The deepest mate is h#17, in KBvkqp:
+The deepest mate is h#17, shared by KBvkqp, KRBvkqp and KRBvkrp. In KBvkqp:
 
 ```
 8/8/1p6/8/8/8/Bq6/1k1K4 b - - 0 1
@@ -140,8 +144,8 @@ checked cheaply.
 ## Limits, and the open call
 
 Seven pieces need about 2 TB resident and an out-of-core generator that does
-not exist. Six pieces need a machine, not a redesign: **629 six-piece classes
-have never been computed, and 279 of them fit in 32 GiB and take about a day
+not exist. Six pieces need a machine, not a redesign: **614 six-piece classes
+have never been computed, and 269 of them fit in 32 GiB and take about a day
 each.** Contributions arrive as pull requests on the dataset
 (`helpmate-tables push --create-pr`), and every merged table is credited.
 Regenerating an existing class and reporting whether the sha256 matches is a

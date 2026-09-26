@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "helpmate-api"
-version = "0.19.0"
+version = "0.20.0"
 description = "Read-only HTTP API for helpmate tablebases"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -13,7 +13,7 @@ dependencies = [
   # not force a reinstall of the other. Nothing is on PyPI yet, so `helpmate`
   # must already be installed from this tree before this package -- see the
   # `install` target in the Makefile.
-  "helpmate>=0.19.0,<0.20",
+  "helpmate>=0.20.0,<0.21",
   "fastapi>=0.110",
   "uvicorn>=0.29",
   "huggingface_hub>=0.23",

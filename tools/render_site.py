@@ -288,10 +288,10 @@ def material_page(doc: Dict) -> str:
                              f'themes.'))
 
 
-ENGINE_THEME_ENTRIES = 30      # registry entries, including colour-specific
-                               # variants -- see docs/USAGE.md ("Thirty
-                               # registry entries cover twenty-six themes")
-ENGINE_THEMES = 26             # distinct theme names the engine can detect
+ENGINE_THEME_ENTRIES = 33      # registry entries, including colour-specific
+                               # variants -- see docs/USAGE.md ("Thirty-three
+                               # registry entries cover twenty-eight themes")
+ENGINE_THEMES = 28             # distinct theme names the engine can detect
 GLOSSARY_THEMES = 295          # named in the Helpmate Analyzer glossary
 
 

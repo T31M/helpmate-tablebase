@@ -206,6 +206,25 @@ workloads) vs extending ChessMG — outcome decides everything downstream.
 
 ## Backlog (unscheduled)
 
+### Release automation — release-please, no `develop` branch
+
+**Goal:** with outside contributors arriving, versioning and the CHANGELOG
+stop being hand work, while the maintainer still decides when to release.
+
+- Decided against a `develop` branch: `main` is already protected (six
+  required checks, up to date, no force-push), and a second long-lived branch
+  adds syncing and delays Pages, which deploys from `main`.
+- **release-please** keeps one open release PR collecting everything merged
+  since the last tag, derives the next version from commit types, and updates
+  the CHANGELOG and version files; merging it tags `v*`, which the existing
+  release workflow already handles. On 0.x, breaking changes bump the minor.
+- Prerequisites: conventional PR titles (`feat:` / `fix:` / `docs:`) enforced
+  by a PR-title check, squash-only merges, and release-please configured to
+  bump every file `tests/repo/test_version_consistency.py` checks (`VERSION`,
+  the three `pyproject.toml`, the two package `__version__`s, the API's
+  `helpmate` pin).
+- Option: deploy Pages on a release tag so the live site means "released".
+
 ### Query acceleration — indexing so `mine` stops scanning
 
 **Goal:** selective mining queries stop reading a whole plane. 97.1% of the

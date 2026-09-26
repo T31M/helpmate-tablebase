@@ -8,6 +8,24 @@ bumps may change behavior).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-26
+
+### Data
+- **Fifteen new six-piece tables, contributed by T31M — the project's first
+  outside contribution. Thank you.** King, rook and bishop against every
+  three-man Black set: KRBvkqq, KRBvkqr, KRBvkqb, KRBvkqn, KRBvkrr, KRBvkrb,
+  KRBvkrn, KRBvkbb, KRBvkbn, KRBvknn, KRBvkqp, KRBvkrp, KRBvkbp, KRBvknp,
+  KRBvkpp (claim #41, dataset PR #1 on `osick/helpmate-tables`), generated
+  with 0.19.0 on a 192-thread, 369 GiB machine; the five pawn tables need
+  about 85 GiB of RAM each. The corpus grows from 302 tables and 52.2 GiB to
+  **317 tables and 172.5 GiB**, six-piece coverage from 16 to 31 of 645
+  classes, and the plane cells from 343.0 to 713.9 billion. KRBvkqp and
+  KRBvkrp tie KBvkqp for the deepest mate, h#17. Still missing at six
+  pieces: 614 tables, 269 of them in the 32 GiB pawnless tier. README,
+  CONTRIBUTING-TABLES, COOPERATIVE-TABLEBASE and the dataset card carry the
+  new figures and credit the contributor; DEEPEST and the showcase site
+  pick up the new tables in a later regeneration.
+
 ### Added
 - **Three line-play themes: `indian`, `maslar`, `maslar:black-white`;
   registry 30 → 33 entries.** All three share one skeleton: a critical move
@@ -69,6 +87,22 @@ bumps may change behavior).
   sibling is chosen the same way. A remaining weakness is stated in a *Note*
   on the card and in the booklet. The index tables gain a *published by*
   column (`Sheglow (1998)`).
+
+- **An authorship statement** (`docs/AUTHORSHIP.md`, linked from the README
+  and the site): these positions were enumerated, not composed; no
+  authorship is claimed, none will enter a composing tourney, and a
+  generated database anticipates nobody (#36).
+
+### Changed
+- **Setup instructions for contributors** in CONTRIBUTING-TABLES, written
+  for a fresh cloud instance (#42, by T31M), and BUILD documents virtual
+  environments and why `pipx install ./src/packages/api` fails (#33).
+- **The theme index is collapsed per theme**, 37,000 px → 1,900 px (#38).
+  The site's theme note counts the engine's 28 themes in 33 registry
+  entries (was 26 / 30).
+
+### Fixed
+- **The generated site pages had no stylesheet** (#35).
 
 ## [0.19.0] - 2026-09-11
 

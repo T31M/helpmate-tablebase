@@ -4,7 +4,7 @@ This project needs CPU and RAM more than it needs code.
 
 The corpus is **complete through five pieces** — all 220 five-piece classes,
 plus everything below them. At six pieces there are **645 material classes
-that need a real table**, and **16 are done**. The rest is roughly six hundred
+that need a real table**, and **31 are done**. The rest is roughly six hundred
 machine-days of work, and it is not going to come from one desk.
 
 If you have a machine with 32 GiB of RAM and a week where it would otherwise
@@ -15,16 +15,16 @@ idle, you can produce something nobody has ever computed.
 
 ## What is missing
 
-629 six-piece tables. Peak RAM equals the raw table size, because generation
+614 six-piece tables. Peak RAM equals the raw table size, because generation
 holds four bytes per cell resident:
 
 | pawns | tables missing | RAM needed | machine |
 | --- | --- | --- | --- |
-| **0** | **279** | **28.9 GiB** | **32 GiB — the accessible tier** |
+| **0** | **269** | **28.9 GiB** | **32 GiB — the accessible tier** |
 | 3 | 28 | 47.6 GiB | 64 GiB |
 | 4 | 4 | 35.7 GiB | 64 GiB |
-| 2 | 98 | 63.5 GiB | 96 GiB (64 is too tight) |
-| 1 | 220 | 84.7 GiB | 96 GiB |
+| 2 | 97 | 63.5 GiB | 96 GiB (64 is too tight) |
+| 1 | 216 | 84.7 GiB | 96 GiB |
 
 Start with the pawnless tier. It is the largest single group, it fits on
 ordinary hardware, and every table in it is 28.9 GiB raw — about 1–3 GiB once
@@ -174,6 +174,11 @@ real contribution** — it converts a trusted table into a verified one.
 
 Every merged table is credited by material and contributor in the dataset
 card. If you would rather not be named, say so in the claim issue.
+
+The first outside contribution came from **T31M**: fifteen tables, KRBvkqq
+through KRBvkpp (issue #41, dataset PR #1), computed on a 192-thread,
+369 GiB machine — including five one- and two-pawn tables from the 96 GiB
+tier. The setup instructions below are theirs too (#42).
 
 ## Setup
 
