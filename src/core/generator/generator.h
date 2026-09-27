@@ -133,7 +133,6 @@ public:
     void init_pass();
     bool scan_pass(int d);              // Task 10
     void run_all_passes();              // Task 10: scan until fixed point; sets max_dtm_
-    void count_sweep();                 // Task 12
     void finalize_and_write();          // Task 10 (stats extended in Task 13)
     nlohmann::json stats_json() const;  // Task 13
     // test accessors:

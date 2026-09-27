@@ -117,58 +117,14 @@ void SliceGen::init_pass() {
                     dtm_[s][c] = DTM_INVALID;
                     continue;
                 }
-                if (s == 1 && b.state() == PosState::Checkmate) dtm_[1][c] = 0;
+                if (s == 1 && b.state() == PosState::Checkmate) {
+                    dtm_[1][c] = 0;
+                    cnt_[1][c] = 1;
+                }
             }
         }
     });
     if (opt_.progress) std::cerr << "  " << mat_.name() << ": init pass done (" << secs_since(t0) << " s)\n";
-}
-
-void SliceGen::count_sweep() {
-    // Pass d reads only counts of cells with dtm d-1, which the previous
-    // iteration finalized; sub-slice tables were fully counted before this
-    // slice (topological build order); eval_board merges EP branches with
-    // the same min/sum rule. Within one d, cell c only ever writes cnt_[s][c]
-    // and reads already-finalized lower-depth cells/sub-tables, so cells are
-    // independent of each other and safe to split across worker threads;
-    // the d loop itself stays sequential since depth d depends on depth d-1.
-    parallel_for(ps_, opt_.threads, [this](uint64_t begin, uint64_t end) {
-        for (uint64_t c = begin; c < end; ++c)
-            if (dtm_[1][c] == 0) cnt_[1][c] = 1;
-    });
-    for (int d = 1; d <= max_dtm_; ++d) {
-        auto t0 = std::chrono::steady_clock::now();
-        int s = (d % 2) ? 0 : 1;
-        parallel_for(ps_, opt_.threads, [this, s, d](uint64_t begin, uint64_t end) {
-            std::vector<PlacedPiece> pp;
-            Board b;
-            for (uint64_t c = begin; c < end; ++c) {
-                if (dtm_[s][c] != d) continue;
-                if (!idx_.decode(c, pp))
-                    throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": solved cell does not decode");
-                b.reset(pp, (Color)s);
-                unsigned total = 0;
-                try {
-                    for (const Move& m : b.legal_moves()) {
-                        b.make(m);
-                        ValuePair v = eval_board(b, [this, &pp](Board& x) { return lookup_epless(x, pp); });
-                        b.unmake(m);
-                        if (v.dtm == d - 1) total = std::min(255u, total + (unsigned)v.count);
-                    }
-                } catch (const GeneratorLookupError& e) {
-                    throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": " + e.what());
-                } catch (const std::out_of_range& e) {  // TableReader::get bounds guard
-                    throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": " + e.what());
-                }
-                cnt_[s][c] = (uint8_t)total;  // >= 1 by construction of dtm
-            }
-        });
-        // Reported from the coordinating thread at a pass boundary only --
-        // the worker loop above is untouched by any progress bookkeeping.
-        if (opt_.progress)
-            std::cerr << "  " << mat_.name() << ": count sweep d=" << d << "/" << max_dtm_ << " done ("
-                      << secs_since(t0) << " s)\n";
-    }
 }
 
 const std::vector<uint8_t>& SliceGen::dtm(Color stm) const { return dtm_[(int)stm]; }
@@ -201,10 +157,10 @@ ValuePair SliceGen::lookup_epless(Board& b, std::vector<PlacedPiece>& piece_scra
 
 bool SliceGen::scan_pass(int d) {
     // Safety argument for running this pass's cell loop across worker threads:
-    // pass d writes only the value d, and only into currently-UNSET cells of
-    // ONE plane (dtm_[s], s = mover's side); it reads (a) the opposite-parity
-    // plane, which this pass never writes -- a cell's successors after one
-    // ply always have the other side to move -- (b) finished sub-tables
+    // pass d writes DTM and count only into currently-UNSET cells of ONE
+    // plane (s = mover's side); it reads (a) the opposite-parity plane,
+    // whose lower-depth DTM/count pairs are final after the previous pass
+    // (successors after one ply have the other side to move), (b) finished sub-tables
     // (read-only after load_for(), before any pass runs), and (c) same-plane
     // values only to check DTM_UNSET (never written by another cell). So two
     // workers touching different cells c1 != c2 never read-during-write or
@@ -226,19 +182,24 @@ bool SliceGen::scan_pass(int d) {
             if (!idx_.decode(c, pp))  // UNSET cells always decode
                 throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": UNSET cell does not decode");
             b.reset(pp, mover);
-            // Catch here rather than tracking the current cell in a variable: zero-cost EH puts
-            // nothing on the happy path. (The unchanged-instruction-sequence argument applies to
-            // this scan_pass loop only; count_sweep's identical wrapper makes no such claim.)
+            // Catch here rather than tracking the current cell in a variable:
+            // zero-cost EH puts nothing on the happy path.
             try {
+                unsigned total = 0;
+                bool found = false;
                 for (const Move& m : b.legal_moves()) {
                     b.make(m);
                     ValuePair v = eval_board(b, [this, &pp](Board& x) { return lookup_epless(x, pp); });
                     b.unmake(m);
                     if (v.dtm == d - 1) {
-                        dtm_[s][c] = (uint8_t)d;
-                        ++local;
-                        break;
+                        found = true;
+                        total = std::min(255u, total + (unsigned)v.count);
                     }
+                }
+                if (found) {
+                    dtm_[s][c] = (uint8_t)d;
+                    cnt_[s][c] = (uint8_t)total;
+                    ++local;
                 }
             } catch (const GeneratorLookupError& e) {
                 throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": " + e.what());
@@ -489,7 +450,6 @@ std::vector<std::string> generate(const Material& root, const GenOptions& opt_in
         auto t0 = std::chrono::steady_clock::now();
         SliceGen g(m, opt);
         g.run_all_passes();
-        g.count_sweep();
         g.finalize_and_write();
         if (opt.verbose) {
             int md = g.max_dtm() < 0 ? (int)DTM_UNSOLVABLE : g.max_dtm();
