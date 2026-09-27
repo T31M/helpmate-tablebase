@@ -164,47 +164,61 @@ bool SliceGen::scan_pass(int d) {
     // (read-only after load_for(), before any pass runs), and (c) same-plane
     // values only to check DTM_UNSET (never written by another cell). So two
     // workers touching different cells c1 != c2 never read-during-write or
-    // write-during-write each other's data. Each worker owns a disjoint cell
-    // range (and its own Board/pp, since Board is stateful); the only shared
-    // mutable state is `resolved`, a counter each worker adds its private
-    // per-chunk tally to exactly once, after its cell loop -- so the hot loop
-    // itself carries no locks, IO, or shared atomic traffic.
+    // write-during-write each other's data. The atomic cursor gives each
+    // worker disjoint tiles; Board/pp stay private and are reused across its
+    // tiles. Each worker adds its local resolved count only once after its
+    // cell loop. Each depth joins before the next reads its counts.
     auto t0 = std::chrono::steady_clock::now();
     Color mover = (d % 2) ? Color::White : Color::Black;
     int s = (int)mover;
     std::atomic<uint64_t> resolved{0};
-    parallel_for(ps_, opt_.threads, [this, s, mover, d, &resolved](uint64_t begin, uint64_t end) {
+    // Match parallel_for's old behavior for tiny planes: never start more
+    // workers than there are cells to visit.
+    const int workers = (int)std::min<uint64_t>((uint64_t)std::max(1, opt_.threads),
+                                                std::max<uint64_t>(1, ps_));
+    // Four coarse tiles per worker on average preserve locality in the expensive
+    // early depths while still allowing idle workers to help at later depths.
+    const uint64_t target_tiles = (uint64_t)workers * 4;
+    const uint64_t tile_cells = workers == 1 ? std::max<uint64_t>(1, ps_)
+                                             : std::max<uint64_t>(1, ps_ / target_tiles + (ps_ % target_tiles != 0));
+    std::atomic<uint64_t> next_cell{0};
+    parallel_for(workers, workers, [this, s, mover, d, &resolved, &next_cell, tile_cells](uint64_t, uint64_t) {
         std::vector<PlacedPiece> pp;
         Board b;
         uint64_t local = 0;
-        for (uint64_t c = begin; c < end; ++c) {
-            if (dtm_[s][c] != DTM_UNSET) continue;
-            if (!idx_.decode(c, pp))  // UNSET cells always decode
-                throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": UNSET cell does not decode");
-            b.reset(pp, mover);
-            // Catch here rather than tracking the current cell in a variable:
-            // zero-cost EH puts nothing on the happy path.
-            try {
-                unsigned total = 0;
-                bool found = false;
-                for (const Move& m : b.legal_moves()) {
-                    b.make(m);
-                    ValuePair v = eval_board(b, [this, &pp](Board& x) { return lookup_epless(x, pp); });
-                    b.unmake(m);
-                    if (v.dtm == d - 1) {
-                        found = true;
-                        total = std::min(255u, total + (unsigned)v.count);
+        for (;;) {
+            uint64_t begin = next_cell.fetch_add(tile_cells, std::memory_order_relaxed);
+            if (begin >= ps_) break;
+            uint64_t end = std::min(ps_, begin + tile_cells);
+            for (uint64_t c = begin; c < end; ++c) {
+                if (dtm_[s][c] != DTM_UNSET) continue;
+                if (!idx_.decode(c, pp))  // UNSET cells always decode
+                    throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": UNSET cell does not decode");
+                b.reset(pp, mover);
+                // Catch here rather than tracking the current cell in a variable:
+                // zero-cost EH puts nothing on the happy path.
+                try {
+                    unsigned total = 0;
+                    bool found = false;
+                    for (const Move& m : b.legal_moves()) {
+                        b.make(m);
+                        ValuePair v = eval_board(b, [this, &pp](Board& x) { return lookup_epless(x, pp); });
+                        b.unmake(m);
+                        if (v.dtm == d - 1) {
+                            found = true;
+                            total = std::min(255u, total + (unsigned)v.count);
+                        }
                     }
+                    if (found) {
+                        dtm_[s][c] = (uint8_t)d;
+                        cnt_[s][c] = (uint8_t)total;
+                        ++local;
+                    }
+                } catch (const GeneratorLookupError& e) {
+                    throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": " + e.what());
+                } catch (const std::out_of_range& e) {  // TableReader::get bounds guard
+                    throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": " + e.what());
                 }
-                if (found) {
-                    dtm_[s][c] = (uint8_t)d;
-                    cnt_[s][c] = (uint8_t)total;
-                    ++local;
-                }
-            } catch (const GeneratorLookupError& e) {
-                throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": " + e.what());
-            } catch (const std::out_of_range& e) {  // TableReader::get bounds guard
-                throw GeneratorLookupError(cell_context(mat_, c, s, d) + ": " + e.what());
             }
         }
         if (local) resolved.fetch_add(local, std::memory_order_relaxed);
