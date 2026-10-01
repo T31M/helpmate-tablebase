@@ -22,10 +22,13 @@ BOT_NOTE = ("*Updated automatically from the dataset and the other claims — "
             "you no longer need to keep a status list in the issue by hand.*")
 
 
-def _names(text: str) -> list[str]:
+def _names(text: str, explicit_only: bool = False) -> list[str]:
     out: list[str] = []
     for tok in _NAME.findall(text):
-        out += expand(tok) if "?" in tok else ([tok] if canonical(tok) == tok else [])
+        if "?" in tok:
+            out += [] if explicit_only else expand(tok)
+        elif canonical(tok) == tok:
+            out.append(tok)
     return out
 
 
@@ -38,6 +41,12 @@ def parse_claim(text: str) -> tuple[list[str], list[str]]:
     released = _names(" ".join(_STRUCK.findall(text or "")))
     claimed = set(_names(_STRUCK.sub(" ", text or ""))) - set(released)
     return _ordered(claimed), _ordered(released)
+
+
+def explicit_names(text: str) -> set[str]:
+    """The claimed materials named as a plain canonical name, not via a `?` wildcard."""
+    released = set(_names(" ".join(_STRUCK.findall(text or ""))))
+    return set(_names(_STRUCK.sub(" ", text or ""), explicit_only=True)) - released
 
 
 def _sections(body: str) -> dict[str, str]:
@@ -72,6 +81,7 @@ class Claim:
     hf: str | None = None          # the claim form's fields; None / False on a free-text claim
     credit: str | None = None
     anonymous: bool = False
+    explicit: set[str] = field(default_factory=set)   # named plainly, not only via a `?` wildcard
 
 
 class ClaimIndex:
@@ -93,7 +103,7 @@ def load_index(gh) -> ClaimIndex:
         body = i.get("body") or ""
         mats, rel = parse_claim(f"{i['title']}\n{body}")
         out.append(Claim(i["number"], i["user"]["login"], i["created_at"], mats, rel, body,
-                         *parse_form(body)))
+                         *parse_form(body), explicit=explicit_names(f"{i['title']}\n{body}")))
     return ClaimIndex(out)
 
 
@@ -195,6 +205,8 @@ def _update_claim(c: Claim, index: ClaimIndex, statuses: dict[str, Status], in_r
             conflicts.append(f"{m} is already claimed in #{first.issue}")
         s = statuses[m]
         if s.state == "done":
+            if m not in c.explicit:
+                continue        # only covered by a wildcard: listed as done, not a conflict
             entry = registry.tables.get(m)
             if entry is None:
                 conflicts.append(f"{m} is already in the dataset")

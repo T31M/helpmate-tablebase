@@ -8,9 +8,11 @@
 # test-site, which runs render_site.py then the site's node tests.
 #
 # site/data/status.json (state per material, contributors) is the one file
-# built here, daily and on every deploy, and never committed: it comes from
-# the dataset and the claim issues. If that step fails the site still
-# deploys and says the state is unavailable.
+# built here, daily, on every deploy and after every Claims run, and never
+# committed: it comes from the dataset and the claim issues, so a new claim
+# shows on the site within minutes. The workflow_run trigger fires whatever
+# the Claims run's conclusion was: the site build does not depend on it. If
+# that step fails the site still deploys and says the state is unavailable.
 name: Pages
 
 on:
@@ -26,6 +28,9 @@ on:
       - "src/packages/api/helpmate_server/contrib/**"
   schedule:
     - cron: "23 4 * * *"
+  workflow_run:
+    workflows: [Claims]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +45,9 @@ concurrency:
 
 jobs:
   build:
+    # A Claims run skipped for an unrelated issue/comment still completes:
+    # do not rebuild for it. Success and failure runs rebuild.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
