@@ -7,6 +7,13 @@
       "display": "T31M",
       "anonymous": false,
       "note": "king, rook and bishop against every three-man Black set, 120 GiB compressed, computed on a 192-thread, 369 GiB machine. The pawn tables need about 85 GiB of RAM each. KRBvkqp and KRBvkrp tie the deepest mate in the corpus, h#17."
+    },
+    "popeye37": {
+      "github": "popeye37",
+      "hf": "popeye37",
+      "display": "popeye37",
+      "anonymous": false,
+      "note": ""
     }
   },
   "tables": {
@@ -129,6 +136,21 @@
       "merged": "2026-09-26",
       "generator_version": "0.19.0",
       "verification": null
+    },
+    "KRRvkqq": {
+      "contributor": "popeye37",
+      "hf_pr": 2,
+      "claim": 39,
+      "merged": "2026-10-01",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "93a8a3c3177f08c9bc59e70ebdbe377eb106cafb",
+        "date": "2026-10-01",
+        "samples": 2000,
+        "seed": 409664041,
+        "result": "pass"
+      }
     }
   }
 }

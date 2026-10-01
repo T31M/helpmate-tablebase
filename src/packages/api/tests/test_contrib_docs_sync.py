@@ -91,7 +91,8 @@ def test_contributor_table_lists_t31m():
     reg = Registry.load(REPO / "data" / "contributions.json")
     st, reg = _statuses(set(reg.tables))
     table = render_contributors(reg, st)
-    assert "T31M" in table and "15" in table and "KRBvkqq" in table
+    n = len([m for m in reg.tables_of("T31M") if st[m].state == "done"])   # grows as T31M contributes
+    assert "T31M" in table and f"| {n}: " in table and "KRBvkqq" in table
     assert "PR #1" in table and "h#17" in table
 
 
@@ -113,7 +114,14 @@ def test_sync_rewrites_spans_writes_files_and_closes_finished_claims(tmp_path):
     issue = {"number": 7, "title": "Claim: KQvk", "body": "", "user": {"login": "bob"},
              "created_at": "2026-09-01T00:00:00Z"}
     gh = FakeGitHub([issue])
-    reg = Registry.load(REPO / "data" / "contributions.json")
+    # A registry of its own: the real data/contributions.json grows with every
+    # accepted contribution, and this test must not pin its contents.
+    (tmp_path / "data" / "contributions.json").write_text(json.dumps({
+        "schema": 1,
+        "contributors": {"T31M": {"github": "T31M", "hf": "T31M", "display": "T31M"}},
+        "tables": {"KRBvkqq": {"contributor": "T31M", "hf_pr": 1, "claim": 41, "merged": "2026-09-26",
+                               "generator_version": "0.19.0", "verification": None}}}))
+    reg = Registry.load(tmp_path / "data" / "contributions.json")
     written = sync(tmp_path, hub, gh, reg, tmp_path)
     assert (tmp_path / "README.md").read_text() == "n=<!-- contrib:tables -->2<!-- /contrib -->\n"
     assert {p.name for p in written} >= {"materials.json", "corpus.json", ".all-contributorsrc",

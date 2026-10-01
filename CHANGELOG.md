@@ -23,6 +23,7 @@ bumps may change behavior).
   record behind it.
 
 ### Data
+- KRRvkqq contributed by popeye37 (dataset PR #2, claim #39).
 - Marker tables for every six-piece class in which no helpmate exists: the 70
   with a bare White king (Kvk...) and KBvkrrr, KNvkqqq, published to the
   dataset. Six-piece progress is now counted over all 715 classes, markers

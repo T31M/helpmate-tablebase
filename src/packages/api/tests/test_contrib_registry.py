@@ -66,6 +66,8 @@ def test_record_and_save_roundtrip(tmp_path):
 
 def test_seeded_registry_credits_t31m_with_fifteen_tables():
     reg = Registry.load(REPO_ROOT / "data" / "contributions.json")
-    assert len(reg.tables_of("T31M")) == 15
-    assert all(reg.tables[m]["hf_pr"] == 1 and reg.tables[m]["claim"] == 41
-               for m in reg.tables_of("T31M"))
+    # the seeded record: T31M's KRB set from dataset PR #1 (later contributions add more)
+    seeded = [m for m in reg.tables_of("T31M") if reg.tables[m]["hf_pr"] == 1]
+    assert sorted(seeded) == sorted(f"KRBvk{b}" for b in
+                                    "qq qr qb qn rr rb rn bb bn nn qp rp bp np pp".split())
+    assert all(reg.tables[m]["claim"] == 41 for m in seeded)
