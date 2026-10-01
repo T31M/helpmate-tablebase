@@ -13,6 +13,9 @@ const screens = {
   puzzles: { init: initPuzzles, data: ["puzzles"] },
   materials: { init: initMaterials, data: ["materials", "corpus", "status"] },
 };
+// Deploy stamp: CI (tools/stamp_site.py) rewrites this exact line to
+// `const V = "?v=<commit>";` so data fetches cannot mix with a stale cache.
+const V = "";
 const loaded = {};
 const cache = {};
 
@@ -22,7 +25,7 @@ const OPTIONAL = { status: validStatus };
 
 async function data(name) {
   if (!cache[name]) {
-    const req = fetch(`data/${name}.json`).then((r) => {
+    const req = fetch(`data/${name}.json${V}`).then((r) => {
       if (!r.ok) throw new Error(`${name}.json: HTTP ${r.status}`);
       return r.json();
     });

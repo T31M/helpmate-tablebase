@@ -63,6 +63,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Assemble and test the site
         run: make test-site
+      # Pages caches everything for ten minutes; without a per-deploy query a
+      # browser can pair an old js file with the new index.html. Stamps the
+      # artifact only, never the committed sources.
+      - name: Stamp the site with the deploy version
+        run: python3 tools/stamp_site.py site "${GITHUB_SHA::12}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

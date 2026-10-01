@@ -69,9 +69,9 @@ def mateable_classes(pieces: int) -> int:
 
     A bare white king cannot deliver mate, so every class where White has
     nothing but the king is empty by construction -- there is no problem in
-    it to show and no table worth generating. Subtracting them is what turns
-    the raw 715 six-man classes into the 645 this project counts as needing a
-    real table (README.md, docs/CONTRIBUTING-TABLES.md).
+    it to show. Subtracting them turns the raw 715 six-man classes into the
+    645 that can hold a problem. (README.md counts progress over all 715: the
+    bare-king classes are published as marker tables and count as done there.)
     """
     if pieces < 3:
         return 0

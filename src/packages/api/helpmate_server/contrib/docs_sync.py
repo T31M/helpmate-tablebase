@@ -35,12 +35,14 @@ def replace_spans(text: str, values: dict[str, str]) -> str:
 class CorpusFacts:
     files: dict[str, dict]
     max_dtm: int
-    cells: int
+    cells: int  # plane cells of the tables that hold data (markers excluded)
+    markers: frozenset[str] = frozenset()  # tables proving no helpmate exists
 
     @classmethod
     def from_manifest(cls, manifest: dict, tables: Path) -> "CorpusFacts":
         files = manifest.get("files", {})
         max_dtm, cells = 0, 0
+        markers: set[str] = set()
         sidecars = [n for n in files if n.endswith(".stats.json")]
         missing = [n for n in sidecars if not (tables / n).exists()]
         if missing:
@@ -49,24 +51,29 @@ class CorpusFacts:
                             "point --tables at a complete corpus")
         for name in sidecars:
             sc = json.loads((tables / name).read_text())
-            cells += 2 * int(sc["plane_size"])
-            if sc["max_dtm"] < 253:
+            if sc.get("all_unsolvable") or sc["max_dtm"] >= 253:
+                markers.add(name[:-len(".stats.json")])
+            else:
+                cells += 2 * int(sc["plane_size"])  # a marker stores a verdict, not cells
                 max_dtm = max(max_dtm, int(sc["max_dtm"]))
-        return cls(files, max_dtm, cells)
+        return cls(files, max_dtm, cells, frozenset(markers))
 
     def done(self) -> set[str]:
         return {f[:-3] for f in self.files if f.endswith(".hm")}
 
     def values(self) -> dict[str, str]:
         done = self.done()
-        six_real = [m for m in universe() if m.pieces == 6 and not m.bare_king]
-        missing = [m for m in six_real if m.name not in done]
+        six = [m for m in universe() if m.pieces == 6]
+        missing = [m for m in six if m.name not in done]
         v = {"tables": str(len(done)),
+             "tables-real": str(len(done - self.markers)),
              "gib": f"{sum(x['size'] for x in self.files.values()) / 2**30:.1f}",
              "cells-billion": f"{self.cells / 1e9:.1f}",
              # 34 plies = h#17 (Black starts); 33 plies = h#16.5 (White starts)
              "deepest": f"h#{self.max_dtm // 2}" + (".5" if self.max_dtm % 2 else ""),
-             "six-done": str(len(six_real) - len(missing)),
+             "six-total": str(len(six)),
+             "six-done": str(len(six) - len(missing)),
+             "six-empty": str(sum(m.name in self.markers and m.name in done for m in six)),
              "six-open": str(len(missing))}
         for p in range(5):
             v[f"six-open-p{p}"] = str(sum(m.pawns == p for m in missing))

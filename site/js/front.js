@@ -13,7 +13,7 @@ export async function initFront({ corpus, deepest, status }) {
     ["positions with a helpmate", fmt(corpus.solvable)],
     ["with a unique solution", fmt(corpus.unique)],
     ["deepest mate", `${stipulation(corpus.deepest.dtm)} (${corpus.deepest.material})`],
-    ["six-piece classes", `${six} of 645`],
+    ["six-piece classes", `${six} of 715`],
   ];
   dl.innerHTML = items.map(([k, v]) => `<div><dd>${v}</dd><dt>${k}</dt></div>`).join("");
   document.getElementById("build-note").textContent =

@@ -112,7 +112,7 @@ export function contributorCards(status) {
 export function sixProgress(status, corpus) {
   const s = status && status.counts ? status.counts.six : null;
   const complete = s && STATES.every((k) => Number.isFinite(s[k]));
-  if (!complete) return `Six men: ${(corpus.by_pieces || {})[6] || 0} of 645 done.`;
+  if (!complete) return `Six men: ${(corpus.by_pieces || {})[6] || 0} of 715 done.`;
   return `Six men: ${Number(s.done)} done, ${Number(s["in review"])} in review, ` +
-    `${Number(s.claimed)} claimed, ${Number(s.open)} open of 645.`;
+    `${Number(s.claimed)} claimed, ${Number(s.open)} open of 715.`;
 }

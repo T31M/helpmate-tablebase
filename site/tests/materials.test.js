@@ -141,13 +141,13 @@ test("contributor cards escape names and link profiles unless anonymous", () => 
 test("six-piece progress with and without status", () => {
   const status = { counts: { six: { done: 46, "in review": 30, claimed: 50, open: 519, "not needed": 70 } } };
   assert.equal(sixProgress(status, { by_pieces: { 6: 46 } }),
-    "Six men: 46 done, 30 in review, 50 claimed, 519 open of 645.");
-  assert.equal(sixProgress(null, { by_pieces: { 6: 31 } }), "Six men: 31 of 645 done.");
+    "Six men: 46 done, 30 in review, 50 claimed, 519 open of 715.");
+  assert.equal(sixProgress(null, { by_pieces: { 6: 31 } }), "Six men: 31 of 715 done.");
 });
 
 test("six-piece progress falls back on a malformed status", () => {
   const corpus = { by_pieces: { 6: 31 } };
-  const fallback = "Six men: 31 of 645 done.";
+  const fallback = "Six men: 31 of 715 done.";
   assert.equal(sixProgress({ counts: {} }, corpus), fallback);
   assert.equal(sixProgress({ counts: { six: { done: 1, open: 2 } } }, corpus), fallback);
   assert.ok(!sixProgress({ counts: { six: { done: 1 } } }, corpus).includes("undefined"));

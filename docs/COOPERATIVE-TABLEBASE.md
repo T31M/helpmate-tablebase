@@ -22,7 +22,8 @@ adversarial tablebases never needed: the **number of distinct optimal
 solutions**. For every legal position in a material class the table stores
 distance to mate and how many shortest mating lines tie. `count = 1` is a
 sound problem; anything else is a dual. The corpus is currently complete
-through five pieces, with <!-- contrib:six-done -->31<!-- /contrib --> of the 645 six-piece classes done.
+through five pieces, with <!-- contrib:six-done -->103<!-- /contrib --> of the <!-- contrib:six-total -->715<!-- /contrib --> six-piece classes done
+(<!-- contrib:six-empty -->75<!-- /contrib --> of them proven empty by marker tables).
 
 ```
 $ helpmate mine KQvk --dtm 2 --count 1 --max 3
@@ -98,14 +99,12 @@ plane scan about 2.3×.
 
 ## What the data says
 
-Across the <!-- contrib:tables -->317<!-- /contrib --> tables there are <!-- contrib:cells-billion -->713.9<!-- /contrib --> billion plane cells. Just over half are
-illegal positions the dense index has to reserve room for, 10.0 % are legal
-but unsolvable, 39.3 % have a helpmate, and of those 6.4 % have a unique
-solution. The fifteen KRB six-piece tables are more than half of all cells,
+Across the <!-- contrib:tables-real -->249<!-- /contrib --> tables that hold data there are <!-- contrib:cells-billion -->651.8<!-- /contrib --> billion plane cells (marker tables are left out: they store a verdict, not cells). Just over half, 55.5 %, are illegal positions the dense index has to reserve room for, 1.4 % are legal but unsolvable, 43.1 % have a helpmate, and of those 6.4 % have a unique solution.
+The fifteen KRB six-piece tables are more than half of all cells,
 so they pull these shares their way: with the extra white pieces far more
 positions can be mated. Across the first 302 tables the figures were
 343.0 billion cells, 20.7 % unsolvable, 27.7 % with a helpmate, and 2.9 %
-of those unique.
+of those unique (markers then still counted as unsolvable cells).
 
 The deepest mate is h#17, shared by KBvkqp, KRBvkqp and KRBvkrp. In KBvkqp:
 
@@ -144,8 +143,8 @@ checked cheaply.
 ## Limits, and the open call
 
 Seven pieces need about 2 TB resident and an out-of-core generator that does
-not exist. Six pieces need a machine, not a redesign: **<!-- contrib:six-open -->614<!-- /contrib --> six-piece classes
-have never been computed, and <!-- contrib:six-open-p0 -->269<!-- /contrib --> of them fit in 32 GiB and take about a day
+not exist. Six pieces need a machine, not a redesign: **<!-- contrib:six-open -->612<!-- /contrib --> six-piece classes
+have never been computed, and <!-- contrib:six-open-p0 -->267<!-- /contrib --> of them fit in 32 GiB and take about a day
 each.** Contributions arrive as pull requests on the dataset
 (`helpmate-tables push --create-pr`), and every merged table is credited.
 Regenerating an existing class and reporting whether the sha256 matches is a

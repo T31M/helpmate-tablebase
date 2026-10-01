@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -22,12 +23,63 @@ def test_replace_spans():
         replace_spans("<!-- contrib:nope -->1<!-- /contrib -->", {})
 
 
+def _fake_corpus(tmp_path):
+    """Two real six-piece tables, a marker with a real White piece, a bare-king
+    marker, a five-piece table and a five-piece marker."""
+    files, sidecars = {}, {
+        "KQRvkqr": {"plane_size": 10, "max_dtm": 20},
+        "KRRvkqr": {"plane_size": 10, "max_dtm": 30},
+        "KBvkrrr": {"plane_size": 10, "max_dtm": 0, "all_unsolvable": True},
+        "Kvkqqqq": {"plane_size": 10, "max_dtm": 255},       # marker by max_dtm alone
+        "KQvk": {"plane_size": 5, "max_dtm": 10},
+        "KBvkn": {"plane_size": 5, "max_dtm": 0, "all_unsolvable": True},
+    }
+    for name, sc in sidecars.items():
+        files[f"{name}.hm"] = {"size": 2**30}
+        files[f"{name}.stats.json"] = {"size": 1}
+        (tmp_path / f"{name}.stats.json").write_text(json.dumps({"material": name, **sc}))
+    return {"files": files}
+
+
+def test_six_piece_counts_use_the_715_frame(tmp_path):
+    f = CorpusFacts.from_manifest(_fake_corpus(tmp_path), tmp_path)
+    v = f.values()
+    assert v["six-total"] == "715"
+    assert v["six-done"] == "4"          # KQRvkqr KRRvkqr KBvkrrr Kvkqqqq; five-piece ones do not count
+    assert v["six-empty"] == "2"         # KBvkrrr, Kvkqqqq
+    assert v["six-open"] == "711"
+    # missing by pawns: 715 six-piece classes, 4 done (all pawnless)
+    from helpmate_server.contrib.materials import universe
+    by_p = [sum(m.pieces == 6 and m.pawns == p for m in universe()) for p in range(5)]
+    assert [int(v[f"six-open-p{p}"]) for p in range(5)] == [by_p[0] - 4, *by_p[1:]]
+    assert v["tables"] == "6"
+    # markers store a verdict, not cells: only the three real tables count
+    assert v["tables-real"] == "3"
+    assert v["cells-billion"] == f"{2 * (10 + 10 + 5) / 1e9:.1f}"
+    assert f.cells == 50
+    # the deepest ignores markers
+    assert v["deepest"] == "h#15"
+
+
+def test_bare_king_table_missing_counts_as_open(tmp_path):
+    m = _fake_corpus(tmp_path)
+    del m["files"]["Kvkqqqq.hm"], m["files"]["Kvkqqqq.stats.json"]
+    v = CorpusFacts.from_manifest(m, tmp_path).values()
+    assert (v["six-done"], v["six-empty"], v["six-open"]) == ("3", "1", "712")
+
+
 @pytest.mark.skipif(not (CORPUS / "manifest.json").exists(), reason="needs the real corpus")
-def test_facts_reproduce_the_v0_20_0_numbers():
+def test_real_corpus_six_piece_invariants():
     f = CorpusFacts.from_manifest(json.loads((CORPUS / "manifest.json").read_text()), CORPUS)
     v = f.values()
-    assert (v["tables"], v["gib"], v["six-done"], v["six-open"], v["six-open-p0"],
-            v["deepest"], v["cells-billion"]) == ("317", "172.5", "31", "614", "269", "h#17", "713.9")
+    done, empty, opened = int(v["six-done"]), int(v["six-empty"]), int(v["six-open"])
+    assert v["six-total"] == "715"
+    assert done + opened == 715
+    assert sum(int(v[f"six-open-p{p}"]) for p in range(5)) == opened
+    assert 0 <= empty <= done
+    assert 0 < int(v["tables-real"]) <= int(v["tables"])
+    assert int(v["tables-real"]) == int(v["tables"]) - len(f.markers & f.done())
+    assert re.fullmatch(r"h#\d+(\.5)?", v["deepest"])
 
 
 def _statuses(done):

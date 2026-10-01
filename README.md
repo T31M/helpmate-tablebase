@@ -6,7 +6,7 @@ point at one position — a table that already knows the answer for all of them.
 Complete through five pieces. MIT licensed. The tables are a free download.
 
 > [!IMPORTANT]
-> **<!-- contrib:six-open -->614<!-- /contrib --> six-piece tablebases have never been computed, and <!-- contrib:six-open-p0 -->269<!-- /contrib --> of them need
+> **<!-- contrib:six-open -->612<!-- /contrib --> six-piece tablebases have never been computed, and <!-- contrib:six-open-p0 -->267<!-- /contrib --> of them need
 > only 32 GiB of RAM and about a day of CPU each.** If you have a machine that
 > idles overnight, you can compute something nobody ever has — and get credited
 > for it.
@@ -73,10 +73,10 @@ Generation is a one-off cost. Every query afterwards is a table lookup.
 | --- | --- | --- |
 | 2–4 | 66 | **complete** |
 | 5 | 220 | **complete** |
-| 6 | 645 | <!-- contrib:six-done -->31<!-- /contrib --> done, <!-- contrib:six-open -->614<!-- /contrib --> to go |
+| 6 | <!-- contrib:six-total -->715<!-- /contrib --> | <!-- contrib:six-done -->103<!-- /contrib --> done (<!-- contrib:six-empty -->75<!-- /contrib --> proven empty), <!-- contrib:six-open -->612<!-- /contrib --> to go |
 | 7+ | — | needs an out-of-core generator that does not exist |
 
-**<!-- contrib:tables -->317<!-- /contrib --> tables, <!-- contrib:gib -->172.5<!-- /contrib --> GiB** block-compressed, published as a Hugging Face
+**<!-- contrib:tables -->389<!-- /contrib --> tables, <!-- contrib:gib -->172.5<!-- /contrib --> GiB** block-compressed, published as a Hugging Face
 dataset. The deepest mate in the corpus is <!-- contrib:deepest -->h#17<!-- /contrib -->.
 
 Fifteen of the six-piece tables — king, rook and bishop against every
@@ -121,7 +121,7 @@ each class the first time someone asks for it.
 Six hundred machine-days of work remain at six pieces, and it will not come
 from one desk.
 
-**<!-- contrib:six-open-p0 -->269<!-- /contrib --> of the missing tables need only 32 GiB of RAM** and about a day each.
+**<!-- contrib:six-open-p0 -->267<!-- /contrib --> of the missing tables need only 32 GiB of RAM** and about a day each.
 If you have a machine that idles overnight, you can compute something nobody
 ever has. Contributions land as pull requests on the dataset, and every
 merged table is credited.

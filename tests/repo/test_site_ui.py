@@ -134,7 +134,7 @@ def test_front_contributors(site, browser, width):
     if has_status:
         assert "<b>bold</b>" in page.inner_text("#contrib-cards")
         assert page.locator("#contrib-cards b").count() == 0
-    assert "of 645" in page.inner_text("#contrib-progress")
+    assert "of 715" in page.inner_text("#contrib-progress")
     assert page.evaluate(NO_HSCROLL)
     page.close()
 

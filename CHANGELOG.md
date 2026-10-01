@@ -22,6 +22,20 @@ bumps may change behavior).
   contributor section on the front page; `data/contributions.json` is the
   record behind it.
 
+### Data
+- Marker tables for every six-piece class in which no helpmate exists: the 70
+  with a bare White king (Kvk...) and KBvkrrr, KNvkqqq, published to the
+  dataset. Six-piece progress is now counted over all 715 classes, markers
+  included; the docs and the site say how many of the done classes are proven
+  empty.
+
+### Fixed
+- Site: after a deploy a browser could pair a cached old `js/materials.js`
+  (GitHub Pages sends `max-age=600`) with the new `index.html`, and the
+  Materials screen crashed ("Cannot read properties of null"). The Pages
+  workflow now runs `tools/stamp_site.py`, which appends `?v=<commit>` to
+  every script, stylesheet, module import and data fetch of the built site.
+
 ### Changed
 - Corpus counts in README, CONTRIBUTING-TABLES, COOPERATIVE-TABLEBASE and the
   dataset card are generated (`helpmate-tables sync`).
