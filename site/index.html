@@ -59,6 +59,17 @@
         <div class="readout" id="front-readout"></div>
       </div>
     </div>
+    <section class="contributors" id="front-contributors">
+      <h2>Contributors</h2>
+      <p>Six-piece tables are computed by volunteers on their own machines. Thank you.</p>
+      <div class="cards" id="contrib-cards"></div>
+      <p id="contrib-progress"></p>
+      <p class="links">
+        <a href="#/materials?state=open&amp;prio=1">Open materials, priority P1 →</a> ·
+        <a href="https://github.com/osick/helpmate-tablebase/issues/new?template=claim.yml">Claim a material</a> ·
+        <a href="https://github.com/osick/helpmate-tablebase/blob/main/docs/CONTRIBUTING-TABLES.md">How to compute a table</a>
+      </p>
+    </section>
   </section>
 
   <section id="screen-deepest" hidden>
@@ -139,26 +150,30 @@
   </section>
 
   <section id="screen-materials" hidden>
-    <h1>The corpus, table by table</h1>
+    <h1>Every material, three to six men</h1>
     <p class="lede" id="materials-lede"></p>
-    <div class="controls">
-      <label>Pieces
-        <select id="materials-pieces">
-          <option value="all">all</option>
-          <option value="2">2</option><option value="3">3</option><option value="4">4</option>
-          <option value="5">5</option><option value="6">6</option>
-        </select>
-      </label>
+    <p class="status-line" id="materials-asof"></p>
+    <div class="controls" id="materials-controls">
+      <label>Men <select data-f="pieces"><option value="all">all</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+      <label>State <select data-f="state"><option value="all">all</option><option>open</option><option>claimed</option><option>in review</option><option>done</option><option>not needed</option></select></label>
+      <label>Priority <select data-f="prio"><option value="all">all</option><option value="1">P1</option><option value="2">P2</option><option value="3">P3</option><option value="4">P4</option></select></label>
+      <label>Pawns <select data-f="pawns"><option value="all">all</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+      <label>Contributor <select data-f="contributor"><option value="all">all</option></select></label>
+      <label>Name <input data-f="q" type="search" placeholder="KQvk???" size="10" spellcheck="false"></label>
       <span class="count" id="materials-count"></span>
     </div>
+    <div class="table-scroll">
     <table class="data sortable" id="materials-table">
       <thead><tr>
-        <th data-key="material">class</th><th data-key="pieces">men</th>
+        <th data-key="material">material</th><th data-key="pieces">men</th>
+        <th data-key="priority">priority</th><th data-key="state">state</th>
+        <th data-key="contributor">contributor</th><th data-key="ram_gib">RAM</th>
         <th data-key="max_dtm">longest mate</th><th data-key="solvable">positions with a helpmate</th>
         <th data-key="unique">with a unique one</th><th data-key="size_bytes">table</th>
       </tr></thead>
       <tbody></tbody>
     </table>
+    </div>
   </section>
 </main>
 

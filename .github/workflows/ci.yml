@@ -115,7 +115,7 @@ jobs:
       - name: Install all three distributions
         run: |
           python -m pip install .[dev]
-          python -m pip install './src/packages/api[dev]' './src/packages/web[dev]'
+          python -m pip install './src/packages/api[dev,verify]' './src/packages/web[dev]'
 
       # Slow tests (exhaustive KQvk cross-check, ~10 min) need --run-slow and
       # are skipped by default via src/packages/bindings/tests/conftest.py.
@@ -151,7 +151,7 @@ jobs:
       - name: Install all three distributions
         run: |
           python -m pip install .[dev]
-          python -m pip install './src/packages/api[dev]' './src/packages/web[dev]'
+          python -m pip install './src/packages/api[dev,verify]' './src/packages/web[dev]'
 
       # Browsers are cached; --with-deps installs the system libraries the
       # runner image lacks. The cache key follows the playwright version so a

@@ -6,6 +6,11 @@
 # site/vendor AND runs tools/render_site.py, which generates the 302 material
 # pages and the theme index from that committed JSON. The gate is make
 # test-site, which runs render_site.py then the site's node tests.
+#
+# site/data/status.json (state per material, contributors) is the one file
+# built here, daily and on every deploy, and never committed: it comes from
+# the dataset and the claim issues. If that step fails the site still
+# deploys and says the state is unavailable.
 name: Pages
 
 on:
@@ -17,12 +22,17 @@ on:
       - "src/packages/web/helpmate_web/static/vendor/**"
       - ".github/workflows/pages.yml"
       - "Makefile"
+      - "data/contributions.json"
+      - "src/packages/api/helpmate_server/contrib/**"
+  schedule:
+    - cron: "23 4 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  issues: read
 
 concurrency:
   group: pages
@@ -36,6 +46,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # State per material (done / in review / claimed / ...) and the
+      # contributors, read from the dataset and the claim issues. If this
+      # fails the site still deploys and says the state is unavailable.
+      - name: Build the materials state
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          python -m pip install "huggingface_hub>=0.23"
+          python -m helpmate_server.tables_cli site-status --out site/data/status.json
+        env:
+          PYTHONPATH: src/packages/api
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Assemble and test the site
         run: make test-site
       - uses: actions/configure-pages@v5

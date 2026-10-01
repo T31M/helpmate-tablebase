@@ -31,72 +31,26 @@ from __future__ import annotations
 
 import argparse
 import os
-import struct
 import sys
 import time
 from multiprocessing import Pool
 from pathlib import Path
 
+# The block check lives in the helpmate-tables package now (it is verify's
+# V3); this script keeps its command line and output for existing runbooks.
 try:
-    import zstandard as zstd
-except ImportError:  # pragma: no cover - environment, not logic
-    sys.exit("verify_corpus: needs the 'zstandard' package (pip install zstandard)")
-
-MAGIC = b"HM8P"
-HEADER_LEN = 64
-MAX_REPORTED = 20  # bad blocks listed per table before giving up on it
+    from helpmate_server.contrib.tablefile import check_blocks
+except ImportError:  # running from a checkout without helpmate-api installed
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "packages" / "api"))
+    from helpmate_server.contrib.tablefile import check_blocks
 
 
 def check_table(path: str) -> tuple[str, str, int, float]:
     """Return (path, verdict, blocks_checked, seconds). verdict is 'OK', a
     'skip ...' reason, or 'BAD ...' with the first bad blocks listed."""
     t0 = time.time()
-    with open(path, "rb") as fh:
-        hdr = fh.read(HEADER_LEN)
-        if len(hdr) < HEADER_LEN or hdr[:4] != MAGIC:
-            return path, "BAD not a helpmate table (magic)", 0, time.time() - t0
-        version, encoding = struct.unpack_from("<IB", hdr, 4)
-        (plane_size,) = struct.unpack_from("<Q", hdr, 36)
-        _max_dtm, flags, block_size = struct.unpack_from("<BBI", hdr, 44)
-        (json_len,) = struct.unpack_from("<I", hdr, 60)
-        if flags & 1:
-            return path, f"skip marker (v{version})", 0, time.time() - t0
-        if encoding != 2 or block_size == 0:
-            return path, f"skip raw (v{version}, encoding {encoding})", 0, time.time() - t0
-
-        fh.seek(HEADER_LEN + json_len)
-        raw = fh.read(8)
-        if len(raw) < 8:
-            return path, "BAD truncated before block index", 0, time.time() - t0
-        (nb,) = struct.unpack("<Q", raw)
-        index = fh.read(8 * (nb + 1))
-        if len(index) < 8 * (nb + 1):
-            return path, "BAD truncated block index", 0, time.time() - t0
-        offsets = struct.unpack(f"<{nb + 1}Q", index)
-        blocks_start = fh.tell()
-        file_size = os.fstat(fh.fileno()).st_size
-        if blocks_start + offsets[-1] > file_size:
-            return path, "BAD block index points past end of file", 0, time.time() - t0
-
-        total = 4 * plane_size
-        dctx = zstd.ZstdDecompressor()
-        bad: list[str] = []
-        for b in range(nb):
-            expect = min(block_size, total - b * block_size)
-            fh.seek(blocks_start + offsets[b])
-            src = fh.read(offsets[b + 1] - offsets[b])
-            try:
-                out = dctx.decompress(src, max_output_size=expect)
-            except zstd.ZstdError as exc:
-                bad.append(f"block {b}: {exc}")
-            else:
-                if len(out) != expect:
-                    bad.append(f"block {b}: decoded {len(out)} bytes, index says {expect}")
-            if len(bad) >= MAX_REPORTED:
-                bad.append("...")
-                break
-        verdict = "OK" if not bad else "BAD " + "; ".join(bad)
-        return path, verdict, nb, time.time() - t0
+    verdict, nb = check_blocks(path)
+    return path, verdict, nb, time.time() - t0
 
 
 def main(argv: list[str] | None = None) -> int:

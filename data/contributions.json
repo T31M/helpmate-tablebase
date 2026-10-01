@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "contributors": {
+    "T31M": {
+      "github": "T31M",
+      "hf": "T31M",
+      "display": "T31M",
+      "anonymous": false,
+      "note": "king, rook and bishop against every three-man Black set, 120 GiB compressed, computed on a 192-thread, 369 GiB machine. The pawn tables need about 85 GiB of RAM each. KRBvkqp and KRBvkrp tie the deepest mate in the corpus, h#17."
+    }
+  },
+  "tables": {
+    "KRBvkbb": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkbn": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkbp": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvknn": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvknp": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkpp": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkqb": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkqn": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkqp": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkqq": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkqr": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkrb": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkrn": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkrp": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    },
+    "KRBvkrr": {
+      "contributor": "T31M",
+      "hf_pr": 1,
+      "claim": 41,
+      "merged": "2026-09-26",
+      "generator_version": "0.19.0",
+      "verification": null
+    }
+  }
+}

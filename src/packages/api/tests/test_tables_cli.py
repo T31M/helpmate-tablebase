@@ -143,8 +143,10 @@ class PrHub(RecorderHub):
         super().__init__()
         self.prs: list[tuple[list[str], str]] = []
         self.url = url
-    def open_pr(self, paths, message):
+        self.description = None
+    def open_pr(self, paths, message, description=""):
         self.prs.append(([Path(p).name for p in paths], message))
+        self.description = description
         return self.url
 
 def test_create_pr_opens_one_request_for_the_whole_set(tmp_path, capsys):
@@ -194,7 +196,7 @@ def test_create_pr_on_an_empty_directory_is_an_error(tmp_path):
 def test_create_pr_reports_failure_without_claiming_success(tmp_path, capsys):
     seed(tmp_path)
     class Failing(PrHub):
-        def open_pr(self, paths, message):
+        def open_pr(self, paths, message, description=""):
             raise OSError("413 payload too large")
     hub = Failing()
     rc = tables_cli.main(["push", "--tables", str(tmp_path), "--repo", "u/ds",
@@ -238,3 +240,18 @@ def test_push_advertises_the_manifest_only_in_the_final_commit(tmp_path):
     assert len(hub.commits) > 1                                  # actually chunked
     assert "manifest.json" not in sum(hub.commits[:-1], [])
     assert "manifest.json" in hub.commits[-1]
+
+
+def test_create_pr_writes_claim_and_github_lines(tmp_path):
+    seed(tmp_path)
+    hub = PrHub()
+    assert tables_cli.main(["push", "--tables", str(tmp_path), "--repo", "u/ds",
+                            "--material", "KQvk", "--create-pr", "--claim", "39",
+                            "--github", "popeye37"], hub_factory=lambda repo: hub) == 0
+    assert hub.description == "Claim: osick/helpmate-tablebase#39\nGitHub: @popeye37"
+
+
+def test_claim_without_create_pr_is_a_usage_error(tmp_path, capsys):
+    seed(tmp_path)
+    assert tables_cli.main(["push", "--tables", str(tmp_path), "--repo", "u/ds",
+                            "--claim", "39"], hub_factory=lambda repo: RecorderHub()) == 2

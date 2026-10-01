@@ -4,7 +4,7 @@ This project needs CPU and RAM more than it needs code.
 
 The corpus is **complete through five pieces** — all 220 five-piece classes,
 plus everything below them. At six pieces there are **645 material classes
-that need a real table**, and **31 are done**. The rest is roughly six hundred
+that need a real table**, and **<!-- contrib:six-done -->31<!-- /contrib --> are done**. The rest is roughly six hundred
 machine-days of work, and it is not going to come from one desk.
 
 If you have a machine with 32 GiB of RAM and a week where it would otherwise
@@ -15,16 +15,16 @@ idle, you can produce something nobody has ever computed.
 
 ## What is missing
 
-614 six-piece tables. Peak RAM equals the raw table size, because generation
+<!-- contrib:six-open -->614<!-- /contrib --> six-piece tables. Peak RAM equals the raw table size, because generation
 holds four bytes per cell resident:
 
 | pawns | tables missing | RAM needed | machine |
 | --- | --- | --- | --- |
-| **0** | **269** | **28.9 GiB** | **32 GiB — the accessible tier** |
-| 3 | 28 | 47.6 GiB | 64 GiB |
-| 4 | 4 | 35.7 GiB | 64 GiB |
-| 2 | 97 | 63.5 GiB | 96 GiB (64 is too tight) |
-| 1 | 216 | 84.7 GiB | 96 GiB |
+| **0** | **<!-- contrib:six-open-p0 -->269<!-- /contrib -->** | **28.9 GiB** | **32 GiB — the accessible tier** |
+| 3 | <!-- contrib:six-open-p3 -->28<!-- /contrib --> | 47.6 GiB | 64 GiB |
+| 4 | <!-- contrib:six-open-p4 -->4<!-- /contrib --> | 35.7 GiB | 64 GiB |
+| 2 | <!-- contrib:six-open-p2 -->97<!-- /contrib --> | 63.5 GiB | 96 GiB (64 is too tight) |
+| 1 | <!-- contrib:six-open-p1 -->216<!-- /contrib --> | 84.7 GiB | 96 GiB |
 
 Start with the pawnless tier. It is the largest single group, it fits on
 ordinary hardware, and every table in it is 28.9 GiB raw — about 1–3 GiB once
@@ -35,10 +35,16 @@ out-of-core generator that does not exist yet.
 
 ## How to contribute one
 
-**1. Claim it first.** Open an issue on
-[github.com/osick/helpmate-tablebase](https://github.com/osick/helpmate-tablebase/issues)
-titled `claim: KBBBvkb` before you start. A day of CPU wasted on a duplicate
-helps nobody. Claims lapse after three weeks of silence.
+**1. Claim it first.** Open an issue with the **Claim a material** form
+([new claim](../../issues/new?template=claim.yml)) before you start. A day of
+CPU wasted on a duplicate helps nobody. List one material per line; patterns
+such as `KQvk???` are allowed. A bot keeps the status of every claim in one
+comment on your issue. To hand a material over, strike its name through
+(`~~KRRvkpp~~`). The
+[materials list](https://osick.github.io/helpmate-tablebase/#/materials) on
+the site, filterable, shows priority, state and contributor of every
+material. Priority P1 means one White piece besides the king: the longest,
+deepest problems, so start there. Claims lapse after three weeks of silence.
 
 **2. Pull the existing corpus first.** This is not optional — it is the
 difference between a day and a week. `gen` builds the full closure of
@@ -67,17 +73,19 @@ Leave headroom: the generator checks available memory before allocating and
 refuses rather than inviting the OOM killer. Do not run it under `--force-ram`
 to get around that.
 
-**4. Sanity-check your own output** before submitting:
+**4. Sanity-check your own output** before submitting, with the same checks
+the maintainer runs:
 
 ```bash
-helpmate stats KBBBvkb --tables ./tables
-helpmate probe "<some FEN in that material>" --tables ./tables
-helpmate line  "<the same FEN>" --tables ./tables --all --max 5
+pip install './src/packages/api[verify]'    # once; `make install` already does it
+helpmate-tables verify --tables ./tables --material KBBBvkb
 ```
 
-`plane_size` in the stats output must match the index size for that material,
-`max_dtm` should be a plausible small number (nothing in the published corpus
-exceeds 34), and the lines must actually be legal mates.
+`--tables` must hold the table and every published sub-table it needs
+(`verify` exits with status 2 and names the missing one otherwise). It runs
+checks V2 to V7 below; expect a few minutes for a pawnless six-piece table. A
+❌ means do not submit: fix the cause (or regenerate) and run it again.
+`--report FILE` also writes the JSON report.
 
 **5. Open a pull request on the dataset.** Contributions land as PRs against
 [huggingface.co/datasets/osick/helpmate-tables](https://huggingface.co/datasets/osick/helpmate-tables),
@@ -86,7 +94,8 @@ so nothing transits anyone's laptop and review happens where the data lives:
 ```bash
 huggingface-cli login          # once; stores an HF token
 helpmate-tables push --tables ./tables --repo osick/helpmate-tables \
-                     --material KBBBvkb --create-pr
+                     --material KBBBvkb --create-pr \
+                     --claim 47 --github your-login
 ```
 
 ```
@@ -114,33 +123,44 @@ identity**, and nothing links them automatically:
 HF token. So a maintainer looking at a pull request sees an HF username and
 has no way to connect it to the person who claimed the material.
 
-**Close the loop yourself:** put your GitHub handle in the HF pull request
-description, and paste the pull request URL back into your claim issue. Run
+**Closing the loop:** `--claim <issue>` (the number of your claim issue) and
+`--github <your login>` write both into the HF pull request description, so
+the maintainer can link the two accounts and credit you. Run
 `huggingface-cli whoami` if you are unsure which account your token belongs
 to — it is easy to be logged in as an old one.
 
 ## What gets checked before a merge
 
 Being blunt about the state of this: **a donated table is currently reviewed,
-not proven.** The checks that run today are these, in ascending cost.
+not proven.** `helpmate-tables verify` runs seven checks, cheapest first. You
+run V2 to V7 with `--material`; the maintainer runs V1 to V7 on your pull
+request with `--pr`. If V4 or V5 fails, V6 and V7 are skipped.
 
-- **Structural.** The reader rejects a file whose embedded material name does
-  not match its filename, or whose `plane_size` disagrees with the index size
-  computed for that material — the same identity check the generator applies
-  to sub-tables before trusting them for a prune decision. A truncated or
-  mislabelled file cannot survive this.
-- **Block integrity.** `python3 tools/verify_corpus.py <TABLE>` decodes every
-  zstd block of a compressed table and checks each frame's content checksum
-  and length against the block index. It proves the bytes are sound, nothing
-  more, and it is cheap: a 4 GB six-piece table takes under a minute. Run it
-  on your own table before opening the pull request.
-- **Statistical.** The `stats.json` sidecar is compared against the bytes it
-  claims to describe: cell counts, the dtm histogram, `max_dtm`. A table
-  generated from a different material, or at a different symmetry, does not
-  produce a consistent sidecar.
-- **Spot checks.** Random positions probed and their optimal lines replayed
-  for legality and for actually being mate, plus shallow positions
-  cross-checked against an independent python-chess search.
+- **V1 PR hygiene.** Only `<M>.hm` plus `<M>.stats.json` pairs with safe file
+  names at the top level of the dataset, at least one of them; nothing deleted;
+  every material canonical; not already in the manifest; claim link present.
+  The files are the difference between the pull request and the commit it
+  branched from, so other changes landing on `main` meanwhile never count.
+- **V2 header.** Magic, block-compressed encoding, embedded material equals the
+  file name, `plane_size` equals the index size, generator version not newer
+  than the verifier.
+- **V3 block integrity.** Every zstd frame decodes; its checksum and length
+  match the block index.
+- **V4 sidecar.** The four planes are recomputed block by block; invalid and
+  unsolvable counts, the DTM histogram and `max_dtm` must equal the sidecar
+  and the header exactly.
+- **V5 deepest.** Every FEN the sidecar lists as deepest probes to `max_dtm`.
+- **V6 local consistency.** Random positions (seeded, seed in the report) obey
+  the recurrence the generator solves: dtm is 1 plus the minimum over
+  successors, the count is the saturating sum over the minimising successors,
+  with captures and promotions read from the published sub-tables.
+- **V7 independent oracle.** Shallow positions are re-solved by a python-chess
+  search that shares no code with the generator and must reproduce dtm and
+  count. By default that is up to 20 positions for each DTM from 0 to 3 plies
+  plus up to 20 of V6's positions, so at most 100 positions, all at most 3
+  plies deep (`--oracle-samples`, `--oracle-plies`). The limit is runtime:
+  python-chess needs minutes per six-piece position at 5 plies. The report
+  records the settings used.
 
 **What is not checked is full correctness.** Proving a donated table right
 means regenerating it, which costs exactly what the donation saved. The
@@ -172,13 +192,50 @@ real contribution** — it converts a trusted table into a verified one.
 
 ## Credit
 
-Every merged table is credited by material and contributor in the dataset
-card. If you would rather not be named, say so in the claim issue.
+Every merged table is credited by material and contributor in
+the [materials list](https://osick.github.io/helpmate-tablebase/#/materials), the README and the dataset card. If you would rather not be named, say so in
+the claim issue.
 
 The first outside contribution came from **T31M**: fifteen tables, KRBvkqq
 through KRBvkpp (issue #41, dataset PR #1), computed on a 192-thread,
 369 GiB machine — including five one- and two-pawn tables from the 96 GiB
 tier. The setup instructions below are theirs too (#42).
+
+## For the maintainer
+
+```bash
+helpmate-tables status                                  # what is waiting
+helpmate-tables verify --tables ~/tb --pr 2 3 4         # asks before downloading; posts reports
+helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credits, docs PR
+```
+
+- `verify --pr` lists the PR files and sizes and asks before downloading
+  (`--yes` skips the question, `--plan-only` stops after the list, `--no-post`
+  keeps the report off HF and GitHub). Downloads are staged in `~/tb-staging`,
+  bound to the PR head, and a rerun resumes size-exactly. It exits with status 2
+  if `--tables` lacks a sub-table the PR needs.
+- `accept` refuses a PR that changed since its passing verification, and needs
+  a clean checkout on its first run. Steps: merge the HF PR, regenerate and
+  push the manifest, move the files into `--tables`, open a docs PR
+  (`contributions.json`, the site's materials data, README and card figures, CHANGELOG,
+  all-contributors) and wait for CI before squash-merging it, upload the dataset
+  card once that PR is merged, then comment on and close the finished claims. It
+  is resumable: rerun the same command after a failure. Use
+  `--contributor LOGIN` when neither the PR description nor the claim issue
+  names one.
+- `helpmate-tables sync --tables ~/tb` regenerates the counts and the site's
+  materials data (`site/data/materials.json`, `corpus.json`; Kvk (two bare
+  kings) is listed last, with no priority) and closes finished claims
+  (`--no-close` to skip); it refuses when `--tables` lacks sidecars the
+  manifest lists. The Claims workflow only
+  updates status comments and never closes issues.
+- When `status` reports enough new tables, refresh DEEPEST, the site and the
+  booklet:
+
+```bash
+python3 tools/deepest_showcase.py --tables ~/tb && make docs-deepest \
+  && python3 tools/build_site_data.py --tables ~/tb
+```
 
 ## Setup
 

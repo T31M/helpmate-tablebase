@@ -1,3 +1,5 @@
+import shutil
+
 import pytest, helpmate
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -41,3 +43,22 @@ def client_mining(kqvk_dir) -> TestClient:
     configuration."""
     app = create_app(ChainSource([LocalDir(kqvk_dir)]), enable_mine=True)
     return TestClient(app)
+
+
+@pytest.fixture(scope="session")
+def compressed_tables(tmp_path_factory) -> Path:
+    """Block-compressed closure of KQvk and KPvk (KPvk promotes into KQvk,
+    KRvk, KBvk, KNvk and captures into Kvk), 1 KiB blocks so even these small
+    tables have many blocks. Generated once; tests that damage a table must
+    use `table_copy`."""
+    d = tmp_path_factory.mktemp("compressed")
+    for mat in ("KQvk", "KPvk"):
+        helpmate.generate(mat, tables=str(d), threads=2, compress=True, block_size=1)
+    return Path(d)
+
+
+@pytest.fixture()
+def table_copy(tmp_path, compressed_tables) -> Path:
+    d = tmp_path / "tables"
+    shutil.copytree(compressed_tables, d)
+    return d

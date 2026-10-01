@@ -1,0 +1,20 @@
+{
+  "projectName": "helpmate-tablebase",
+  "projectOwner": "osick",
+  "repoType": "github",
+  "files": [
+    "README.md"
+  ],
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "T31M",
+      "name": "T31M",
+      "avatar_url": "https://avatars.githubusercontent.com/u/4603377?v=4",
+      "profile": "https://github.com/T31M",
+      "contributions": [
+        "data"
+      ]
+    }
+  ]
+}

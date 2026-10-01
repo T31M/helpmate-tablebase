@@ -8,6 +8,25 @@ bumps may change behavior).
 
 ## [Unreleased]
 
+### Added
+- `helpmate-tables verify`: seven checks on a contributed table (PR contents,
+  header and identity, zstd blocks, sidecar recomputed from the payload,
+  deepest positions, local consistency with successors and sub-tables, and an
+  independent python-chess solver). Contributors run it with `--material`
+  before pushing; the maintainer runs it with `--pr`, which downloads the
+  dataset PR (after confirming its size) and posts the report.
+- `helpmate-tables accept`, `status`, `sync`, `claims`; `push --claim --github`.
+- Claim issue form and a Claims workflow that keeps one status comment per claim.
+- Site Materials page: all 1000 materials from three to six men with priority,
+  state, contributor and filters (state refreshed daily at deploy), and a
+  contributor section on the front page; `data/contributions.json` is the
+  record behind it.
+
+### Changed
+- Corpus counts in README, CONTRIBUTING-TABLES, COOPERATIVE-TABLEBASE and the
+  dataset card are generated (`helpmate-tables sync`).
+- `tools/verify_corpus.py` is a wrapper over the package's block check.
+
 ## [0.20.0] - 2026-09-26
 
 ### Data

@@ -1,15 +1,15 @@
 {
- "tables": 302,
+ "tables": 317,
  "markers": 68,
- "size_bytes": 55987171821,
- "solvable": 95133476457,
- "unique": 2746194439,
+ "size_bytes": 185164328751,
+ "solvable": 280892316140,
+ "unique": 17983072513,
  "by_pieces": {
-  "2": 1,
   "3": 10,
   "4": 55,
   "5": 220,
-  "6": 16
+  "6": 31,
+  "2": 1
  },
  "deepest": {
   "material": "KBvkqp",

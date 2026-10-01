@@ -497,3 +497,28 @@ def test_main_merges_a_scoped_run_into_an_existing_index_and_themes(tmp_path, mo
     fens = {p["fen"] for p in themes["model"]["problems"]}
     assert fens == {"kpvk-fen", "new-fen"}
     assert themes["model"]["count"] == 2
+
+
+def test_main_skips_materials_whose_row_is_not_done(tmp_path, monkeypatch):
+    """A sidecar for a material materials.json lists as not done (a table being
+    verified, say) gets no page; rows without a `done` key (old data) count as done."""
+    bp = _load()
+    tables, out = tmp_path / "tb", tmp_path / "out"
+    tables.mkdir()
+    out.mkdir()
+    for m in ("KQvk", "KRvk", "KBvk"):
+        (tables / f"{m}.stats.json").write_text(json.dumps({**STATS, "material": m}))
+    (out / "materials.json").write_text(json.dumps([
+        {"material": "KQvk", "done": True}, {"material": "KRvk", "done": False},
+        {"material": "KBvk"}]))
+    built = []
+
+    def fake_build(binary, tables_dir, material, sc, row, attrib):
+        built.append(material)
+        return {"pieces": 3, "unique": [], "duals": [],
+                "stats": {"deepest_unique_dtm": None, "solvable": 0}}
+
+    monkeypatch.setattr(bp, "build_material", fake_build)
+    assert bp.main(["--tables", str(tables), "--out", str(out)]) == 0
+    assert built == ["KBvk", "KQvk"]
+    assert not (out / "material" / "KRvk.json").exists()
