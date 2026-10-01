@@ -23,6 +23,9 @@ bumps may change behavior).
   record behind it.
 
 ### Data
+- KRRvkqn contributed by popeye37 (dataset PR #5, claim #39).
+- KRRvkqb contributed by popeye37 (dataset PR #4, claim #39).
+- KRRvkqr contributed by popeye37 (dataset PR #3, claim #39).
 - KRRvkqq contributed by popeye37 (dataset PR #2, claim #39).
 - Marker tables for every six-piece class in which no helpmate exists: the 70
   with a bare White king (Kvk...) and KBvkrrr, KNvkqqq, published to the

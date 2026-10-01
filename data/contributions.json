@@ -137,6 +137,36 @@
       "generator_version": "0.19.0",
       "verification": null
     },
+    "KRRvkqb": {
+      "contributor": "popeye37",
+      "hf_pr": 4,
+      "claim": 39,
+      "merged": "2026-10-01",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "f2cc74db3453c8a35a5c21b335d69b6adf361d9f",
+        "date": "2026-10-01",
+        "samples": 2000,
+        "seed": 2103922083,
+        "result": "pass"
+      }
+    },
+    "KRRvkqn": {
+      "contributor": "popeye37",
+      "hf_pr": 5,
+      "claim": 39,
+      "merged": "2026-10-01",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "11a6c74f344cbee8854136d8b9ad833b0f47a522",
+        "date": "2026-10-01",
+        "samples": 2000,
+        "seed": 2103922083,
+        "result": "pass"
+      }
+    },
     "KRRvkqq": {
       "contributor": "popeye37",
       "hf_pr": 2,
@@ -149,6 +179,21 @@
         "date": "2026-10-01",
         "samples": 2000,
         "seed": 409664041,
+        "result": "pass"
+      }
+    },
+    "KRRvkqr": {
+      "contributor": "popeye37",
+      "hf_pr": 3,
+      "claim": 39,
+      "merged": "2026-10-01",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "c4cf9fd5bd410f874f5aa4643981a8c1ae808e5a",
+        "date": "2026-10-01",
+        "samples": 2000,
+        "seed": 2103922083,
         "result": "pass"
       }
     }

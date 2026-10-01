@@ -6,7 +6,7 @@ point at one position — a table that already knows the answer for all of them.
 Complete through five pieces. MIT licensed. The tables are a free download.
 
 > [!IMPORTANT]
-> **<!-- contrib:six-open -->611<!-- /contrib --> six-piece tablebases have never been computed, and <!-- contrib:six-open-p0 -->266<!-- /contrib --> of them need
+> **<!-- contrib:six-open -->608<!-- /contrib --> six-piece tablebases have never been computed, and <!-- contrib:six-open-p0 -->263<!-- /contrib --> of them need
 > only 32 GiB of RAM and about a day of CPU each.** If you have a machine that
 > idles overnight, you can compute something nobody ever has — and get credited
 > for it.
@@ -73,10 +73,10 @@ Generation is a one-off cost. Every query afterwards is a table lookup.
 | --- | --- | --- |
 | 2–4 | 66 | **complete** |
 | 5 | 220 | **complete** |
-| 6 | <!-- contrib:six-total -->715<!-- /contrib --> | <!-- contrib:six-done -->104<!-- /contrib --> done (<!-- contrib:six-empty -->75<!-- /contrib --> proven empty), <!-- contrib:six-open -->611<!-- /contrib --> to go |
+| 6 | <!-- contrib:six-total -->715<!-- /contrib --> | <!-- contrib:six-done -->107<!-- /contrib --> done (<!-- contrib:six-empty -->75<!-- /contrib --> proven empty), <!-- contrib:six-open -->608<!-- /contrib --> to go |
 | 7+ | — | needs an out-of-core generator that does not exist |
 
-**<!-- contrib:tables -->390<!-- /contrib --> tables, <!-- contrib:gib -->173.7<!-- /contrib --> GiB** block-compressed, published as a Hugging Face
+**<!-- contrib:tables -->393<!-- /contrib --> tables, <!-- contrib:gib -->180.7<!-- /contrib --> GiB** block-compressed, published as a Hugging Face
 dataset. The deepest mate in the corpus is <!-- contrib:deepest -->h#17<!-- /contrib -->.
 
 Fifteen of the six-piece tables — king, rook and bishop against every
@@ -91,7 +91,7 @@ tripled the size of the corpus. Thank you.
 | contributor | tables | notes |
 | --- | --- | --- |
 | [**T31M**](https://huggingface.co/T31M) | 15: KRBvkbb, KRBvkbn, KRBvkbp, KRBvknn, KRBvknp, KRBvkpp, KRBvkqb, KRBvkqn, KRBvkqp, KRBvkqq, KRBvkqr, KRBvkrb, KRBvkrn, KRBvkrp, KRBvkrr | [PR #1](https://huggingface.co/datasets/osick/helpmate-tables/discussions/1): king, rook and bishop against every three-man Black set, 120 GiB compressed, computed on a 192-thread, 369 GiB machine. The pawn tables need about 85 GiB of RAM each. KRBvkqp and KRBvkrp tie the deepest mate in the corpus, h#17. |
-| [**popeye37**](https://huggingface.co/popeye37) | 1: KRRvkqq | [PR #2](https://huggingface.co/datasets/osick/helpmate-tables/discussions/2):  |
+| [**popeye37**](https://huggingface.co/popeye37) | 4: KRRvkqb, KRRvkqn, KRRvkqq, KRRvkqr | [PR #2](https://huggingface.co/datasets/osick/helpmate-tables/discussions/2), [PR #3](https://huggingface.co/datasets/osick/helpmate-tables/discussions/3), [PR #4](https://huggingface.co/datasets/osick/helpmate-tables/discussions/4), [PR #5](https://huggingface.co/datasets/osick/helpmate-tables/discussions/5):  |
 <!-- /contrib -->
 
 [**The deepest sound problem in every material class →**](docs/DEEPEST.md)
@@ -122,7 +122,7 @@ each class the first time someone asks for it.
 Six hundred machine-days of work remain at six pieces, and it will not come
 from one desk.
 
-**<!-- contrib:six-open-p0 -->266<!-- /contrib --> of the missing tables need only 32 GiB of RAM** and about a day each.
+**<!-- contrib:six-open-p0 -->263<!-- /contrib --> of the missing tables need only 32 GiB of RAM** and about a day each.
 If you have a machine that idles overnight, you can compute something nobody
 ever has. Contributions land as pull requests on the dataset, and every
 merged table is credited.
