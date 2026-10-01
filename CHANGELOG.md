@@ -23,6 +23,16 @@ bumps may change behavior).
   record behind it.
 
 ### Data
+- KRRvknp contributed by popeye37 (dataset PR #15, claim #39).
+- KRRvknn contributed by popeye37 (dataset PR #14, claim #39).
+- KRRvkbp contributed by popeye37 (dataset PR #13, claim #39).
+- KRRvkbn contributed by popeye37 (dataset PR #12, claim #39).
+- KRRvkbb contributed by popeye37 (dataset PR #11, claim #39).
+- KRRvkrp contributed by popeye37 (dataset PR #10, claim #39).
+- KRRvkrn contributed by popeye37 (dataset PR #9, claim #39).
+- KRRvkrb contributed by popeye37 (dataset PR #8, claim #39).
+- KRRvkrr contributed by popeye37 (dataset PR #7, claim #39).
+- KRRvkqp contributed by popeye37 (dataset PR #6, claim #39).
 - KRRvkqn contributed by popeye37 (dataset PR #5, claim #39).
 - KRRvkqb contributed by popeye37 (dataset PR #4, claim #39).
 - KRRvkqr contributed by popeye37 (dataset PR #3, claim #39).
