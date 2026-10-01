@@ -16,11 +16,14 @@ def _rows(checks: Iterable[Check]) -> list[str]:
 
 
 def render_markdown(reports: list[TableReport], *, heading: str, seed: int, tool: str,
-                    pr_checks: Iterable[Check] = ()) -> str:
-    pr_checks = list(pr_checks)
+                    pr_checks: Iterable[Check] = (), subtables_from: Iterable[int] = ()) -> str:
+    pr_checks, subtables_from = list(pr_checks), list(subtables_from)
     ok = all(r.passed for r in reports) and all(c.status != "fail" for c in pr_checks)
     lines = [f"## {heading}: {'passed ✅' if ok else 'FAILED ❌'}", "",
              f"{tool}, seed {seed}.", ""]
+    if subtables_from:
+        lines += ["sub-tables from verified, not yet accepted PRs: "
+                  + ", ".join(f"#{n}" for n in subtables_from), ""]
     if pr_checks:
         lines += ["| | | pull request | |", "|---|---|---|---|", *_rows(pr_checks), ""]
     for r in reports:
@@ -34,11 +37,14 @@ def render_markdown(reports: list[TableReport], *, heading: str, seed: int, tool
 
 def report_json(reports: list[TableReport], *, seed: int, tool: str, head: str | None,
                 pr: int | None, pr_checks: Iterable[Check] = (),
-                settings: dict | None = None) -> dict:
-    """`settings`: what was sampled (samples, oracle_samples, oracle_plies) and the date."""
+                settings: dict | None = None, subtables_from: list[int] | None = None) -> dict:
+    """`settings`: what was sampled (samples, oracle_samples, oracle_plies) and the date.
+    `subtables_from`: PRs (verified, not yet accepted) whose files served as sub-tables."""
     pr_checks = list(pr_checks)
     ok = all(r.passed for r in reports) and all(c.status != "fail" for c in pr_checks)
     return {"result": "pass" if ok else "fail", "seed": seed, "tool": tool,
-            "head": head, "pr": pr, **(settings or {}), "pr_checks": [asdict(c) for c in pr_checks],
+            "head": head, "pr": pr, **(settings or {}),
+            **({} if subtables_from is None else {"subtables_from": list(subtables_from)}),
+            "pr_checks": [asdict(c) for c in pr_checks],
             "tables": {r.material: {"passed": r.passed, "checks": [asdict(c) for c in r.checks]}
                        for r in reports}}

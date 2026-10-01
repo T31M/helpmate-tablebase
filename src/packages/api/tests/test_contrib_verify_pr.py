@@ -234,3 +234,140 @@ def test_plan_only_lists_several_prs_after_one_flag(tmp_path, compressed_tables,
                          hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub())
     out = capsys.readouterr().out
     assert rc == 0 and hub.downloads == [] and "KQvk.hm" in out and "KPvk.hm" in out
+
+
+# --- a batch whose PRs depend on each other: KPvk (PR 6) promotes into KQvk (PR 5) ---
+
+PAIR = {"KQvk": ("KQvk.hm", "KQvk.stats.json"), "KPvk": ("KPvk.hm", "KPvk.stats.json")}
+
+
+def _dependent_prs(tmp_path, corpus):
+    """Main and --tables lack KQvk and KPvk; PR 5 adds KQvk, PR 6 adds KPvk."""
+    main = {p.name: p.read_bytes() for p in corpus.iterdir() if not p.name.startswith(("KQvk.", "KPvk."))}
+    hub = FakeHub(main)
+    for num, mat, head in ((5, "KQvk", "hA"), (6, "KPvk", "hB")):
+        hub.add_pr(num, {n: (corpus / n).read_bytes() for n in PAIR[mat]},
+                   description="Claim: #39", head=head)
+    tb = tmp_path / "tb"
+    tb.mkdir()
+    for name, data in main.items():
+        (tb / name).write_bytes(data)
+    return hub, tb
+
+
+def _verify(hub, tables, staging, *prs):
+    return tables_cli.main(["verify", "--tables", str(tables), "--pr", *map(str, prs), "--staging",
+                            str(staging), "--yes", "--no-post", *ARGS],
+                           hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub())
+
+
+def _report(staging, num):
+    return json.loads((staging / f"pr-{num}" / "report.json").read_text())
+
+
+def _result(staging, num):
+    return _report(staging, num)["result"]
+
+
+def test_batch_is_verified_in_dependency_order_with_earlier_prs_as_sub_tables(
+        tmp_path, compressed_tables, capsys):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    staging = tmp_path / "st"
+    assert _verify(hub, tb, staging, 6, 5) == 0
+    out = capsys.readouterr().out
+    assert out.index("Verification of PR #5") < out.index("Verification of PR #6")
+    assert _result(staging, 5) == _result(staging, 6) == "pass"
+    assert (staging / "pr-6" / "overlay" / "KQvk.hm").resolve() == \
+        (staging / "pr-5" / "files" / "KQvk.hm").resolve()
+    assert _report(staging, 6)["subtables_from"] == [5] and _report(staging, 5)["subtables_from"] == []
+    line = "sub-tables from verified, not yet accepted PRs: #5"
+    assert line in (staging / "pr-6" / "report.md").read_text()
+    assert line not in (staging / "pr-5" / "report.md").read_text()
+
+
+def test_a_pr_verified_in_an_earlier_run_provides_sub_tables(tmp_path, compressed_tables):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    staging = tmp_path / "st"
+    assert _verify(hub, tb, staging, 5) == 0
+    assert _verify(hub, tb, staging, 6) == 0 and _result(staging, 6) == "pass"
+    assert _report(staging, 6)["subtables_from"] == [5]
+
+
+def test_a_verified_pr_closed_since_provides_nothing(tmp_path, compressed_tables, capsys):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    staging = tmp_path / "st"
+    assert _verify(hub, tb, staging, 5) == 0
+    hub.prs[5][0].status = "closed"                                # rejected, or accepted meanwhile
+    assert _verify(hub, tb, staging, 6) == 2
+    err = capsys.readouterr().err
+    assert "KQvk is staged from PR #5, which is no longer open" in err
+    assert not (staging / "pr-6" / "report.json").exists()
+
+
+def test_a_verified_pr_whose_head_moved_provides_nothing(tmp_path, compressed_tables, capsys):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    staging = tmp_path / "st"
+    assert _verify(hub, tb, staging, 5) == 0
+    hub.prs[5][0].head = "hA2"                                     # pushed after verification
+    assert _verify(hub, tb, staging, 6) == 2
+    assert "KQvk is in PR #5 (not verified yet — verify it first)" in capsys.readouterr().err
+
+
+def test_a_staged_pr_that_failed_or_moved_on_provides_nothing(tmp_path, compressed_tables, capsys):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    staging = tmp_path / "st"
+    assert _verify(hub, tb, staging, 5) == 0
+    rep_path = staging / "pr-5" / "report.json"
+    rep = json.loads(rep_path.read_text())
+    rep_path.write_text(json.dumps({**rep, "result": "fail"}))
+    assert _verify(hub, tb, staging, 6) == 2
+    rep_path.write_text(json.dumps({**rep, "head": "older"}))       # .head no longer matches
+    assert _verify(hub, tb, staging, 6) == 2
+    capsys.readouterr()
+
+
+def test_published_tables_win_over_staged_ones(tmp_path, compressed_tables):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    staging = tmp_path / "st"
+    assert _verify(hub, tb, staging, 5) == 0
+    for n in PAIR["KQvk"]:
+        (tb / n).write_bytes((compressed_tables / n).read_bytes())  # KQvk got published meanwhile
+    assert _verify(hub, tb, staging, 6) == 0
+    assert (staging / "pr-6" / "overlay" / "KQvk.hm").resolve() == (tb / "KQvk.hm").resolve()
+    assert _report(staging, 6)["subtables_from"] == []
+
+
+def test_missing_sub_table_names_the_open_pr_that_has_it(tmp_path, compressed_tables, capsys):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    staging = tmp_path / "st"
+    assert _verify(hub, tb, staging, 6) == 2
+    err = capsys.readouterr().err
+    assert "KQvk is in PR #5 (not verified yet — verify it first)" in err
+    assert not (staging / "pr-6" / "report.json").exists()
+
+
+def test_missing_sub_table_in_a_verified_pr_says_so(tmp_path, compressed_tables, capsys):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    staging = tmp_path / "st"
+    assert _verify(hub, tb, staging, 5) == 0
+    for n in PAIR["KQvk"]:
+        (staging / "pr-5" / "files" / n).unlink()                  # e.g. moved away by hand
+    assert _verify(hub, tb, staging, 6) == 2
+    assert "KQvk is in PR #5 (verified, not yet accepted)" in capsys.readouterr().err
+
+
+def test_missing_sub_table_nobody_offers_keeps_the_generic_message(tmp_path, compressed_tables, capsys):
+    hub, tb = _dependent_prs(tmp_path, compressed_tables)
+    del hub.prs[5]
+    assert _verify(hub, tb, tmp_path / "st", 6) == 2
+    err = capsys.readouterr().err
+    assert "no table for KQvk" in err and "pull the published corpus" in err and "PR #" not in err
+
+
+def test_batch_order_puts_promotion_and_capture_sub_tables_first():
+    from helpmate_server.contrib.verify import _batch_order
+
+    def pr(num, *mats):
+        return PullRequest(num, "", "", "open", "", [f"{m}.hm" for m in mats])
+    prs = [pr(3, "KRRvkqp"), pr(4, "KRRvkq"), pr(5, "KRRvkqn"), pr(6, "KRRvkpp"), pr(7, "x.hm")]
+    assert [p.num for p in sorted(prs, key=_batch_order)] == [7, 4, 5, 3, 6]

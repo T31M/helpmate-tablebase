@@ -26,6 +26,9 @@ class FakeHub:
         self.commits: list[tuple[str, dict[str, bytes]]] = []
         self.downloads: list[str] = []
         self.pr_fetches: list[int] = []
+        self.conflicts: dict[int, list[str]] = {}   # PR -> files the Hub reports as conflicting
+        self.copies: list[dict] = []                 # merge_by_copy calls, in order
+        self.closed: list[tuple[int, str]] = []      # (PR, comment)
 
     def add_pr(self, num, files: dict[str, bytes], *, author="popeye37", description="",
                head="h1", status="open", delete=()):
@@ -75,12 +78,37 @@ class FakeHub:
         self.comments.append((num, text))
 
     def merge(self, num):
+        from helpmate_server.contrib.hf import MergeConflict
+        if num in self.conflicts:
+            raise MergeConflict(num, list(self.conflicts[num]))
         pr, files = self.prs[num]
         self.main.update(files)
         for p in self.deletes[num]:
             self.main.pop(p, None)
         pr.status = "merged"
         self.merged.append(num)
+
+    def pr_status(self, num):
+        return self.prs[num][0].status
+
+    def close_pr(self, num, comment):
+        self.closed.append((num, comment))
+        self.prs[num][0].status = "closed"
+
+    def merge_by_copy(self, num, head, files, message, comment, on_commit=None):
+        """Copies `files` from the PR's tree into main, then closes the PR. If main already
+        has them all, no commit is made and the ref is main's head ("main-sha")."""
+        assert head == self.prs[num][0].head, "copy from a head that is not the PR's"
+        tree = self._pr_tree(num)
+        already = all(self.main.get(f) == tree[f] for f in files)
+        self.main.update({f: tree[f] for f in files})
+        ref = "main-sha" if already else f"https://hf.example/commit/copy-{len(self.copies) + 1}"
+        self.copies.append({"num": num, "head": head, "files": list(files), "message": message,
+                            "already": already})
+        if on_commit is not None:
+            on_commit(ref, already)
+        self.close_pr(num, comment(ref, already))
+        return ref
 
     def main_files(self):
         import hashlib

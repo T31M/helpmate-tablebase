@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import shutil
 import sys
@@ -13,7 +14,7 @@ from .checks import (
 )
 from .consistency import check_consistency
 from .links import parse_links
-from .materials import canonical
+from .materials import Material, canonical
 from .oracle import check_oracle
 from .report import render_markdown, report_json
 from .tablefile import read_header
@@ -109,17 +110,84 @@ def check_pr_hygiene(pr, manifest_files: dict) -> Check:
     return Check("V1", title, "pass", f"{len(hms)} table(s)")
 
 
-def _build_overlay(tables: Path, files_dir: Path, overlay: Path) -> None:
+def _build_overlay(tables: Path, files_dir: Path, overlay: Path,
+                   others: dict[int, Path] | None = None) -> list[int]:
+    """Link `others` (PR number -> staged files of another verified PR), then `tables`
+    (published data wins over staged), then the PR's own files into `overlay`; a later source
+    wins a name clash. Returns the PRs of `others` that still supply a link."""
     if overlay.exists():
         shutil.rmtree(overlay)
     overlay.mkdir(parents=True)
-    for src in (tables, files_dir):
+    source: dict[str, int | None] = {}
+    for num, src in [*(others or {}).items(), (None, tables), (None, files_dir)]:
         for p in src.iterdir():
             if p.name.endswith((".hm", ".stats.json")):
                 link = overlay / p.name
                 if link.is_symlink():
                     link.unlink()
                 link.symlink_to(p.resolve())
+                source[p.name] = num
+    return sorted({n for n in source.values() if n is not None})
+
+
+def _passed_report(d: Path) -> dict | None:
+    """`d/report.json` if it says pass, else None."""
+    try:
+        rep = json.loads((d / "report.json").read_text())
+    except (OSError, ValueError):
+        return None
+    return rep if isinstance(rep, dict) and rep.get("result") == "pass" else None
+
+
+def _verified_files(staging: Path, exclude: int, open_heads: dict[int, str | None]) -> dict[int, Path]:
+    """Staged files of other PRs that are still open and passed verification at their current
+    head, which is also the head staged there."""
+    out = {}
+    for num, head in sorted(open_heads.items()):
+        d = staging / f"pr-{num}"
+        if num == exclude or head is None:
+            continue
+        rep, marker = _passed_report(d), d / "files" / ".head"
+        if rep is not None and rep.get("head") == head and marker.exists() and marker.read_text() == head:
+            out[num] = d / "files"
+    return out
+
+
+def _flip(material: str) -> str:
+    m = Material(material)
+    return f"K{m.black.upper()}vk{m.white.lower()}"
+
+
+def _who_has(exc: Exception, open_prs: list, staging: Path) -> str:
+    """The MissingSubtable message, plus which PR has the missing table if one is known."""
+    m = re.search(r"no table for (\w+) nor its color flip", str(exc))
+    if not m:
+        return str(exc)
+    names = {m.group(1)} | ({_flip(m.group(1))} if "v" in m.group(1) else set())
+    for pr in open_prs:
+        found = names & set(pr.materials)
+        if found:
+            rep = _passed_report(staging / f"pr-{pr.num}")
+            state = ("verified, not yet accepted" if rep is not None and rep.get("head") == pr.head
+                     else "not verified yet — verify it first")
+            return f"{exc}; {found.pop()} is in PR #{pr.num} ({state})"
+    open_nums = {pr.num for pr in open_prs}
+    for d in sorted(staging.glob("pr-*")):
+        num = d.name[len("pr-"):]
+        if not num.isdigit() or int(num) in open_nums:
+            continue
+        for name in sorted(names):
+            if (d / "files" / f"{name}.hm").exists():
+                return (f"{exc}; {name} is staged from PR #{num}, which is no longer open "
+                        "(if it was accepted, pull the published corpus)")
+    return str(exc)
+
+
+def _batch_order(pr) -> tuple[int, int, int]:
+    """Sub-tables before the tables that need them: a promotion has one pawn fewer, a capture
+    one man fewer and no more pawns."""
+    mats = [Material(m) for m in pr.materials if canonical(m) == m]
+    return (max((m.pawns for m in mats), default=0), max((m.pieces for m in mats), default=0), pr.num)
 
 
 def _unsafe(name: str) -> bool:
@@ -193,25 +261,29 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
     manifest_files = hub.fetch_manifest().get("files", {})
     gh = None if a.no_post else (gh_factory or GitHub)(a.github_repo)
     rc = 0
-    for pr in prs:
+    open_prs = hub.open_pull_requests()
+    open_heads = {p.num: p.head for p in open_prs}
+    for pr in sorted(prs, key=_batch_order):
         d = staging / f"pr-{pr.num}"
         files_dir = d / "files"
         d.mkdir(parents=True, exist_ok=True)
         v1 = check_pr_hygiene(pr, manifest_files)
         reports: list = []
+        subtables_from: list[int] = []
         try:
             if not any(_unsafe(f) for f in pr.files):
                 _stage(hub, pr, files_dir)
-                _build_overlay(tables, files_dir, d / "overlay")
+                subtables_from = _build_overlay(tables, files_dir, d / "overlay",
+                                                _verified_files(staging, pr.num, open_heads))
                 reports = [verify_table(m, d / "overlay", opts, version) for m in pr.materials]
         except MissingSubtable as exc:
             # Our corpus is incomplete, not the PR's fault: post nothing.
-            raise UsageError(str(exc)) from exc
+            raise UsageError(_who_has(exc, open_prs, staging)) from exc
         seed = opts.resolved_seed()
         md = render_markdown(reports, heading=f"Verification of PR #{pr.num}", seed=seed,
-                             tool=tool, pr_checks=[v1])
+                             tool=tool, pr_checks=[v1], subtables_from=subtables_from)
         js = report_json(reports, seed=seed, tool=tool, head=pr.head, pr=pr.num, pr_checks=[v1],
-                         settings=opts.settings())
+                         settings=opts.settings(), subtables_from=subtables_from)
         (d / "report.md").write_text(md)
         (d / "report.json").write_text(json.dumps(js, indent=2))
         print(md)

@@ -7,6 +7,19 @@ import pytest
 from helpmate_server.contrib.hf import Hub
 
 
+class _Response:
+    """Just enough of an HTTP response for HfHubHTTPError: huggingface_hub 0.34 (requests)
+    takes it optionally, 2.x (httpx) requires it and reads .headers and .request."""
+    status_code = 400
+    headers: dict = {}
+    request = None
+
+
+def _bad_request(message):
+    from huggingface_hub.errors import BadRequestError
+    return BadRequestError(message, response=_Response())
+
+
 class _Event:
     def __init__(self, type_, **kw):
         self.type = type_
@@ -221,3 +234,149 @@ def test_open_pull_requests_still_propagates_other_errors():
     api.list_repo_commits = boom
     with pytest.raises(ConnectionError):
         Hub("o/d", api=api).open_pull_requests()
+
+
+# --- merge conflicts and the server-side copy fallback ---
+
+class ConflictApi(FakeApi):
+    """Main has moved on with its own `.gitattributes`, so merging a PR that also
+    touched it is refused the way the Hub refuses it (BadRequestError + filesWithConflicts)."""
+
+    def __init__(self, main_tree, conflicting=(".gitattributes",)):
+        super().__init__(main_tree)
+        self.conflicting = list(conflicting) if isinstance(conflicting, (list, tuple)) else conflicting
+        self.status_changes = []
+        self.commit_ops = []
+
+    def merge_pull_request(self, repo, num, repo_type=None, comment=None):
+        self.calls.append(("merge", num))
+        raise _bad_request("Bad request for merge endpoint: There are merge conflicts, cannot proceed")
+
+    def get_discussion_details(self, repo, num, repo_type=None):
+        d = super().get_discussion_details(repo, num, repo_type=repo_type)
+        d.conflicting_files = self.conflicting
+        return d
+
+    def create_commit(self, repo_id, operations, *, commit_message, repo_type=None, **kw):
+        from huggingface_hub import CommitOperationCopy
+        ops = list(operations)
+        self.commit_ops.append((commit_message, ops))
+        tree = dict(self.commits[self.main][1])
+        changed = False
+        for op in ops:
+            assert isinstance(op, CommitOperationCopy)
+            src = self.commits[self._rev(op.src_revision)][1][op.src_path_in_repo]
+            changed |= tree.get(op.path_in_repo) != src   # huggingface_hub drops no-op copies
+            tree[op.path_in_repo] = src
+        if changed:                                     # all dropped: no commit, main's head returned
+            self.main = self._new(self.main, tree)
+        return type("CI", (), {"oid": self.main,
+                               "commit_url": f"https://hf.example/commit/{self.main}"})()
+
+    def repo_info(self, repo_id, repo_type=None, revision=None, **kw):
+        return type("Info", (), {"sha": self._rev(revision)})()
+
+    def change_discussion_status(self, repo_id, discussion_num, new_status, *, comment=None,
+                                 repo_type=None, token=None):
+        self.status_changes.append((discussion_num, new_status, comment, repo_type))
+        self.prs[discussion_num]["status"] = new_status
+
+
+def _conflicting(conflicting=(".gitattributes",)):
+    api = ConflictApi(MAIN, conflicting)
+    api.open_pr(2, {**KRR, ".gitattributes": (11, None, "g-pr")})
+    api.commit_main(add={".gitattributes": (12, None, "g-main")})
+    return api
+
+
+def test_merge_conflict_carries_the_conflicting_files():
+    from helpmate_server.contrib.hf import MergeConflict
+    api = _conflicting()
+    with pytest.raises(MergeConflict) as exc:
+        Hub("o/d", api=api).merge(2)
+    assert exc.value.files == [".gitattributes"]
+
+
+def test_merge_conflict_without_a_file_list_is_never_empty():
+    """The Hub may say `True` (conflicts, list unavailable): never an empty list, which
+    would look like a subset of anything."""
+    from helpmate_server.contrib.hf import MergeConflict
+    api = _conflicting(conflicting=True)
+    with pytest.raises(MergeConflict) as exc:
+        Hub("o/d", api=api).merge(2)
+    assert exc.value.files and exc.value.files != [".gitattributes"]
+
+
+def test_other_merge_errors_propagate_unchanged():
+    from huggingface_hub.errors import BadRequestError
+    api = _conflicting()
+
+    def refuse(*a, **k):
+        raise _bad_request("Bad request: you are not allowed to merge")
+    api.merge_pull_request = refuse
+    with pytest.raises(BadRequestError, match="not allowed"):
+        Hub("o/d", api=api).merge(2)
+
+
+def test_merge_by_copy_copies_server_side_verifies_and_closes():
+    from huggingface_hub import CommitOperationCopy
+    api = _conflicting()
+    head = api.prs[2]["oids"][-1]
+    seen = []
+    url = Hub("o/d", api=api).merge_by_copy(
+        2, head, ["KRRvkqq.hm", "KRRvkqq.stats.json"], message="Add KRRvkqq",
+        comment=_comment, on_commit=lambda ref, already: seen.append((ref, already)))
+    (msg, ops), = api.commit_ops
+    assert msg == "Add KRRvkqq"
+    assert [(o.src_path_in_repo, o.path_in_repo, o.src_revision) for o in ops] == [
+        ("KRRvkqq.hm", "KRRvkqq.hm", head), ("KRRvkqq.stats.json", "KRRvkqq.stats.json", head)]
+    assert all(isinstance(o, CommitOperationCopy) for o in ops)
+    main = api.commits[api.main][1]
+    assert main["KRRvkqq.hm"] == KRR["KRRvkqq.hm"] and main[".gitattributes"] == (12, None, "g-main")
+    assert url == f"https://hf.example/commit/{api.main}" and seen == [(url, False)]
+    assert api.status_changes == [(2, "closed", f"Merged as {url}. Thank you!", "dataset")]
+
+
+def _comment(ref, already):
+    return f"Already on main as of {ref}." if already else f"Merged as {ref}. Thank you!"
+
+
+def test_merge_by_copy_of_files_already_on_main_makes_no_commit_and_says_so():
+    """huggingface_hub drops copies whose destination already equals the source; with all of
+    them dropped it makes no commit and returns main's head: never claim "Merged as"."""
+    api = _conflicting()
+    head = api.prs[2]["oids"][-1]
+    api.commit_main(add=KRR)                       # e.g. landed by hand meanwhile
+    before, seen = api.main, []
+    ref = Hub("o/d", api=api).merge_by_copy(2, head, ["KRRvkqq.hm", "KRRvkqq.stats.json"],
+                                            message="m", comment=_comment,
+                                            on_commit=lambda r, a: seen.append((r, a)))
+    assert api.main == before and ref == before and seen == [(before, True)]
+    ((num, status, text, _),) = api.status_changes
+    assert status == "closed" and text == f"Already on main as of {before}." and "Merged as" not in text
+
+
+def test_merge_by_copy_refuses_to_close_when_main_does_not_match_the_head():
+    api = _conflicting()
+    head = api.prs[2]["oids"][-1]
+    real = api.create_commit
+
+    def lossy(*a, **k):
+        info = real(*a, **k)
+        api.commits[api.main][1]["KRRvkqq.hm"] = (699, "bad", "b9")   # a truncated copy
+        return info
+    api.create_commit = lossy
+    seen = []
+    with pytest.raises(RuntimeError, match="KRRvkqq.hm"):
+        Hub("o/d", api=api).merge_by_copy(2, head, ["KRRvkqq.hm", "KRRvkqq.stats.json"],
+                                          message="m", comment=_comment,
+                                          on_commit=lambda r, a: seen.append(r))
+    assert api.status_changes == [] and seen == []
+
+
+def test_close_and_status_of_a_pr():
+    api = _conflicting()
+    hub = Hub("o/d", api=api)
+    assert hub.pr_status(2) == "open"
+    hub.close_pr(2, "done")
+    assert api.status_changes == [(2, "closed", "done", "dataset")] and hub.pr_status(2) == "closed"

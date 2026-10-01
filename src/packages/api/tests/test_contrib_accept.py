@@ -698,3 +698,141 @@ def test_real_git_dirty_paths_lets_accept_refuse_unlisted_edits(clone, tmp_path,
     dirty = Git(clone).dirty_paths()
     assert sorted(dirty) == ["CHANGELOG.md", "docs/other.md"]
     assert [d for d in dirty if d not in DOCS_PATHS] == ["docs/other.md"]
+
+
+# --- a dataset PR that conflicts with main on `.gitattributes` only ---
+
+def test_gitattributes_only_conflict_is_merged_by_copy_and_closed(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    hub.conflicts[2] = [".gitattributes"]
+    git = FakeGit()
+    assert _run(checkout, staging, hub, gh, tables, git) == 0
+    assert hub.merged == []
+    (copy,) = hub.copies
+    assert copy["num"] == 2 and copy["head"] == "abc"
+    assert copy["files"] == ["KRRvkqq.hm", "KRRvkqq.stats.json"]
+    assert copy["message"] == "Add KRRvkqq from dataset PR #2 by popeye37"
+    ((num, comment),) = hub.closed
+    assert num == 2 and "https://hf.example/commit/copy-1" in comment
+    assert "`.gitattributes`" in comment and "abc" in comment and "Thank you" in comment
+    assert "KRRvkqq.hm" in json.loads(hub.main["manifest.json"])["files"]
+    assert (tables / "KRRvkqq.hm").read_bytes() == b"table"
+    reg = json.loads((checkout / "data" / "contributions.json").read_text())
+    assert reg["tables"]["KRRvkqq"]["contributor"] == "popeye37" and reg["tables"]["KRRvkqq"]["hf_pr"] == 2
+    assert "popeye37" in (checkout / "CHANGELOG.md").read_text()
+    assert not (staging / "accept-2.json").exists()
+
+
+def test_files_already_on_main_close_the_pr_without_claiming_a_merge(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    hub.conflicts[2] = [".gitattributes"]
+    hub.main.update(hub.prs[2][1])                 # the PR's files reached main some other way
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    ((num, comment),) = hub.closed
+    assert comment.startswith("Already on main as of main-sha (copied from this PR's verified head abc")
+    assert "Merged as" not in comment
+    reg = json.loads((checkout / "data" / "contributions.json").read_text())
+    assert reg["tables"]["KRRvkqq"]["contributor"] == "popeye37"
+
+
+def test_copy_message_keeps_an_anonymous_contributor_anonymous(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    gh.issues[39]["body"] = ANON_FORM
+    hub.conflicts[2] = [".gitattributes"]
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    msg = hub.copies[0]["message"]
+    assert "Pop Eye" not in msg and "popeye37" not in msg and "an anonymous contributor" in msg
+
+
+@pytest.mark.parametrize("files", [["README.md"], [".gitattributes", "KRRvkqq.hm"],
+                                   ["(files not listed by the Hub)"]])
+def test_any_other_conflict_stops_before_copying(tmp_path, capsys, files):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    hub.conflicts[2] = files
+    git = FakeGit()
+    assert _run(checkout, staging, hub, gh, tables, git) == 2
+    err = capsys.readouterr().err
+    assert all(f in err for f in files) and "#2" in err
+    assert hub.copies == [] and hub.closed == [] and hub.commits == [] and git.calls == []
+
+
+def test_head_changed_before_the_copy_is_refused(tmp_path, capsys):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    hub.conflicts[2] = [".gitattributes"]
+    hub.pr_head = lambda n: "pushed-meanwhile"
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 2
+    assert hub.copies == [] and hub.closed == [] and "pushed-meanwhile" in capsys.readouterr().err
+
+
+class CloseFails(FakeHub):
+    """The copy commit lands; closing the PR fails (after or before the Hub applied it)."""
+
+    def close_pr(self, num, comment):
+        if getattr(self, "applied_then_fail", False):
+            super().close_pr(num, comment)
+        if not getattr(self, "healed", False):
+            raise RuntimeError("network")
+        super().close_pr(num, comment)
+
+
+def _close_fails(tmp_path, applied):
+    checkout, staging, hub0, gh, tables = _setup(tmp_path)
+    hub = CloseFails(dict(hub0.main))
+    hub.prs, hub.bases, hub.deletes = hub0.prs, hub0.bases, hub0.deletes
+    hub.conflicts[2] = [".gitattributes"]
+    hub.applied_then_fail = applied
+    with pytest.raises(RuntimeError):
+        _run(checkout, staging, hub, gh, tables, FakeGit())
+    state = json.loads((staging / "accept-2.json").read_text())
+    assert state["copied"] == {"2": {"ref": "https://hf.example/commit/copy-1", "already": False}}
+    assert state["merged"] == []
+    hub.healed = True
+    _forget_merged_prs(hub)
+    return checkout, staging, hub, gh, tables
+
+
+def test_resume_after_the_copy_only_closes_the_pr(tmp_path):
+    checkout, staging, hub, gh, tables = _close_fails(tmp_path, applied=False)
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    assert len(hub.copies) == 1                                   # never copied twice
+    ((num, comment),) = hub.closed
+    assert num == 2 and "https://hf.example/commit/copy-1" in comment and "abc" in comment
+    reg = json.loads((checkout / "data" / "contributions.json").read_text())
+    assert reg["tables"]["KRRvkqq"]["contributor"] == "popeye37"
+
+
+def test_resume_with_the_pr_already_closed_neither_copies_nor_closes_again(tmp_path):
+    checkout, staging, hub, gh, tables = _close_fails(tmp_path, applied=True)
+    assert hub.prs[2][0].status == "closed"
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    assert len(hub.copies) == 1 and len(hub.closed) == 1
+
+
+def test_a_pr_closed_by_the_copy_is_done_not_in_review(tmp_path):
+    from datetime import datetime, timezone
+    from helpmate_server.contrib.claims import material_status, load_index
+    from helpmate_server.contrib.registry import Registry
+    from helpmate_server.contrib.site_status import build_status
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    hub.conflicts[2] = [".gitattributes"]
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    assert hub.open_pull_requests() == []
+    reg = Registry.load(checkout / "data" / "contributions.json")
+    s = build_status(hub, gh, reg, datetime(2026, 10, 1, tzinfo=timezone.utc))
+    assert s["materials"]["KRRvkqq"]["state"] == "done" and s["materials"]["KRRvkqq"]["hf_pr"] == 2
+    done = {f[:-3] for f in hub.fetch_manifest()["files"] if f.endswith(".hm")}
+    assert material_status(done, {}, load_index(gh), reg)["KRRvkqq"].state == "done"
+
+
+def test_resume_reads_a_copy_recorded_in_the_earlier_bare_string_format(tmp_path):
+    """State files written before {ref, already} hold the commit URL as a plain string."""
+    checkout, staging, hub, gh, tables = _close_fails(tmp_path, applied=False)
+    path = staging / "accept-2.json"
+    state = json.loads(path.read_text())
+    state["copied"] = {"2": "https://hf.example/commit/abc"}
+    path.write_text(json.dumps(state))
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    assert len(hub.copies) == 1                                   # only the first run's copy
+    ((num, comment),) = hub.closed
+    assert num == 2 and comment.startswith("Merged as https://hf.example/commit/abc:")
+    assert not path.exists()
