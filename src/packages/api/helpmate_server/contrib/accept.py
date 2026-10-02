@@ -71,8 +71,8 @@ class Git:
         self._runner = runner
         self._sleep = sleep
 
-    def _run(self, *args: str, env: dict | None = None, check: bool = True):
-        return self._runner(list(args), cwd=self.cwd, check=check, capture_output=True, text=True,
+    def _run(self, *args: str, env: dict | None = None, check: bool = True, text: bool = True):
+        return self._runner(list(args), cwd=self.cwd, check=check, capture_output=True, text=text,
                             env={**os.environ, **(env or {})})
 
     def _out(self, *args: str, env: dict | None = None) -> str:
@@ -100,6 +100,11 @@ class Git:
         self._run("git", "clean", "-fd", "--", *paths)
         self._run("git", "fetch", "origin", "main", env=_NO_GLOBAL)
         self._run("git", "switch", "-C", branch, "origin/main")
+
+    def main_file(self, path: str) -> bytes:
+        """`path` as origin/main has it right now (fetched first), byte for byte."""
+        self._run("git", "fetch", "origin", "main", env=_NO_GLOBAL)
+        return self._run("git", "show", f"origin/main:{path}", text=False).stdout
 
     def commit_all(self, message: str) -> None:
         self._run("git", "add", "-A")
@@ -350,7 +355,6 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                     shutil.move(str(src), tables / f)
         mark("local")
 
-    card_path = state_path.with_suffix(".card.md")
     if "docs" not in state["done"]:
         branch = "data/accept-" + "-".join(map(str, sorted(prs)))
         lines = []
@@ -401,7 +405,6 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                     text = add_changelog_data(text, line)
                 cl.write_text(text)
                 sync(checkout, hub, gh, reg, tables, close_claims=False)
-                card_path.write_bytes((checkout / "docs" / "hf-dataset-card.md").read_bytes())
                 trailers = sorted({f"Co-authored-by: {p['github']} <{gh.user_id(p['github'])}+"
                                    f"{p['github']}@users.noreply.github.com>"
                                    for p in people.values()
@@ -445,7 +448,8 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
         mark("docs")
 
     if "card" not in state["done"]:  # only now: the public card must not credit a failed docs PR
-        hub.commit({"README.md": card_path.read_bytes()}, "Dataset card: contributors and counts")
+        # main's card, not a copy from this run's docs step: a later accept run may have published a newer one
+        hub.commit({"README.md": git.main_file("docs/hf-dataset-card.md")}, "Dataset card: contributors and counts")
         mark("card")
 
     if "claims" not in state["done"]:
@@ -462,7 +466,6 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
         close_finished_claims(gh, idx, material_status(done, {}, idx, reg))
         mark("claims")
     state_path.unlink()
-    card_path.unlink(missing_ok=True)
     return 0
 
 def status(hub, gh, registry, staging: Path, checkout: Path) -> str:

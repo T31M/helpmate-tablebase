@@ -10,6 +10,7 @@ from helpmate_server.contrib.accept import accept, add_changelog_data, manifest_
 class FakeGit:
     def __init__(self, fail_at=None):
         self.calls, self.fail_at = [], fail_at
+        self.main_card = b"x\n"          # docs/hf-dataset-card.md as origin/main has it right now
 
     def _do(self, name, *a):
         self.calls.append((name, *a))
@@ -26,6 +27,7 @@ class FakeGit:
     def wait_and_merge(self, url, branch): self._do("wait_and_merge", url)
     def back(self, ref): self._do("back", ref)
     def close_pr(self, url): self._do("close_pr", url)
+    def main_file(self, path): self._do("main_file", path); return self.main_card
 
 
 class ConflictingGit(FakeGit):
@@ -207,7 +209,7 @@ def test_accept_resumes_after_ci_failure_without_merging_twice(tmp_path):
     git = FakeGit()
     assert _run(checkout, staging, hub, gh, tables, git) == 0
     assert hub.merged == [2]                                     # not merged again
-    assert [c[0] for c in git.calls] == ["back", "wait_and_merge"]   # resumes at the docs PR
+    assert [c[0] for c in git.calls] == ["back", "wait_and_merge", "main_file"]   # resumes at the docs PR, then the card
 
 
 class ManifestFails(FakeHub):
@@ -425,6 +427,32 @@ def test_card_uploaded_only_after_docs_pr_merged(tmp_path):
     assert sum("Dataset card" in m for m, _ in hub.commits) == 1
 
 
+def test_card_uploaded_is_mains_current_card_not_this_runs_snapshot(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    git = FakeGit()
+    git.main_card = b"newer card from a later accept run\n"
+    assert _run(checkout, staging, hub, gh, tables, git) == 0
+    assert ("main_file", "docs/hf-dataset-card.md") in git.calls
+    assert [f for m, f in hub.commits if "Dataset card" in m] == [{"README.md": git.main_card}]
+    assert not list(staging.glob("*.card.md"))
+
+
+def test_resume_with_docs_done_uploads_mains_card_and_ignores_an_old_card_file(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    with pytest.raises(RuntimeError):
+        _run(checkout, staging, hub, gh, tables, FakeGit(fail_at="wait_and_merge"))
+    state_file = next(staging.glob("accept-*.json"))
+    state = json.loads(state_file.read_text())
+    state["done"] = [s for s in state["done"] if s not in ("docs", "card", "claims")]
+    state["done"] += ["docs"]
+    state_file.write_text(json.dumps(state))
+    state_file.with_suffix(".card.md").write_bytes(b"stale snapshot with 393 tables\n")
+    git = FakeGit()
+    git.main_card = b"main card with 403 tables\n"
+    assert _run(checkout, staging, hub, gh, tables, git) == 0
+    assert [f for m, f in hub.commits if "Dataset card" in m] == [{"README.md": b"main card with 403 tables\n"}]
+
+
 def test_claim_comment_not_posted_twice_after_rerun(tmp_path):
     checkout, staging, hub, gh, tables = _two_prs(tmp_path)
     (staging / "pr-3" / "files" / "KRRvkqr.hm").write_bytes(b"t2")
@@ -487,6 +515,23 @@ def test_wait_and_merge_squashes_then_deletes_the_branch_without_the_global_conf
     assert r.envs[merge]["GIT_CONFIG_GLOBAL"] == "/dev/null"
     assert r.calls[merge + 1:] == [PUSH_DELETE, ["git", "branch", "-D", "br"]]
     assert r.envs[merge + 1]["GIT_CONFIG_GLOBAL"] == "/dev/null"
+
+
+def test_main_file_fetches_origin_main_then_shows_the_file_without_the_global_config(tmp_path):
+    from helpmate_server.contrib.accept import Git
+
+    class Show(Runner):
+        def __call__(self, args, **kw):
+            done = super().__call__(args, **kw)
+            if args[:2] == ["git", "show"]:
+                done.stdout = b"card\n"
+            return done
+
+    r = Show([])
+    assert Git(tmp_path, runner=r).main_file("docs/hf-dataset-card.md") == b"card\n"
+    assert r.calls == [["git", "fetch", "origin", "main"],
+                       ["git", "show", "origin/main:docs/hf-dataset-card.md"]]
+    assert r.envs[0]["GIT_CONFIG_GLOBAL"] == "/dev/null"
 
 
 def test_branch_cleanup_tolerates_branches_already_gone(tmp_path):
