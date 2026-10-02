@@ -1,6 +1,6 @@
 {
  "closed-walk": {
-  "count": 88,
+  "count": 92,
   "problems": [
    {
     "material": "KBBPvk",
@@ -617,11 +617,39 @@
     "dtm": 14,
     "stipulation": "h#7",
     "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/N7/1p6/2kR4/8/1K2n3/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "7k/6R1/8/8/6N1/p7/p7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
    }
   ]
  },
  "excelsior": {
-  "count": 219,
+  "count": 220,
   "problems": [
    {
     "material": "KBBPvk",
@@ -2155,11 +2183,18 @@
     "dtm": 13,
     "stipulation": "h#6.5",
     "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
    }
   ]
  },
  "excelsior:black": {
-  "count": 16,
+  "count": 17,
   "problems": [
    {
     "material": "KBNvkp",
@@ -2271,6 +2306,13 @@
     "fen": "q7/K1p5/8/8/8/6R1/8/7k w - - 0 1",
     "dtm": 13,
     "stipulation": "h#6.5",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
     "kind": "unique"
    }
   ]
@@ -3702,7 +3744,7 @@
   ]
  },
  "ideal": {
-  "count": 542,
+  "count": 592,
   "problems": [
    {
     "material": "KBBBvk",
@@ -7497,11 +7539,392 @@
     "dtm": 11,
     "stipulation": "h#5.5",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/8/8/8/6b1/8/kRNK2b1 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/5NRk/8/n7/Kb6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/1n6/8/7R/6bk/8/8/1K5N b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "3k4/3R4/3N4/8/2b5/8/8/nK6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/kRN5/3n4/2bK4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "6n1/3Nb3/3R4/3k4/8/3K4/8/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "5Rkb/6p1/8/6N1/8/8/8/1K6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/7R/3n3k/4N1n1/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/5n2/2N4n/8/R7/k7/2K5/8 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "5n2/8/6n1/8/8/2K2N2/8/2kR4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/3n4/2n1kRN1/8/2K5/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/5NRk/8/8/2p5/n7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "4Rk2/5p2/8/7N/8/8/8/Kn6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/N7/1p6/2kR4/8/1K2n3/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/K7/8/3nN1pk/7R/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "7k/6R1/8/8/6N1/p7/p7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/N7/1p6/2kR4/6p1/1K6/8/8 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "7k/4N2R/8/8/8/1q6/8/Kb6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "1n6/8/8/8/5NRk/8/4q3/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/7R/7k/4N1q1/8/8/K2n4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/1q6/1n3NRk/8/8/8/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "7k/4N2R/8/8/8/8/2n4q/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/1p6/8/5NRk/8/2q5/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5q2/6p1/8/kRN5/8/8/1K6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5NRk/8/8/8/3p4/6q1/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "1K6/8/7q/8/2p5/8/4N2R/7k b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "8/8/8/7q/7k/5NR1/2q5/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "6Nk/7R/8/8/2q5/3q4/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "3qk3/2N2R2/8/8/8/8/5q2/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "8/7q/8/5NRk/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "8/8/5NRk/8/4r3/8/2q5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "7R/6rk/8/1q2N3/8/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "kRN5/8/8/4q3/8/8/r7/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "6Nk/7R/7b/8/8/8/3r4/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "n7/7N/8/8/6rk/7R/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7k/4N2R/8/8/6n1/8/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7N/7R/7k/1n4r1/8/8/8/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "3n3k/4r2R/7N/8/8/8/3K4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "8/7R/4N1pk/8/1r6/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "K7/8/8/8/4p3/8/1r6/kRN5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "8/8/8/5NRk/8/1r6/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "2r5/8/5NRk/8/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "8/5NRk/8/8/8/5r2/5r2/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   }
+  ]
+ },
+ "indian": {
+  "count": 2,
+  "problems": [
+   {
+    "material": "KRNvkpp",
+    "fen": "8/4k3/3R4/8/p1p4N/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   }
+  ]
+ },
+ "klasinc": {
+  "count": 1,
+  "problems": [
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
    }
   ]
  },
  "kniest": {
-  "count": 41,
+  "count": 52,
   "problems": [
    {
     "material": "KBBvkbn",
@@ -7789,11 +8212,88 @@
     "dtm": 8,
     "stipulation": "h#4",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7k/7R/7N/4p3/8/8/8/K1b5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "6kR/6b1/8/6N1/4p3/8/2K5/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "7k/4N2R/8/8/8/8/2n4q/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "3n3k/4r2R/7N/8/8/8/3K4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "7k/7R/7N/8/4p3/8/1r6/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6pk/5R2/8/8/4p3/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "7R/7k/6R1/4p3/8/8/1Kp5/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
  "mirror": {
-  "count": 422,
+  "count": 432,
   "problems": [
    {
     "material": "KBBBvk",
@@ -10748,11 +11248,81 @@
     "dtm": 11,
     "stipulation": "h#5.5",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "6Nk/7R/8/8/2q5/3q4/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "3qk3/2N2R2/8/8/8/8/5q2/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N6q/7q/8/8/8/5k2/4R3/K7 w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "6Nk/7R/7b/8/8/8/3r4/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/8/8/8/7p/2p3Rk/3R4/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "7R/7k/6R1/4p3/8/8/1Kp5/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
  "model": {
-  "count": 766,
+  "count": 829,
   "problems": [
    {
     "material": "KBBBvk",
@@ -16115,11 +16685,452 @@
     "dtm": 11,
     "stipulation": "h#5.5",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/Nb6/8/8/2b5/R7/k1K5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/8/8/8/6b1/8/kRNK2b1 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "6k1/6R1/6N1/6b1/8/8/5b2/3K4 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/5NRk/8/n7/Kb6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/1n6/8/7R/6bk/8/8/1K5N b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "3k4/3R4/3N4/8/2b5/8/8/nK6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/kRN5/3n4/2bK4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "6n1/3Nb3/3R4/3k4/8/3K4/8/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "5Rkb/6p1/8/6N1/8/8/8/1K6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/7R/3n3k/4N1n1/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/5n2/2N4n/8/R7/k7/2K5/8 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "5n2/8/6n1/8/8/2K2N2/8/2kR4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/3n4/2n1kRN1/8/2K5/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/5NRk/8/8/2p5/n7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "4Rk2/5p2/8/7N/8/8/8/Kn6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "5n2/8/3p4/8/8/8/3R2N1/1K1k4 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/N7/1p6/2kR4/8/1K2n3/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/K7/8/3nN1pk/7R/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5NRk/8/8/2p5/4p3/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "7k/6R1/8/8/6N1/p7/p7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/N7/1p6/2kR4/6p1/1K6/8/8 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/8/p7/8/p7/kR6/8/K2N4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/4k3/3R4/8/p1p4N/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "7k/4N2R/8/8/8/1q6/8/Kb6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/4N3/1q6/7b/8/R7/k1K5 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/8/8/8/1Nq5/1R6/1k1Kb3 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "1n6/8/8/8/5NRk/8/4q3/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/7R/7k/4N1q1/8/8/K2n4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/1q6/1n3NRk/8/8/8/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "7k/4N2R/8/8/8/8/2n4q/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/1p6/8/5NRk/8/2q5/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5q2/6p1/8/kRN5/8/8/1K6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5NRk/8/8/8/3p4/6q1/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "1K6/8/7q/8/2p5/8/4N2R/7k b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "8/8/8/7q/7k/5NR1/2q5/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "6Nk/7R/8/8/2q5/3q4/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "3qk3/2N2R2/8/8/8/8/5q2/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "8/7q/8/5NRk/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "8/8/5NRk/8/4r3/8/2q5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "7R/6rk/8/1q2N3/8/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "kRN5/8/8/4q3/8/8/r7/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "6Nk/7R/7b/8/8/8/3r4/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "n7/7N/8/8/6rk/7R/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7k/4N2R/8/8/6n1/8/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7N/7R/7k/1n4r1/8/8/8/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "3n3k/4r2R/7N/8/8/8/3K4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "8/7R/4N1pk/8/1r6/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "K7/8/8/8/4p3/8/1r6/kRN5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "8/8/8/5NRk/8/1r6/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "2r5/8/5NRk/8/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "8/5NRk/8/8/8/5r2/5r2/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6pk/5R2/8/8/4p3/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/8/8/8/7p/2p3Rk/3R4/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "7R/7k/6R1/4p3/8/8/1Kp5/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
  "nocapture": {
-  "count": 358,
+  "count": 363,
   "problems": [
    {
     "material": "KBBBvk",
@@ -18626,11 +19637,46 @@
     "dtm": 12,
     "stipulation": "h#6",
     "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/5k2/4R3/8/8/1K5b/N5b1 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/5k2/2b1R3/8/4b3/1K6/N7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/3b1k2/4R3/5b2/8/1K6/N7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N6q/7q/8/8/8/5k2/4R3/K7 w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
    }
   ]
  },
  "nocheck": {
-  "count": 436,
+  "count": 471,
   "problems": [
    {
     "material": "KBBBvk",
@@ -21683,6 +22729,251 @@
     "dtm": 11,
     "stipulation": "h#5.5",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/Nb6/8/8/2b5/R7/k1K5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/8/8/8/6b1/8/kRNK2b1 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "6k1/6R1/6N1/6b1/8/8/5b2/3K4 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/5NRk/8/n7/Kb6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "3k4/3R4/3N4/8/2b5/8/8/nK6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/kRN5/3n4/2bK4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "6n1/3Nb3/3R4/3k4/8/3K4/8/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "5Rkb/6p1/8/6N1/8/8/8/1K6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/7R/3n3k/4N1n1/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/5n2/2N4n/8/R7/k7/2K5/8 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "5n2/8/6n1/8/8/2K2N2/8/2kR4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/3n4/2n1kRN1/8/2K5/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "5n2/8/3p4/8/8/8/3R2N1/1K1k4 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "7k/6R1/8/8/6N1/p7/p7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/N7/1p6/2kR4/6p1/1K6/8/8 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/8/p7/8/p7/kR6/8/K2N4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "7k/4N2R/8/8/8/1q6/8/Kb6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/4N3/1q6/7b/8/R7/k1K5 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "1n6/8/8/8/5NRk/8/4q3/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/7R/7k/4N1q1/8/8/K2n4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5q2/6p1/8/kRN5/8/8/1K6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "8/8/8/7q/7k/5NR1/2q5/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "7R/6rk/8/1q2N3/8/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "8/6b1/7k/4N2R/8/1r6/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "8/6bk/5N1R/8/8/1r6/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "4Rk2/6b1/7N/8/4r3/8/8/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "n7/7N/8/8/6rk/7R/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7k/4N2R/8/8/6n1/8/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "7k/7R/7N/8/4p3/8/1r6/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "K7/8/8/8/4p3/8/1r6/kRN5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6pk/5R2/8/8/4p3/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/8/8/8/7p/2p3Rk/3R4/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
@@ -22320,7 +23611,7 @@
   ]
  },
  "promotion": {
-  "count": 380,
+  "count": 397,
   "problems": [
    {
     "material": "KBBPvk",
@@ -24981,11 +26272,130 @@
     "dtm": 12,
     "stipulation": "h#6",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7k/7R/7N/4p3/8/8/8/K1b5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "6kR/6b1/8/6N1/4p3/8/2K5/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/5NRk/8/8/2p5/n7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5NRk/8/8/2p5/4p3/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/N7/1p6/2kR4/6p1/1K6/8/8 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/8/p7/8/p7/kR6/8/K2N4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5NRk/8/8/8/3p4/6q1/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "1K6/8/7q/8/2p5/8/4N2R/7k b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "7k/7R/7N/8/4p3/8/1r6/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "K7/8/8/8/4p3/8/1r6/kRN5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6pk/5R2/8/8/4p3/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "7R/7k/6R1/4p3/8/8/1Kp5/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
  "pure": {
-  "count": 790,
+  "count": 856,
   "problems": [
    {
     "material": "KBBBvk",
@@ -30516,11 +31926,473 @@
     "dtm": 11,
     "stipulation": "h#5.5",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/Nb6/8/8/2b5/R7/k1K5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/8/8/8/6b1/8/kRNK2b1 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "6k1/6R1/6N1/6b1/8/8/5b2/3K4 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/5NRk/8/n7/Kb6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/1n6/8/7R/6bk/8/8/1K5N b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "3k4/3R4/3N4/8/2b5/8/8/nK6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/kRN5/3n4/2bK4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "6n1/3Nb3/3R4/3k4/8/3K4/8/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "5Rkb/6p1/8/6N1/8/8/8/1K6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/7R/3n3k/4N1n1/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/5n2/2N4n/8/R7/k7/2K5/8 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "5n2/8/6n1/8/8/2K2N2/8/2kR4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/3n4/2n1kRN1/8/2K5/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/5NRk/8/8/2p5/n7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "4Rk2/5p2/8/7N/8/8/8/Kn6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "5n2/8/3p4/8/8/8/3R2N1/1K1k4 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/N7/1p6/2kR4/8/1K2n3/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/K7/8/3nN1pk/7R/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5NRk/8/8/2p5/4p3/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "7k/6R1/8/8/6N1/p7/p7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/N7/1p6/2kR4/6p1/1K6/8/8 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/8/p7/8/p7/kR6/8/K2N4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/4k3/3R4/8/p1p4N/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "7k/4N2R/8/8/8/1q6/8/Kb6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/4N3/1q6/7b/8/R7/k1K5 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/8/8/8/1Nq5/1R6/1k1Kb3 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "1n6/8/8/8/5NRk/8/4q3/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/7R/7k/4N1q1/8/8/K2n4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/1q6/1n3NRk/8/8/8/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "7k/4N2R/8/8/8/8/2n4q/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/1p6/8/5NRk/8/2q5/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5q2/6p1/8/kRN5/8/8/1K6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5NRk/8/8/8/3p4/6q1/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "1K6/8/7q/8/2p5/8/4N2R/7k b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "8/8/8/7q/7k/5NR1/2q5/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "6Nk/7R/8/8/2q5/3q4/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "3qk3/2N2R2/8/8/8/8/5q2/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N7/8/8/8/8/4q3/1q3R2/K6k w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N6q/7q/8/8/8/5k2/4R3/K7 w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N7/8/8/8/1R6/2q2k2/4q3/K7 w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "8/7q/8/5NRk/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "8/8/5NRk/8/4r3/8/2q5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "7R/6rk/8/1q2N3/8/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "kRN5/8/8/4q3/8/8/r7/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "6Nk/7R/7b/8/8/8/3r4/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "n7/7N/8/8/6rk/7R/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7k/4N2R/8/8/6n1/8/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7N/7R/7k/1n4r1/8/8/8/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "3n3k/4r2R/7N/8/8/8/3K4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "8/7R/4N1pk/8/1r6/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "K7/8/8/8/4p3/8/1r6/kRN5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "8/8/8/5NRk/8/1r6/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "2r5/8/5NRk/8/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "8/5NRk/8/8/8/5r2/5r2/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6pk/5R2/8/8/4p3/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/8/8/8/7p/2p3Rk/3R4/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "7R/7k/6R1/4p3/8/8/1Kp5/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
  "self-block": {
-  "count": 470,
+  "count": 542,
   "problems": [
    {
     "material": "KBBvkb",
@@ -33811,11 +35683,515 @@
     "dtm": 11,
     "stipulation": "h#5.5",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/Nb6/8/8/2b5/R7/k1K5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/8/8/8/6b1/8/kRNK2b1 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "6k1/6R1/6N1/6b1/8/8/5b2/3K4 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/5k2/4R3/8/8/1K5b/N5b1 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/5k2/2b1R3/8/4b3/1K6/N7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/3b1k2/4R3/5b2/8/1K6/N7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/5NRk/8/n7/Kb6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/1n6/8/7R/6bk/8/8/1K5N b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "3k4/3R4/3N4/8/2b5/8/8/nK6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/8/8/8/kRN5/3n4/2bK4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "6n1/3Nb3/3R4/3k4/8/3K4/8/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7k/7R/7N/4p3/8/8/8/K1b5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "5Rkb/6p1/8/6N1/8/8/8/1K6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "6kR/6b1/8/6N1/4p3/8/2K5/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/7R/3n3k/4N1n1/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/5n2/2N4n/8/R7/k7/2K5/8 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "5n2/8/6n1/8/8/2K2N2/8/2kR4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknn",
+    "fen": "8/8/3n4/2n1kRN1/8/2K5/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/5NRk/8/8/2p5/n7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "4Rk2/5p2/8/7N/8/8/8/Kn6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "5n2/8/3p4/8/8/8/3R2N1/1K1k4 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/N7/1p6/2kR4/8/1K2n3/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/K7/8/3nN1pk/7R/8/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5NRk/8/8/2p5/4p3/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "7k/6R1/8/8/6N1/p7/p7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/N7/1p6/2kR4/6p1/1K6/8/8 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/8/p7/8/p7/kR6/8/K2N4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "7k/4N2R/8/8/8/1q6/8/Kb6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/4N3/1q6/7b/8/R7/k1K5 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/8/8/8/1Nq5/1R6/1k1Kb3 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "1n6/8/8/8/5NRk/8/4q3/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/7R/7k/4N1q1/8/8/K2n4 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "8/8/1q6/1n3NRk/8/8/8/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqn",
+    "fen": "7k/4N2R/8/8/8/8/2n4q/2K5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/1p6/8/5NRk/8/2q5/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5q2/6p1/8/kRN5/8/8/1K6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5NRk/8/8/8/3p4/6q1/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "1K6/8/7q/8/2p5/8/4N2R/7k b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "8/8/8/7q/7k/5NR1/2q5/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N7/8/8/8/8/4q3/1q3R2/K6k w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N6q/7q/8/8/8/5k2/4R3/K7 w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N7/8/8/8/1R6/2q2k2/4q3/K7 w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "8/7q/8/5NRk/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "8/8/5NRk/8/4r3/8/2q5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "7R/6rk/8/1q2N3/8/8/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqr",
+    "fen": "kRN5/8/8/4q3/8/8/r7/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "8/6b1/7k/4N2R/8/1r6/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "5N1R/6bk/8/8/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "8/6bk/5N1R/8/8/1r6/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "4Rk2/6b1/7N/8/4r3/8/8/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "6Nk/7R/7b/8/8/8/3r4/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "n7/7N/8/8/6rk/7R/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7k/4N2R/8/8/6n1/8/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "7N/7R/7k/1n4r1/8/8/8/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "3n3k/4r2R/7N/8/8/8/3K4/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "8/7R/4N1pk/8/1r6/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "7k/7R/7N/8/4p3/8/1r6/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "K7/8/8/8/4p3/8/1r6/kRN5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "8/8/8/5NRk/8/1r6/2r5/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "2r5/8/5NRk/8/8/8/1r6/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "8/5NRk/8/8/8/5r2/5r2/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6pk/5R2/8/8/4p3/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/8/8/8/7p/2p3Rk/3R4/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "7R/7k/6R1/4p3/8/8/1Kp5/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
  "set-play": {
-  "count": 84,
+  "count": 85,
   "problems": [
    {
     "material": "KBBBvk",
@@ -34404,11 +36780,18 @@
     "dtm": 12,
     "stipulation": "h#6",
     "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/4k3/3R4/8/p1p4N/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
  "single-piece": {
-  "count": 589,
+  "count": 594,
   "problems": [
    {
     "material": "KBBBvk",
@@ -38532,11 +40915,46 @@
     "dtm": 12,
     "stipulation": "h#6",
     "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/4k3/3R4/8/p1p4N/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
  "single-piece:black": {
-  "count": 560,
+  "count": 565,
   "problems": [
    {
     "material": "KBBBvk",
@@ -42457,6 +44875,41 @@
     "dtm": 12,
     "stipulation": "h#6",
     "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/4k3/3R4/8/p1p4N/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
@@ -42984,7 +45437,7 @@
   ]
  },
  "switchback": {
-  "count": 252,
+  "count": 268,
   "problems": [
    {
     "material": "KBBBvk",
@@ -44749,11 +47202,123 @@
     "dtm": 11,
     "stipulation": "h#5.5",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/8/8/8/6b1/8/kRNK2b1 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbn",
+    "fen": "8/1n6/8/7R/6bk/8/8/1K5N b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "4Rk2/5p2/8/7N/8/8/8/Kn6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "7k/4N2R/8/8/8/1q6/8/Kb6 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/8/8/8/1Nq5/1R6/1k1Kb3 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "1K6/8/7q/8/2p5/8/4N2R/7k b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "8/6bk/5N1R/8/8/1r6/8/K7 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "4Rk2/6b1/7N/8/4r3/8/8/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "6Nk/7R/7b/8/8/8/3r4/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "8/7R/4N1pk/8/1r6/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
    }
   ]
  },
  "umnov": {
-  "count": 241,
+  "count": 257,
   "problems": [
    {
     "material": "KBBPvk",
@@ -46441,11 +49006,123 @@
     "dtm": 11,
     "stipulation": "h#5.5",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/5k2/4R3/8/8/1K5b/N5b1 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/5k2/2b1R3/8/4b3/1K6/N7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbb",
+    "fen": "8/8/3b1k2/4R3/5b2/8/1K6/N7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7k/7R/7N/4p3/8/8/8/K1b5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "5Rkb/6p1/8/6N1/8/8/8/1K6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/5NRk/8/8/2p5/n7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "4Rk2/5p2/8/7N/8/8/8/Kn6 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5k2/6Rp/4p3/N7/8/8/K7 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqq",
+    "fen": "N7/8/8/8/8/4q3/1q3R2/K6k w - - 0 1",
+    "dtm": 9,
+    "stipulation": "h#4.5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "8/7R/4N1pk/8/1r6/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "K7/8/8/8/4p3/8/1r6/kRN5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
    }
   ]
  },
  "underpromotion": {
-  "count": 129,
+  "count": 146,
   "problems": [
    {
     "material": "KBBvkp",
@@ -47349,6 +50026,125 @@
     "dtm": 12,
     "stipulation": "h#6",
     "kind": "dual"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7R/6pk/8/8/7N/b7/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "7k/7R/7N/4p3/8/8/8/K1b5 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkbp",
+    "fen": "6kR/6b1/8/6N1/4p3/8/2K5/8 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvknp",
+    "fen": "8/8/5NRk/8/8/2p5/n7/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/5NRk/8/8/2p5/4p3/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/N7/1p6/2kR4/6p1/1K6/8/8 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkpp",
+    "fen": "8/8/p7/8/p7/kR6/8/K2N4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/8/3p4/8/R1N5/kq6/8/K7 b - - 0 1",
+    "dtm": 18,
+    "stipulation": "h#9",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "8/5NRk/8/8/8/3p4/6q1/1K6 b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqp",
+    "fen": "1K6/8/7q/8/2p5/8/4N2R/7k b - - 0 1",
+    "dtm": 14,
+    "stipulation": "h#7",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "R7/k7/1rp5/N7/8/8/8/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "7k/7R/7N/8/4p3/8/1r6/K7 b - - 0 1",
+    "dtm": 16,
+    "stipulation": "h#8",
+    "kind": "unique"
+   },
+   {
+    "material": "KRNvkrp",
+    "fen": "K7/8/8/8/4p3/8/1r6/kRN5 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6R1/7k/3p4/8/p7/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "5Rk1/4R2p/8/8/8/p7/8/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "8/7R/6pk/5R2/8/8/4p3/K7 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "unique"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "7R/7k/6R1/4p3/8/8/1Kp5/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
    }
   ]
  },
@@ -47365,7 +50161,7 @@
   ]
  },
  "zilahi": {
-  "count": 24,
+  "count": 29,
   "problems": [
    {
     "material": "KBBBvk",
@@ -47533,6 +50329,41 @@
     "fen": "8/8/8/q7/8/8/1K3R2/4R1k1 b - - 0 1",
     "dtm": 8,
     "stipulation": "h#4",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkqb",
+    "fen": "8/8/2b5/8/2qN4/1Rk5/8/2K5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrb",
+    "fen": "6Nk/7R/7b/8/8/8/3r4/1K6 b - - 0 1",
+    "dtm": 12,
+    "stipulation": "h#6",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrn",
+    "fen": "kN6/Rr6/8/8/8/8/8/1nK5 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRNvkrr",
+    "fen": "kN6/Rr6/8/8/8/8/4r3/3K4 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
+    "kind": "dual"
+   },
+   {
+    "material": "KRRvkpp",
+    "fen": "7R/7k/6R1/4p3/8/8/1Kp5/8 b - - 0 1",
+    "dtm": 10,
+    "stipulation": "h#5",
     "kind": "dual"
    }
   ]

@@ -2414,5 +2414,133 @@
   "unique": 3,
   "duals": 1,
   "has_helpmate": true
+ },
+ {
+  "material": "KRNvkbb",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkbn",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkbp",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvknn",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvknp",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkpp",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkqb",
+  "pieces": 6,
+  "stipulation": "h#9",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkqn",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkqp",
+  "pieces": 6,
+  "stipulation": "h#9",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkqq",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkqr",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkrb",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkrn",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkrp",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRNvkrr",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRRvkpp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
  }
 ]
