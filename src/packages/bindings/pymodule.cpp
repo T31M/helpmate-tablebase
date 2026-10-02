@@ -32,7 +32,7 @@ static void validate_mine_shape(int count, int starts, int ends) {
             "ends=" + std::to_string(ends) + " cannot exceed count=" + std::to_string(count));
 }
 PYBIND11_MODULE(_helpmate, mod) {
-    mod.attr("__version__") = hm::HELPMATE_RELEASE_VERSION;
+    mod.attr("__version__") = hm::HELPMATE_VERSION;
     py::register_exception<MissingTableError>(mod, "MissingTableError", PyExc_RuntimeError);
     mod.def(
         "generate",
