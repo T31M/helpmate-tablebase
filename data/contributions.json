@@ -137,6 +137,231 @@
       "generator_version": "0.19.0",
       "verification": null
     },
+    "KRNvkbb": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkbn": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkbp": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvknn": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvknp": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkpp": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkqb": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkqn": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkqp": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkqq": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkqr": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkrb": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkrn": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkrp": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
+    "KRNvkrr": {
+      "contributor": "T31M",
+      "hf_pr": 17,
+      "claim": 45,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "914dc69e0a8e18956fe1a9471091b2991629ffd7",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 1957487690,
+        "result": "pass"
+      }
+    },
     "KRRvkbb": {
       "contributor": "popeye37",
       "hf_pr": 11,
@@ -209,6 +434,21 @@
         "date": "2026-10-01",
         "samples": 2000,
         "seed": 875220557,
+        "result": "pass"
+      }
+    },
+    "KRRvkpp": {
+      "contributor": "T31M",
+      "hf_pr": 16,
+      "claim": null,
+      "merged": "2026-10-02",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "15a95a8073e2d893a5fefc95dd3f1bdb4b4409f5",
+        "date": "2026-10-02",
+        "samples": 2000,
+        "seed": 774762857,
         "result": "pass"
       }
     },

@@ -23,6 +23,8 @@ bumps may change behavior).
   record behind it.
 
 ### Data
+- KRNvkbb, KRNvkbn, KRNvkbp, KRNvknn, KRNvknp, KRNvkpp, KRNvkqb, KRNvkqn, KRNvkqp, KRNvkqq, KRNvkqr, KRNvkrb, KRNvkrn, KRNvkrp, KRNvkrr contributed by T31M (dataset PR #17, claim #45).
+- KRRvkpp contributed by T31M (dataset PR #16).
 - KRRvknp contributed by popeye37 (dataset PR #15, claim #39).
 - KRRvknn contributed by popeye37 (dataset PR #14, claim #39).
 - KRRvkbp contributed by popeye37 (dataset PR #13, claim #39).
