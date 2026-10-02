@@ -2,6 +2,7 @@
 #include "chess/types.h"
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <optional>
 #include <string>
 #include <vector>
@@ -14,8 +15,20 @@ struct Material {
     static std::optional<Material> parse(const std::string&);  // "KBkqrbp" or "KBvkqrbp"
     static Material of(const std::vector<PlacedPiece>&);
 
+    // Piece counts packed one byte per PieceType (byte t holds the count of
+    // type t), indexed by Color -- the form Board::pieces(out, counts) fills.
+    // Comparing two of these is two integer compares on registers.
+    using Counts = std::array<uint64_t, 2>;
+    Counts counts() const;
+    static Material from_counts(const Counts&);
+
     std::string name() const;                       // canonical "KBvkqrbp"
-    bool operator==(const Material&) const = default;
+    // Same result as the defaulted member-wise compare, but a fixed 12-byte
+    // compare the compiler inlines: std::array's == calls out to memcmp.
+    bool operator==(const Material& o) const {
+        static_assert(sizeof(Material) == 12, "white and black counts, no padding");
+        return std::memcmp(this, &o, sizeof(Material)) == 0;
+    }
 
     bool has_pawns() const;
     int total() const;

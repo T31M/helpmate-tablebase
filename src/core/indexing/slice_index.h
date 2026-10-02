@@ -2,8 +2,10 @@
 #include "chess/types.h"
 #include "indexing/material.h"
 #include "indexing/kk.h"
+#include <array>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace hm {
@@ -37,6 +39,11 @@ private:
     bool pawns_;
     const KKTable* kk_;
     std::vector<Slot> slots_;
+    // Per piece kind (color * 6 + type): its run of identical slots,
+    // [run_first_, run_first_ + run_count_). Kings and absent kinds have count 0.
+    std::array<uint8_t, 12> run_first_{}, run_count_{};
+    // (first, count) of each run holding two or more identical pieces.
+    std::vector<std::pair<uint8_t, uint8_t>> multi_runs_;
     uint64_t size_ = 0;
 };
 

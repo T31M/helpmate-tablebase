@@ -33,6 +33,24 @@ Material Material::of(const std::vector<PlacedPiece>& pieces) {
     return m;
 }
 
+Material::Counts Material::counts() const {
+    Counts c{0, 0};
+    for (int t = 0; t < 6; ++t) {
+        c[0] |= (uint64_t)white[t] << (8 * t);
+        c[1] |= (uint64_t)black[t] << (8 * t);
+    }
+    return c;
+}
+
+Material Material::from_counts(const Counts& c) {
+    Material m;
+    for (int t = 0; t < 6; ++t) {
+        m.white[t] = (uint8_t)(c[0] >> (8 * t));
+        m.black[t] = (uint8_t)(c[1] >> (8 * t));
+    }
+    return m;
+}
+
 std::string Material::name() const {
     std::string out;
     for (int t = 0; t < 6; ++t) out.append(white[t], WLET[t]);

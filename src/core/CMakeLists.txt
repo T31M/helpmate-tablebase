@@ -4,6 +4,11 @@
 set(HELPMATE_SOURCES chess/board.cpp chess/san.cpp indexing/material.cpp indexing/kk.cpp indexing/slice_index.cpp format/table_file.cpp format/block_codec.cpp format/block_cache.cpp generator/oracle.cpp generator/generator.cpp probe/tablebase.cpp themes/attack.cpp themes/mate_themes.cpp themes/trajectory.cpp themes/line_themes.cpp themes/position_themes.cpp themes/identity.cpp themes/set_themes.cpp themes/registry.cpp probe/mine_set.cpp probe/mine_shell.cpp)  # tasks append here
 add_library(helpmate_core STATIC ${HELPMATE_SOURCES})
 
+# Appended to the release version in HELPMATE_VERSION only (CLI --version and
+# the generator_version in tables/stats). VERSION, project() and the Python
+# package versions stay a bare X.Y.Z; this marks builds from the t31m fork.
+set(HELPMATE_VERSION_SUFFIX "-t31m" CACHE STRING "Suffix appended to HELPMATE_VERSION")
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
                ${CMAKE_BINARY_DIR}/generated/version.h @ONLY)
 

@@ -1,5 +1,7 @@
 #pragma once
 #include "chess/types.h"
+#include <array>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -21,6 +23,10 @@ public:
     int ep_square() const;  // -1 if none
     std::vector<PlacedPiece> pieces() const;
     void pieces(std::vector<PlacedPiece>& out) const;  // fills reusable caller-owned storage
+    // pieces(out) plus, in the same pass, the number of pieces of each type:
+    // counts[color] holds one byte per PieceType (byte t = count of type t),
+    // the packed form of Material (see Material::Counts).
+    void pieces(std::vector<PlacedPiece>& out, std::array<uint64_t, 2>& counts) const;
     bool in_check() const;             // side to move
     bool opponent_in_check() const;    // true => position illegal
     PosState state() const;            // for side to move

@@ -148,3 +148,66 @@ TEST_CASE("copy preserves captured-piece history for unmake") {
     copy_assign.unmake(capture);
     CHECK(copy_assign.fen() == before);
 }
+TEST_CASE("reset on a reused board matches a freshly built one") {
+    // Every observable a fresh from_pieces() board has must survive reuse:
+    // same side (in-place path), side switch (set_position path), and a board
+    // left mid-line with ply != 0 (rebuild path), with and without ep.
+    auto same = [](const Board& a, const Board& b) {
+        CHECK(a.fen() == b.fen());
+        CHECK(a.hash() == b.hash());
+        CHECK(a.ep_square() == b.ep_square());
+        CHECK(a.state() == b.state());
+        auto ma = a.legal_moves(), mb = b.legal_moves();
+        REQUIRE(ma.size() == mb.size());
+        for (size_t i = 0; i < ma.size(); ++i) {
+            CHECK(ma[i].from == mb[i].from);
+            CHECK(ma[i].to == mb[i].to);
+            CHECK(ma[i].flags == mb[i].flags);
+        }
+    };
+    const auto mate = Board::from_fen("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1")->pieces();
+    // White pawn e5, black pawn just double-pushed d7-d5: ep square d6 (43).
+    const auto ep_pos = Board::from_fen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1")->pieces();
+
+    Board reused = *Board::from_fen("n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 7 30");
+    for (int round = 0; round < 2; ++round) {
+        reused.reset(mate, Color::Black);
+        same(reused, Board::from_pieces(mate, Color::Black));
+        reused.reset(mate, Color::Black);  // same side again
+        same(reused, Board::from_pieces(mate, Color::Black));
+        reused.reset(ep_pos, Color::White, 43);  // side switch with ep
+        same(reused, Board::from_pieces(ep_pos, Color::White, 43));
+        reused.reset(ep_pos, Color::White);  // same side, ep cleared
+        same(reused, Board::from_pieces(ep_pos, Color::White));
+
+        // Leave the board one ply deep (capture recorded in history) before reset.
+        reused.reset(ep_pos, Color::White, 43);
+        for (auto& m : reused.legal_moves())
+            if (m.is_ep()) { reused.make(m); break; }
+        REQUIRE(reused.stm() == Color::Black);
+        reused.reset(mate, Color::Black);
+        same(reused, Board::from_pieces(mate, Color::Black));
+    }
+}
+TEST_CASE("pieces with counts matches a tally of pieces()") {
+    for (const char* fen : {"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1",
+                            "7k/6Q1/5K2/8/8/8/8/8 b - - 0 1", "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1"}) {
+        auto b = Board::from_fen(fen);
+        REQUIRE(b);
+        std::array<uint8_t, 6> want[2] = {};
+        for (auto& p : b->pieces()) want[(int)p.piece.color][(int)p.piece.type]++;
+        std::vector<PlacedPiece> out = {{{Color::White, PieceType::Queen}, 0}};  // stale content is replaced
+        std::array<uint64_t, 2> counts{~0ull, ~0ull};
+        b->pieces(out, counts);
+        auto plain = b->pieces();
+        REQUIRE(out.size() == plain.size());
+        for (size_t i = 0; i < out.size(); ++i) {
+            CHECK(out[i].piece == plain[i].piece);
+            CHECK(out[i].square == plain[i].square);
+        }
+        for (int c = 0; c < 2; ++c)
+            for (int ty = 0; ty < 6; ++ty) CHECK((uint8_t)(counts[c] >> (8 * ty)) == want[c][ty]);
+        CHECK((counts[0] >> 48) == 0);
+        CHECK((counts[1] >> 48) == 0);
+    }
+}

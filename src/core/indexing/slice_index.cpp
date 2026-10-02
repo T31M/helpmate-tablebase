@@ -16,6 +16,13 @@ SliceIndex::SliceIndex(const Material& m) : mat_(m) {
         }
     size_ = kk_->size;
     for (auto& s : slots_) size_ *= (uint64_t)s.radix;
+    for (size_t k = 0; k < slots_.size(); ++k) {
+        int kind = (int)slots_[k].piece.color * 6 + (int)slots_[k].piece.type;
+        if (run_count_[kind] == 0) run_first_[kind] = (uint8_t)k;
+        run_count_[kind]++;
+    }
+    for (int kind = 0; kind < 12; ++kind)
+        if (run_count_[kind] > 1) multi_runs_.push_back({run_first_[kind], run_count_[kind]});
 }
 
 uint64_t SliceIndex::size() const { return size_; }
@@ -33,30 +40,39 @@ std::optional<uint64_t> SliceIndex::encode_for_material(const std::vector<Placed
     for (auto& p : pp) if (p.piece.type == PieceType::King)
         (p.piece.color == Color::White ? wk : bk) = p.square;
     if (wk < 0 || wk >= 64 || bk < 0 || bk >= 64) return std::nullopt;
+    const size_t ns = slots_.size();
     uint64_t best = UINT64_MAX;
     for (uint16_t choice : kk_->choices_of[wk * 64 + bk]) {
         if (choice == KKTable::kNoChoice) break;
         int t = choice & 7;
-        uint64_t idx = choice >> 3; bool ok = true;
-        size_t i = 0;
-        while (i < slots_.size() && ok) {
-            size_t j = i;                             // run of identical slots
-            while (j < slots_.size() && slots_[j].piece == slots_[i].piece) j++;
-            std::array<int, 64> sqs;
-            size_t n = 0;
-            for (auto& p : pp)
-                if (p.piece == slots_[i].piece) {
-                    if (n == sqs.size()) return std::nullopt;
-                    sqs[n++] = transform_sq(p.square, t);
-                }
-            if (n != j - i) { ok = false; break; }
-            std::sort(sqs.begin(), sqs.begin() + n);
-            for (size_t k = i; k < j; ++k) {
-                int digit = sqs[k - i] - (slots_[k].radix == 48 ? 8 : 0);
-                if (digit < 0 || digit >= slots_[k].radix) { ok = false; break; }
-                idx = idx * slots_[k].radix + (uint64_t)digit;
+        uint64_t idx = choice >> 3;
+        // One pass drops each transformed square straight into its slot run;
+        // identical pieces then only need ordering within their run.
+        std::array<int, 64> sqs;
+        std::array<uint8_t, 12> fill{};
+        size_t placed = 0;
+        bool ok = true;
+        for (auto& p : pp) {
+            if (p.piece.type == PieceType::King) continue;
+            int kind = (int)p.piece.color * 6 + (int)p.piece.type;
+            if (fill[kind] == run_count_[kind]) { ok = false; break; }  // more than the material holds
+            sqs[run_first_[kind] + fill[kind]++] = transform_sq(p.square, t);
+            ++placed;
+        }
+        if (!ok || placed != ns) continue;
+        // Runs hold a few identical pieces; std::sort's call and introsort
+        // setup cost more than the sort itself at that size.
+        for (auto [first, count] : multi_runs_)
+            for (size_t a = first + 1; a < (size_t)first + count; ++a) {
+                int v = sqs[a];
+                size_t b = a;
+                for (; b > first && sqs[b - 1] > v; --b) sqs[b] = sqs[b - 1];
+                sqs[b] = v;
             }
-            i = j;
+        for (size_t k = 0; k < ns; ++k) {
+            int digit = sqs[k] - (slots_[k].radix == 48 ? 8 : 0);
+            if (digit < 0 || digit >= slots_[k].radix) { ok = false; break; }
+            idx = idx * slots_[k].radix + (uint64_t)digit;
         }
         if (ok) best = std::min(best, idx);
     }

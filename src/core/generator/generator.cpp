@@ -85,7 +85,8 @@ bool slice_has_any_mate(const Material& m) {
     return false;
 }
 
-SliceGen::SliceGen(const Material& m, const GenOptions& opt) : mat_(m), opt_(opt), idx_(m), ps_(idx_.size()) {
+SliceGen::SliceGen(const Material& m, const GenOptions& opt)
+    : mat_(m), mat_counts_(m.counts()), opt_(opt), idx_(m), ps_(idx_.size()) {
     for (int s = 0; s < 2; ++s) {
         dtm_[s].assign(ps_, DTM_UNSET);
         cnt_[s].assign(ps_, 0);
@@ -97,10 +98,12 @@ void SliceGen::init_pass() {
     // Each cell c is examined and written independently of every other cell
     // (opponent_in_check()/state() depend only on pp/s decoded from c itself),
     // so a disjoint [begin,end) range per worker is race-free; each worker
-    // gets its own Board/pp (Board is stateful, not shareable across threads).
+    // gets its own Boards/pp (Board is stateful, not shareable across threads).
     parallel_for(ps_, opt_.threads, [this](uint64_t begin, uint64_t end) {
         std::vector<PlacedPiece> pp;
-        Board b;
+        // One Board per side to move: Board::reset is cheapest when the side
+        // to move is unchanged, and each cell is examined for both sides.
+        Board boards[2];
         for (uint64_t c = begin; c < end; ++c) {
             if (!idx_.decode(c, pp)) {
                 dtm_[0][c] = dtm_[1][c] = DTM_INVALID;
@@ -112,6 +115,7 @@ void SliceGen::init_pass() {
                 continue;
             }  // non-canonical duplicate
             for (int s = 0; s < 2; ++s) {
+                Board& b = boards[s];
                 b.reset(pp, (Color)s);
                 if (b.opponent_in_check()) {
                     dtm_[s][c] = DTM_INVALID;
@@ -133,10 +137,11 @@ const SliceIndex& SliceGen::index() const { return idx_; }
 int SliceGen::max_dtm() const { return max_dtm_; }
 
 ValuePair SliceGen::lookup_epless(Board& b, std::vector<PlacedPiece>& piece_scratch) {
-    b.pieces(piece_scratch);
+    Material::Counts counts;
+    b.pieces(piece_scratch, counts);
     const auto& pp = piece_scratch;
-    Material m = Material::of(pp);
-    if (m == mat_) {
+    if (counts == mat_counts_) {
+        const Material& m = mat_;
         auto e = idx_.encode_for_material(pp, m);
         int s = (int)b.stm();
         // encode() is disengaged for positions this slice cannot hold (kings adjacent/equal).
@@ -152,7 +157,7 @@ ValuePair SliceGen::lookup_epless(Board& b, std::vector<PlacedPiece>& piece_scra
                                        describe_position(pp, b.stm()));
         return {dtm_[s][*e], cnt_[s][*e]};
     }
-    return subs_.lookup_for_material(m, pp, b.stm());
+    return subs_.lookup_for_counts(counts, pp, b.stm());
 }
 
 bool SliceGen::scan_pass(int d) {
