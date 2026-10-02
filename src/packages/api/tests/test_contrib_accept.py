@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -40,14 +43,16 @@ class ConflictingGit(FakeGit):
 
     def reset_to_origin_main(self, branch, paths):
         super().reset_to_origin_main(branch, paths)
-        files = [self.checkout / p for p in paths]
+        def files():
+            for p in (self.checkout / p for p in paths):
+                yield from (f for f in p.rglob("*") if f.is_file()) if p.is_dir() else [p]
         if self.snap is None:
-            self.snap = {f: f.read_bytes() for f in files if f.exists()}
-        for f in files:
-            if f in self.snap:
-                f.write_bytes(self.snap[f])
-            else:
+            self.snap = {f: f.read_bytes() for f in files() if f.exists()}
+        for f in list(files()):
+            if f not in self.snap:
                 f.unlink(missing_ok=True)
+        for f, data in self.snap.items():
+            f.write_bytes(data)
 
     def open_pr(self, title, body, branch=None):
         super().open_pr(title, body, branch)
@@ -92,9 +97,33 @@ def _setup(tmp_path, head="abc", report_head="abc", result="pass"):
     return checkout, staging, hub, gh, tables
 
 
+BINARY = sys.executable          # any existing file stands in for the helpmate binary
+
+
+class PageBuilder:
+    """Stands in for tools/build_problems.py: records each call and, like the real
+    tool, writes a page only for a material that materials.json lists as done."""
+
+    def __init__(self, fail=False, skip=()):
+        self.calls, self.fail, self.skip = [], fail, set(skip)
+
+    def __call__(self, args, *, cwd, check):
+        self.calls.append((list(args), cwd, check))
+        if self.fail:
+            raise subprocess.CalledProcessError(1, args)
+        out = Path(args[args.index("--out") + 1])
+        rows = {r["material"]: r for r in json.loads((out / "materials.json").read_text())}
+        (out / "material").mkdir(exist_ok=True)
+        for i, a in enumerate(args):
+            if a == "--material" and rows.get(args[i + 1], {}).get("done") and args[i + 1] not in self.skip:
+                (out / "material" / f"{args[i + 1]}.json").write_text(json.dumps({"material": args[i + 1]}))
+        return subprocess.CompletedProcess(args, 0)
+
+
 def _run(checkout, staging, hub, gh, tables, git, **kw):
     return accept([2], hub=hub, gh=gh, git=git, checkout=checkout, tables=tables,
-                  staging=staging, contributor=kw.get("contributor"), today="2026-10-01")
+                  staging=staging, contributor=kw.get("contributor"), today="2026-10-01",
+                  binary=kw.get("binary", BINARY), build_pages=kw.get("pages") or PageBuilder())
 
 
 def test_accept_happy_path(tmp_path):
@@ -357,10 +386,13 @@ class FlakyHub(FakeHub):
         super().merge(num)
 
 
-def _two_prs(tmp_path):
+def _two_prs(tmp_path, marker=False):
     checkout, staging, hub, gh, tables = _setup(tmp_path)
     flaky = FlakyHub(dict(hub.main))
-    files = {"KRRvkqr.hm": b"t2", "KRRvkqr.stats.json": b'{"generator_version": "0.20.0", "material": "KRRvkqr", "plane_size": 1, "max_dtm": 9}'}
+    stats = {"generator_version": "0.20.0", "material": "KRRvkqr", "plane_size": 1, "max_dtm": 9}
+    if marker:                                       # a table without a single helpmate
+        stats.update(max_dtm=255, all_unsolvable=True)
+    files = {"KRRvkqr.hm": b"t2", "KRRvkqr.stats.json": json.dumps(stats).encode()}
     flaky.prs, flaky.bases, flaky.deletes = hub.prs, hub.bases, hub.deletes
     flaky.add_pr(3, files, head="h3")
     d = staging / "pr-3"
@@ -371,9 +403,10 @@ def _two_prs(tmp_path):
     return checkout, staging, flaky, gh, tables
 
 
-def _run2(checkout, staging, hub, gh, tables, git):
+def _run2(checkout, staging, hub, gh, tables, git, pages=None):
     return accept([2, 3], hub=hub, gh=gh, git=git, checkout=checkout, tables=tables,
-                  staging=staging, contributor=None, today="2026-10-01")
+                  staging=staging, contributor=None, today="2026-10-01",
+                  binary=BINARY, build_pages=pages or PageBuilder())
 
 
 def test_partial_batch_merge_resumes(tmp_path):
@@ -881,3 +914,170 @@ def test_resume_reads_a_copy_recorded_in_the_earlier_bare_string_format(tmp_path
     ((num, comment),) = hub.closed
     assert num == 2 and comment.startswith("Merged as https://hf.example/commit/abc:")
     assert not path.exists()
+
+
+# --- material pages: accept runs tools/build_problems.py for what it accepts ---
+
+def test_accept_builds_the_pages_of_every_accepted_material_markers_too(tmp_path):
+    checkout, staging, hub, gh, tables = _two_prs(tmp_path, marker=True)
+    hub.healed = True
+    pages = PageBuilder()
+    assert _run2(checkout, staging, hub, gh, tables, FakeGit(), pages=pages) == 0
+    assert pages.calls == [([sys.executable, str(checkout / "tools" / "build_problems.py"),
+                             "--tables", str(tables), "--binary", BINARY,
+                             "--out", str(checkout / "site" / "data"),
+                             "--material", "KRRvkqq", "--material", "KRRvkqr"], checkout, True)]
+
+
+class SnapshotGit(FakeGit):
+    """Records what the checkout holds when the docs commit is made."""
+
+    def __init__(self, checkout):
+        super().__init__()
+        self.checkout, self.at_commit = checkout, None
+
+    def commit_all(self, message):
+        super().commit_all(message)
+        data = self.checkout / "site" / "data"
+        rows = {r["material"]: r for r in json.loads((data / "materials.json").read_text())}
+        self.at_commit = {"pages": sorted(p.name for p in (data / "material").glob("*.json")),
+                          "page_flag": rows["KRRvkqq"]["page"], "done": rows["KRRvkqq"]["done"]}
+
+
+def test_docs_commit_includes_the_built_pages_and_the_page_flags_they_set(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    git = SnapshotGit(checkout)
+    assert _run(checkout, staging, hub, gh, tables, git) == 0
+    # the builder saw KRRvkqq as done (it skips materials that are not), and the
+    # materials data committed with the page says the page exists
+    assert git.at_commit == {"pages": ["KRRvkqq.json"], "page_flag": True, "done": True}
+
+
+@pytest.mark.parametrize("binary", [None, "/nonexistent/helpmate"])
+def test_missing_binary_stops_before_merging(tmp_path, capsys, binary):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    pages = PageBuilder()
+    assert _run(checkout, staging, hub, gh, tables, FakeGit(), binary=binary, pages=pages) == 2
+    assert hub.merged == [] and pages.calls == []
+    assert "--binary" in capsys.readouterr().err
+
+
+def test_cli_without_a_helpmate_binary_on_path_stops_before_merging(tmp_path, capsys, monkeypatch):
+    from helpmate_server import tables_cli
+    from helpmate_server.contrib import cli
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    rc = tables_cli.main(["accept", "2", "--tables", str(tables), "--checkout", str(checkout),
+                          "--staging", str(staging)], hub_factory=lambda r: hub, gh_factory=lambda r: gh)
+    assert rc == 2 and hub.merged == []
+    assert "--binary" in capsys.readouterr().err
+
+
+def test_resume_after_the_page_builder_failed_merges_nothing_twice_and_builds_again(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    git = ConflictingGit(checkout, conflicts=0)      # its reset restores the files, like git's
+    with pytest.raises(subprocess.CalledProcessError):
+        _run(checkout, staging, hub, gh, tables, git, pages=PageBuilder(fail=True))
+    assert hub.merged == [2] and not any(c[0] == "commit_all" for c in git.calls)
+    _forget_merged_prs(hub)
+    snap, git, pages = git.snap, ConflictingGit(checkout, conflicts=0), PageBuilder()
+    git.snap = snap                                   # origin/main as the first run found it
+    assert _run(checkout, staging, hub, gh, tables, git, pages=pages) == 0
+    assert hub.merged == [2] and len(pages.calls) == 1
+    assert [c[0] for c in git.calls].count("commit_all") == 1
+    assert (checkout / "CHANGELOG.md").read_text().count("KRRvkqq contributed by") == 1
+    assert (checkout / "site" / "data" / "material" / "KRRvkqq.json").exists()
+
+
+def test_generated_page_files_count_as_accepts_own_leftovers(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    with pytest.raises(subprocess.CalledProcessError):
+        _run(checkout, staging, hub, gh, tables, FakeGit(), pages=PageBuilder(fail=True))
+    git = FakeGit()
+    git.clean = lambda: False
+    git.dirty_paths = lambda: ["site/data/material/KRRvkqq.json", "site/data/index.json",
+                               "site/data/themes.json"]
+    assert _run(checkout, staging, hub, gh, tables, git) == 0
+
+
+def test_a_path_that_only_starts_like_a_generated_directory_is_not_ours(tmp_path, capsys):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    git = FakeGit()
+    git.dirty_paths = lambda: ["site/data/material.bak"]
+    assert _run(checkout, staging, hub, gh, tables, git) == 2
+    assert "site/data/material.bak" in capsys.readouterr().err
+
+
+def test_real_git_reset_restores_a_generated_directory_without_deleting_it(clone, monkeypatch):
+    from helpmate_server.contrib.accept import Git
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+    pages = clone / "site" / "data" / "material"
+    pages.mkdir(parents=True)
+    (pages / "A.json").write_text('{"a": 1}\n')
+    (pages / "K.json").write_text('{"k": 1}\n')
+    _sh(clone, "git", "add", "-A")
+    _sh(clone, "git", "commit", "-q", "-m", "pages")
+    _sh(clone, "git", "push", "-q", "origin", "main")
+    (pages / "A.json").write_text('{"a": 2}\n')                # modified
+    (pages / "B.json").write_text("{}\n")                       # untracked
+    (pages / "C.json").write_text("{}\n")
+    _sh(clone, "git", "add", "site/data/material/C.json")        # staged new, as after a failed commit
+    Git(clone).reset_to_origin_main("data/accept-2")
+    assert (pages / "A.json").read_text() == '{"a": 1}\n'
+    assert (pages / "K.json").read_text() == '{"k": 1}\n'
+    assert not (pages / "B.json").exists() and not (pages / "C.json").exists()
+    assert _sh(clone, "git", "status", "--porcelain") == ""
+
+
+def test_real_git_dirty_paths_lists_new_files_inside_an_untracked_directory(clone):
+    from helpmate_server.contrib.accept import Git
+    (clone / "site" / "data" / "material").mkdir(parents=True)
+    (clone / "site" / "data" / "material" / "B.json").write_text("{}\n")
+    assert Git(clone).dirty_paths() == ["site/data/material/B.json"]
+
+
+def test_cli_resolves_a_relative_binary_before_handing_it_on(tmp_path, monkeypatch):
+    from helpmate_server import tables_cli
+    from helpmate_server.contrib import accept as accept_mod
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    (tmp_path / "build").mkdir()
+    (tmp_path / "build" / "helpmate").write_text("")
+    monkeypatch.chdir(tmp_path)
+    seen = {}
+    monkeypatch.setattr(accept_mod, "accept", lambda prs, **kw: seen.update(kw) or 0)
+    assert tables_cli.main(["accept", "2", "--tables", str(tables), "--checkout", str(checkout),
+                            "--binary", "build/helpmate"],
+                           hub_factory=lambda r: hub, gh_factory=lambda r: gh) == 0
+    assert seen["binary"] == str(tmp_path.resolve() / "build" / "helpmate")
+
+
+def test_a_material_the_builder_skipped_stops_the_docs_step_and_a_rerun_completes(tmp_path):
+    checkout, staging, hub, gh, tables = _two_prs(tmp_path)
+    hub.healed = True
+    git = ConflictingGit(checkout, conflicts=0)
+    with pytest.raises(RuntimeError, match="no page built for KRRvkqr"):
+        _run2(checkout, staging, hub, gh, tables, git, pages=PageBuilder(skip={"KRRvkqr"}))
+    assert hub.merged == [2, 3] and not any(c[0] == "commit_all" for c in git.calls)
+    _forget_merged_prs(hub)
+    snap, git, pages = git.snap, ConflictingGit(checkout, conflicts=0), PageBuilder()
+    git.snap = snap
+    assert _run2(checkout, staging, hub, gh, tables, git, pages=pages) == 0
+    assert hub.merged == [2, 3] and len(pages.calls) == 1
+    assert [c[0] for c in git.calls].count("commit_all") == 1
+
+
+def test_cli_resolves_the_helpmate_found_on_path(tmp_path, monkeypatch):
+    from helpmate_server import tables_cli
+    from helpmate_server.contrib import accept as accept_mod
+    from helpmate_server.contrib import cli
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "helpmate").write_text("")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "bin/helpmate")   # a relative PATH entry
+    seen = {}
+    monkeypatch.setattr(accept_mod, "accept", lambda prs, **kw: seen.update(kw) or 0)
+    assert tables_cli.main(["accept", "2", "--tables", str(tables), "--checkout", str(checkout)],
+                           hub_factory=lambda r: hub, gh_factory=lambda r: gh) == 0
+    assert seen["binary"] == str(tmp_path.resolve() / "bin" / "helpmate")

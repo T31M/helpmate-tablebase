@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -51,6 +52,8 @@ def add_parsers(sub) -> None:
     ac.add_argument("--staging", type=Path, default=DEFAULT_STAGING)
     ac.add_argument("--repo", default=DATASET_REPO, metavar="USER/DATASET")
     ac.add_argument("--github-repo", default=GITHUB_REPO)
+    ac.add_argument("--binary", metavar="PATH",
+                    help="helpmate binary for the material pages (default: helpmate on PATH)")
     st = sub.add_parser("status", help="(maintainer) open dataset PRs, claims, verification")
     st.add_argument("--checkout", type=Path, default=Path("."))
     st.add_argument("--staging", type=Path, default=DEFAULT_STAGING)
@@ -65,6 +68,12 @@ def add_parsers(sub) -> None:
     ss.add_argument("--repo", default=DATASET_REPO, metavar="USER/DATASET")
     ss.add_argument("--github-repo", default=GITHUB_REPO)
     ss.add_argument("--registry", type=Path, default=Path("data/contributions.json"))
+
+
+def _absolute_binary(given: str | None) -> str | None:
+    """--binary, else helpmate on PATH; absolute, since build_problems runs with cwd=checkout."""
+    found = given or shutil.which("helpmate")
+    return str(Path(found).expanduser().resolve()) if found else None
 
 
 def _installed_version() -> str:
@@ -148,7 +157,8 @@ def run(a: argparse.Namespace, hub_factory=None, gh_factory=None) -> int:
                 return 0
             return accept(a.pr, hub=hub, gh=gh, git=Git(checkout), checkout=checkout,
                           tables=Path(a.tables).expanduser(), staging=Path(a.staging).expanduser(),
-                          contributor=a.contributor, today=date.today().isoformat())
+                          contributor=a.contributor, today=date.today().isoformat(),
+                          binary=_absolute_binary(a.binary))
         raise UsageError(f"{a.cmd}: not implemented yet")
     except UsageError as exc:
         print(f"error: {exc}", file=sys.stderr)

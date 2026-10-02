@@ -225,6 +225,9 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   is resumable: rerun the same command after a failure. Use
   `--contributor LOGIN` when neither the PR description nor the claim issue
   names one.
+  The docs PR also carries the accepted materials' site pages
+  (`site/data/material/<M>.json`, mined by `tools/build_problems.py`), so accept
+  needs the `helpmate` binary on `PATH` (`--binary PATH` to point elsewhere).
 - `helpmate-tables sync --tables ~/tb` regenerates the counts and the site's
   materials data (`site/data/materials.json`, `corpus.json`; Kvk (two bare
   kings) is listed last, with no priority) and closes finished claims

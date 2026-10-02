@@ -24,15 +24,38 @@ from .hf import MergeConflict as HubConflict
 from .hf import PullRequest
 from .links import parse_links
 from .registry import Contributor, Registry, resolve_contributor
+from .site_data import write_site_data
 
 STEPS = ("merge", "manifest", "local", "docs", "card", "claims")
-# Every file the docs step writes; anything else dirty in the checkout is not ours to touch.
+# Every file the docs step writes (site/data/material is a directory: one page per material);
+# anything else dirty in the checkout is not ours to touch.
 DOCS_PATHS = ("CHANGELOG.md", "data/contributions.json", "README.md", "docs/CONTRIBUTING-TABLES.md",
               "docs/COOPERATIVE-TABLEBASE.md", "docs/hf-dataset-card.md", "site/data/materials.json",
-              "site/data/corpus.json", ".all-contributorsrc")
+              "site/data/corpus.json", ".all-contributorsrc", "site/data/material",
+              "site/data/index.json", "site/data/themes.json")
 _NO_CHECKS = "no checks reported"
 _NO_GLOBAL = {"GIT_CONFIG_GLOBAL": "/dev/null"}   # the global config rewrites HTTPS to SSH
 _GH_CREDENTIALS = "credential.helper=!gh auth git-credential"
+
+
+def under(path: str, paths: tuple[str, ...] = DOCS_PATHS) -> bool:
+    """True if `path` is one of `paths` or lies inside one of them (a directory entry)."""
+    return any(path == p or path.startswith(p.rstrip("/") + "/") for p in paths)
+
+
+def build_material_pages(materials: list[str], *, checkout: Path, tables: Path, binary: str,
+                         runner=subprocess.run) -> None:
+    """Mine the site's page data for `materials` (site/data/material/<M>.json, merged into
+    index.json and themes.json). Output is not captured: one line per material."""
+    cmd = [sys.executable, str(checkout / "tools" / "build_problems.py"), "--tables", str(tables),
+           "--binary", binary, "--out", str(checkout / "site" / "data")]
+    for m in materials:
+        cmd += ["--material", m]
+    runner(cmd, cwd=checkout, check=True)
+    missing = [m for m in materials if not (checkout / "site" / "data" / "material" / f"{m}.json").exists()]
+    if missing:  # build_problems exits 0 when it skips a material
+        raise RuntimeError(f"no page built for {', '.join(missing)}; build_problems skipped it — check "
+                           "that the table and sidecar are in --tables and done in materials.json")
 
 
 def manifest_from_hub(hub, generator_version: str) -> dict:
@@ -82,21 +105,24 @@ class Git:
         return self._out("git", "status", "--porcelain") == ""
 
     def dirty_paths(self) -> list[str]:
-        return [line[3:].strip().strip('"') for line in
-                self._run("git", "status", "--porcelain", "--no-renames").stdout.splitlines() if line.strip()]
+        return [line[3:].strip().strip('"') for line in  # -uall: files, not an untracked directory
+                self._run("git", "status", "--porcelain", "--no-renames", "-uall").stdout.splitlines()
+                if line.strip()]
 
     def current(self) -> str:
         return self._out("git", "rev-parse", "--abbrev-ref", "HEAD")
 
     def reset_to_origin_main(self, branch: str, paths: tuple[str, ...] = DOCS_PATHS) -> None:
-        """A fresh branch from origin/main. Only `paths` (what accept generates) are restored
-        to HEAD, in index and worktree, or removed if untracked: nothing else is touched."""
+        """A fresh branch from origin/main. Only `paths` (what accept generates; files or
+        directories) are restored to HEAD, in index and worktree, or removed if not in HEAD:
+        nothing else is touched. Files are compared one by one, so a directory entry keeps
+        its committed files and loses only what accept added to it."""
         in_head = set(self._out("git", "ls-tree", "-r", "--name-only", "HEAD", "--", *paths).splitlines())
         if in_head:
             self._run("git", "restore", "--staged", "--worktree", "--source=HEAD", "--", *sorted(in_head))
-        for p in paths:
-            if p not in in_head:
-                self._run("git", "rm", "-rf", "--ignore-unmatch", "-q", "--", p)
+        staged_new = set(self._out("git", "ls-files", "--", *paths).splitlines()) - in_head
+        if staged_new:  # added to the index by a failed attempt, not in HEAD
+            self._run("git", "rm", "-f", "-q", "--", *sorted(staged_new))
         self._run("git", "clean", "-fd", "--", *paths)
         self._run("git", "fetch", "origin", "main", env=_NO_GLOBAL)
         self._run("git", "switch", "-C", branch, "origin/main")
@@ -203,7 +229,13 @@ def _missing_staged(hub, pr, files_dir: Path) -> list[str]:
 
 
 def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, staging: Path,
-           contributor: str | None, today: str) -> int:
+           contributor: str | None, today: str, binary: str | None,
+           build_pages=subprocess.run) -> int:
+    """`binary`: the helpmate binary the material pages are mined with; `build_pages`
+    runs tools/build_problems.py (subprocess.run's signature)."""
+    if not binary or not Path(binary).is_file():
+        return _err(f"no helpmate binary {'at ' + binary if binary else 'on PATH'}: "
+                    "the material pages need one; pass --binary PATH")
     state_path = staging / f"accept-{'-'.join(map(str, sorted(prs)))}.json"
     state = json.loads(state_path.read_text()) if state_path.exists() else {"done": []}
 
@@ -368,7 +400,7 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
 
         def attempt() -> int | None:
             if not sub("committed"):
-                outside = [d for d in git.dirty_paths() if d not in DOCS_PATHS]
+                outside = [d for d in git.dirty_paths() if not under(d)]
                 if outside:
                     return _err(f"{checkout} has uncommitted changes outside what accept writes: "
                                 f"{', '.join(outside)}")
@@ -405,6 +437,11 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                     text = add_changelog_data(text, line)
                 cl.write_text(text)
                 sync(checkout, hub, gh, reg, tables, close_claims=False)
+                # After sync: build_problems skips a material materials.json does not list as done.
+                # A docs-PR conflict retry runs this again (minutes per six-piece table).
+                build_material_pages(mats, checkout=checkout, tables=tables, binary=binary,
+                                     runner=build_pages)
+                write_site_data(checkout / "site" / "data", tables)  # the page flags, now true
                 trailers = sorted({f"Co-authored-by: {p['github']} <{gh.user_id(p['github'])}+"
                                    f"{p['github']}@users.noreply.github.com>"
                                    for p in people.values()
