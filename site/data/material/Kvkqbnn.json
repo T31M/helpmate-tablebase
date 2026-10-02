@@ -1,0 +1,27 @@
+{
+ "material": "Kvkqbnn",
+ "pieces": 6,
+ "stats": {
+  "max_dtm": null,
+  "deepest_unique_dtm": null,
+  "unique_at_depth": 0,
+  "deepest_dual_dtm": null,
+  "strict_dual_dtm": null,
+  "plane_size": 7751073792,
+  "solvable": 0,
+  "unique": 0,
+  "size_bytes": 492,
+  "saturated_at_max": false,
+  "dtm_histogram": {
+   "btm": {},
+   "wtm": {}
+  }
+ },
+ "unique": [],
+ "duals": [],
+ "notes": [
+  "No helpmate exists in this material."
+ ],
+ "candidates_considered": 0,
+ "candidates_total": 0
+}
