@@ -96,7 +96,9 @@ class Git:
 
     def _run(self, *args: str, env: dict | None = None, check: bool = True, text: bool = True):
         return self._runner(list(args), cwd=self.cwd, check=check, capture_output=True, text=text,
-                            env={**os.environ, **(env or {})})
+                            # English messages: accept matches "remote ref does not exist" and friends,
+                            # which a German locale translates
+                            env={**os.environ, "LC_ALL": "C", "LANGUAGE": "C", **(env or {})})
 
     def _out(self, *args: str, env: dict | None = None) -> str:
         return self._run(*args, env=env).stdout.strip()

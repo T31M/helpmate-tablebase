@@ -1081,3 +1081,19 @@ def test_cli_resolves_the_helpmate_found_on_path(tmp_path, monkeypatch):
     assert tables_cli.main(["accept", "2", "--tables", str(tables), "--checkout", str(checkout)],
                            hub_factory=lambda r: hub, gh_factory=lambda r: gh) == 0
     assert seen["binary"] == str(tmp_path.resolve() / "bin" / "helpmate")
+
+
+def test_git_runs_with_english_messages(tmp_path, monkeypatch):
+    """accept matches git's English messages ("remote ref does not exist"); a German
+    locale made it stop on an already-deleted branch. Every git call runs with LC_ALL=C."""
+    monkeypatch.setenv("LANG", "de_DE.UTF-8")
+    monkeypatch.setenv("LC_ALL", "de_DE.UTF-8")
+    from helpmate_server.contrib.accept import Git
+    seen = []
+
+    def runner(args, **kw):
+        seen.append(kw.get("env") or {})
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    Git(tmp_path, runner=runner).commit_all("m")
+    assert seen and all(e.get("LC_ALL") == "C" and e.get("LANGUAGE") == "C" for e in seen)
