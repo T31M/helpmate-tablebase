@@ -271,3 +271,6 @@ site/themes.html
 # Superpowers SDD scratch: ledgers, briefs, review diffs. Working notes for
 # an in-flight plan, not project history -- git log is the record.
 .superpowers/
+
+# Built at deploy by the Pages workflow, never committed.
+site/data/status.json

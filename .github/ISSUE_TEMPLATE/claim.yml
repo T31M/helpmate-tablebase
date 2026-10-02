@@ -1,0 +1,38 @@
+# .github/ISSUE_TEMPLATE/claim.yml
+name: Claim a material
+description: Reserve one or more tablebases before you spend CPU on them.
+title: "claim: "
+labels: [claim]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        See [docs/CONTRIBUTING-TABLES.md](../blob/main/docs/CONTRIBUTING-TABLES.md) and
+        [the materials list](https://osick.github.io/helpmate-tablebase/#/materials) for what is still open.
+        A bot will comment with the status of every material you claim.
+  - type: textarea
+    id: materials
+    attributes:
+      label: Materials
+      description: One name or pattern per line, e.g. `KRBvkqq` or `KQvk???` (`?` = any piece of that colour).
+    validations:
+      required: true
+  - type: input
+    id: hf
+    attributes:
+      label: Hugging Face username
+      description: The account your dataset pull requests will come from.
+  - type: input
+    id: credit
+    attributes:
+      label: Name to credit
+  - type: checkboxes
+    id: anonymous
+    attributes:
+      label: Credit
+      options:
+        - label: Do not name me in the credits.
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware (optional)

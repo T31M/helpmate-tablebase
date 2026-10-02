@@ -743,12 +743,14 @@ comparable with established practice. `helpmate themes` always prints the
 authoritative, in-build list below — read that if this table and the binary
 you're running ever disagree.
 
-Thirty registry entries cover twenty-six themes. Four themes exist in
-both a broad and a colour-specific form (`excelsior`/`excelsior:white`/
-`excelsior:black`, `single-piece`/`single-piece:white`/`single-piece:black`)
+Thirty-three registry entries cover twenty-eight themes. Five themes exist in
+more than one form (`excelsior`/`excelsior:white`/`excelsior:black`,
+`single-piece`/`single-piece:white`/`single-piece:black`, and
+`maslar`/`maslar:black-white`, whose second form swaps the colours' roles)
 because a detector only ever answers yes/no — it cannot itself report *which*
-side showed the theme, so the colour-specific name is a separate registry
-entry rather than an extra output field. Four entries describe the whole
+side showed the theme, so each form is a separate registry entry rather than
+an extra output field. Castling themes are absent for a structural reason:
+no table holds a castling move (see [Scope and rules](#scope-and-rules)). Four entries describe the whole
 solution set rather than one line in it: `nocapture` and `nocheck` match
 only when every optimal solution qualifies, `zilahi` and `allumwandlung`
 compare solutions with each other — see
@@ -902,6 +904,23 @@ promotions:<types>
     required, q r b n in any order and case, up to eight; a multiset, so qrr
     asks for one queen and two rooks among the promotions of all solutions
     together and rq is the same as qr; further promotions may occur
+indian
+    needs: solutions
+    Indian: a line piece crosses a critical square, a unit of its own colour
+    then interferes on that square, and later that unit moves away giving
+    discovered check from the line piece along the line through the square.
+    Either colour.
+maslar
+    needs: solutions
+    Maslar: a white line piece plays a critical move along the thematic
+    line, a black unit interferes on the crossed square, the black king then
+    arrives on the line beyond it, and the white piece captures the
+    interfering unit giving check (or mate).
+maslar:black-white
+    needs: solutions
+    Black-White Maslar: Black makes the critical move with a line piece,
+    White interferes on the crossed square, and the black line piece finally
+    captures the interfering white unit.
 ```
 
 ### `needs`: what a theme actually reads
@@ -1137,6 +1156,64 @@ on hand-played fixtures only (two lines from one diagram in which a rook
 and a bishop swap the mating and the captured role), and the first table
 that offers a genuine pair should be run before the theme is trusted.
 
+### `indian` and `maslar`: real examples
+
+Against a freshly generated `KRBvk` table, the textbook Indian:
+
+```
+$ helpmate probe "8/8/8/8/2k5/8/2K5/R5B1 w - - 0 1" --themes --tables ~/tb
+dtm=5 (h#2.5) count=1
+themes: mirror single-piece single-piece:black nocapture nocheck indian
+$ helpmate line "8/8/8/8/2k5/8/2K5/R5B1 w - - 0 1" --tables ~/tb
+Ra8 Kb4 Ba7 Ka3 Bc5#
+```
+
+1.Ra8 crosses a7 (the critical move), 2.Ba7 interferes on it, the black
+king walks onto the shut-off a-file, and 3.Bc5# mates by discovery from
+a8. `mine KRBvk --dtm 5 --theme indian` finds 1201 positions (3324
+saturated positions skipped), `--dtm 6` finds 2235; none exists at `--dtm 4`,
+since an Indian needs three moves by one side.
+
+A Maslar with a unique solution, from a freshly generated `KRvkb` table:
+
+```
+$ helpmate probe "8/8/8/8/8/8/2k4b/KR6 w - - 0 1" --themes --tables ~/tb
+dtm=7 (h#3.5) count=1
+themes: pure model ideal mirror nocheck maslar
+$ helpmate line "8/8/8/8/8/8/2k4b/KR6 w - - 0 1" --tables ~/tb
+Rh1 Bg1 Ka2 Kc1 Kb3 Kb1 Rxg1#
+```
+
+1.Rh1 crosses g1 (the critical move), 1...Bg1 interferes on it, the black
+king walks c1-b1 onto the first rank beyond g1, and 4.Rxg1# captures the
+interfering bishop with mate. `KRvkn` shows the same picture with a knight
+(`8/8/8/8/8/8/2k1n3/KR6 w - - 0 1`: `Rh1 Ng1 Ka2 Kc1 Kb3 Kb1 Rxg1#`). In
+those two classes `mine --theme maslar` first finds positions at `--dtm 7`;
+the `--dtm 5` and `--dtm 6` scans were stopped at a five-minute cap without
+a match, so shallower Maslars there are not ruled out, only not found.
+
+With a queen and a black rook it comes a move sooner. `KQvkr` has Maslars
+at `--dtm 5`:
+
+```
+$ helpmate probe "8/8/8/8/1r6/1k6/8/QK6 w - - 0 1" --themes --tables ~/tb
+dtm=5 (h#2.5) count=211
+themes: set-play pure model ideal mirror switchback self-block single-piece single-piece:white single-piece:black umnov maslar
+```
+
+One of its 211 solutions is `Qa8 Ra4 Kc1 Ka2 Qxa4#`: the queen crosses a4,
+the rook interferes there, the king steps onto the a-file beyond it, and
+the queen captures with mate. Not every solution shows the theme (`any`
+semantics), and no unique-solution `KQvkr` Maslar at `--dtm 5` turned up
+within the cap.
+
+**`maslar:black-white` has no real example in this pass.** After Black
+captures the interfering white unit, White must still be able to mate, so
+the theme needs at least five units: a black line piece, a white
+interferer, and white mating material besides. `KNvkr` (the four-unit
+candidate) duly shows none at `--dtm 4` or `--dtm 5`, and no five-unit
+table was to hand. The detector is verified on hand-played fixtures only.
+
 **`kniest`, `zajic` and `schnoebelen` have no verified real example in this
 pass.** All three need `solutions`, which forces full enumeration; several
 materials likely to contain them were tried (`KRvkq`, `KRvkr`, `KRvkb`,
@@ -1362,7 +1439,7 @@ table cannot answer a walk of the *original* (unflipped) FEN. Flipping the
 position ourselves and detecting on *that* is not a fix: every detector is
 hard-coded to the black king, so the four colour-labelled themes
 (`single-piece:white`/`:black`, `excelsior:white`/`:black`) would come out
-swapped — a wrong answer dressed as a right one. The other twenty-six registry
+swapped — a wrong answer dressed as a right one. The other twenty-nine registry
 entries, including `pure`/`model`/`ideal`/`mirror` and the two v0.9 line
 themes that reference the mated king (`kniest`, `zajic`), are in fact
 flip-invariant (they read from the black king's field the same way
@@ -1376,8 +1453,9 @@ each unit's own colour — so it carries no asymmetry to begin with;
 their source, as are `nocapture` and `nocheck`, which read only the
 `captured` and `is_check` flags of each ply, and `umnov`, `umnov-mate`,
 `klasinc`, `allumwandlung` and `promotions:<types>`, which read squares,
-types and promotion flags only. `zilahi` names White as the side whose
-units swap roles, which is the helpmate convention and colour-specific. The CLI prints a note and exits 0; the API returns `"themes":
+types and promotion flags only; `indian` is tested for both colours.
+`zilahi`, `maslar` and `maslar:black-white` name the side that plays each
+role, which is the definition's own convention and colour-specific. The CLI prints a note and exits 0; the API returns `"themes":
 null` with a `themes_note` field explaining why, distinct from `[]` (no
 themes found).
 
@@ -2069,7 +2147,7 @@ failing the listing (or `/v1/stats`, which walks the same catalog).
 ### `GET /v1/themes`
 
 The theme registry — name, definition, `needs` and `parameter` (`null`, or
-`{name, doc, example}` for `promotions:<types>`) for every one of the thirty
+`{name, doc, example}` for `promotions:<types>`) for every one of the thirty-three
 entries in [Themes](#themes) above — served straight from the
 C++ build so the dashboard's theme picker never hard-codes a list that can
 drift from the binary it's talking to:

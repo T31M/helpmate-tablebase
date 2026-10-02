@@ -32,14 +32,14 @@ test: build
 #   make install GIT_CONFIG_GLOBAL=/dev/null
 install:
 	python -m pip install .
-	python -m pip install ./src/packages/api ./src/packages/web
+	python -m pip install './src/packages/api[verify]' ./src/packages/web
 
 # Same three distributions, with each one's [dev] extra so `make install-dev
 # && make test-api` (etc.) has pytest/httpx/playwright available. Same
 # GIT_CONFIG_GLOBAL note as `install` applies.
 install-dev:
 	python -m pip install ".[dev]"
-	python -m pip install "./src/packages/api[dev]" "./src/packages/web[dev]"
+	python -m pip install "./src/packages/api[dev,verify]" "./src/packages/web[dev]"
 
 # Install just the `helpmate` CLI binary, with no Python involved. `make
 # install` above already puts it on PATH as part of the wheel, so this is for

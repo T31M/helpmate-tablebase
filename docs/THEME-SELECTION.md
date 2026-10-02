@@ -14,7 +14,7 @@ of what a detector would need.
 
 | Group | What it needs | Themes |
 |---|---|---|
-| **DONE** | Already shipped | 21 |
+| **DONE** | Already shipped | 23 |
 | **A1** | Diagram only | 5 |
 | **A2** | Mating position only | 4 |
 | **A3** | The other side-to-move plane (set play) | 2 |
@@ -26,14 +26,14 @@ of what a detector would need.
 | **B2** | Set play compared against the solution | 3 |
 | **C1** | Extra probing | 20 |
 | **E1** | Twinning | 4 |
-| **D1** | Motif engine | 95 |
+| **D1** | Motif engine | 93 |
 | **X1** | Out of scope | 25 |
 | **ALIAS** | Aliases | 11 |
 | | **Total** | **295** |
 
-## DONE -- Already shipped  (21)
+## DONE -- Already shipped  (23)
 
-Twenty-one of the glossary's names. Five more shipped detectors -- `pure`, `underpromotion`, `nocapture`, `nocheck` and the parametric `promotions:<types>` -- are **not** glossary entries, so they do not appear anywhere in this document; that is 26 detectors, 30 registry entries counting the colour variants.
+Twenty-three of the glossary's names. Five more shipped detectors -- `pure`, `underpromotion`, `nocapture`, `nocheck` and the parametric `promotions:<types>` -- are **not** glossary entries, so they do not appear anywhere in this document; that is 28 detectors, 33 registry entries counting the colour and role variants.
 
 | Theme | Tier | Note |
 |---|---|---|
@@ -43,8 +43,10 @@ Twenty-one of the glossary's names. Five more shipped detectors -- `pure`, `unde
 | Excelsior | A | implemented |
 | Allumwandlung | B | implemented as `allumwandlung`: all four types across the solutions, either colour -- the same question as the parametric `promotions:qrbn` |
 | Ideal mate | A | implemented |
+| Indian | D→A | implemented as `indian`, either colour; the catalogue tiered it D for "critical square and temporary shut-off", but the structural reading used (a line piece crosses c, a unit of its own colour interferes on c, that unit leaves c giving discovered check along the line through c) is decidable from ply squares plus one attack test |
 | Klasinc theme | D→A | implemented as `klasinc`; the catalogue tiered it D for "line geometry", but the definition used (a unit vacates a square, a line piece passes over it, the unit returns) is decidable from ply from/to squares alone |
 | Kniest theme | A | implemented |
+| Maslar theme | D→A | implemented as `maslar` (white critical move, black interference, black king arrives on the line, the line piece captures the interferer with check) and `maslar:black-white` (black critical move, white interference, black captures); definitions from the glossary text, decidable from ply squares plus one attack test |
 | Mirror mate | A | implemented |
 | Model mate | A | implemented |
 | Pendulum | A | implemented |
@@ -279,7 +281,7 @@ Needs a modified diagram -- often a table already generated, but it needs its ow
 | Striptease theme | E | successive twins made by removal |
 | Zagoruiko theme | E | three twins with changed mates; the solution-group variant is B |
 
-## D1 -- Motif engine -- blocked  (95)
+## D1 -- Motif engine -- blocked  (93)
 
 Needs line-piece geometry the project has no notion of: pins, half-pins, interference, batteries, critical squares, clearance, doubling, unpinning. One piece of machinery rather than 96 separate problems, but a large one, and none of it exists.
 
@@ -328,7 +330,6 @@ Needs line-piece geometry the project has no notion of: pins, half-pins, interfe
 | Herlin | D | peri-critical move |
 | Holzhausen interference | D | interference |
 | HOTF | D | needs motifs grouped into themes before pairs can be compared |
-| Indian | D | critical square and temporary shut-off |
 | Island theme | D | a square's guard lines closed from both ends |
 | Kluver 10 theme | D | ambush and gate-opening |
 | Kubbel-Grimshaw | D | mutual interference |
@@ -337,7 +338,6 @@ Needs line-piece geometry the project has no notion of: pins, half-pins, interfe
 | Loyd-Turton doubling | D | doubling |
 | Loyd-Zepler doubling | D | doubling |
 | Magnet | D | a bicoloured Bristol, so clearance |
-| Maslar theme | D | critical move and interference |
 | Mutual interference | D | interference |
 | Nesic theme | D | mutual interference |
 | Organ pipes | D | four Grimshaw pairs |

@@ -14,7 +14,7 @@ import { whenPanelShown } from "./panels.js";
 // every theme's own `doc` string in the live registry (src/core/themes/
 // registry.cpp) rather than assumed from memory -- the first version of
 // this table named 11 of the build's then 22 registered motifs and left the
-// other 11 to fall into "other" wholesale. All 30 group cleanly into the
+// other 11 to fall into "other" wholesale. All 33 group cleanly into the
 // five below; nothing should land in "other" on a build that still matches
 // this registry.
 //
@@ -29,7 +29,7 @@ const GROUPS = [
     title: "The mate picture",
     intro: "What the mating position itself looks like, judged by the "
          + "black king's field.",
-    members: ["pure", "model", "ideal", "mirror", "self-block"],
+    members: ["pure", "model", "ideal", "mirror", "self-block", "indian", "maslar"],
   },
   {
     title: "How a unit travels",

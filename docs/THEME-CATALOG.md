@@ -60,10 +60,10 @@ target and marked "alias of X" in the note.
 
 | Tier | Themes | Share |
 |---|---|---|
-| A — computable now | 79 | 27% |
+| A — computable now | 81 | 27% |
 | B — cross-solution | 64 | 22% |
 | C — extra probing | 21 | 7% |
-| D — motif engine | 102 | 35% |
+| D — motif engine | 100 | 34% |
 | E — twinning | 4 | 1% |
 | X — out of scope | 25 | 8% |
 | **Total** | **295** | |
@@ -230,7 +230,7 @@ paraphrase of the definition — follow the glossary link above for that.
 | Iceland theme | D | alias of Island theme |
 | Ideal mate | A | implemented |
 | Illegal position | X | retro analysis; the project has none and wants none |
-| Indian | D | critical square and temporary shut-off |
+| Indian | A | implemented; retiered from D: critical move over c, own-colour interference on c, discovered check through c -- ply squares plus one attack test |
 | Island theme | D | a square's guard lines closed from both ends |
 | JT Navon 90 theme | X | tourney-specified pattern |
 | JT Onkoud 50 theme | X | tourney-specified pattern |
@@ -256,7 +256,7 @@ paraphrase of the definition — follow the glossary link above for that.
 | Loyd-Zepler doubling | D | doubling |
 | Magnet | D | a bicoloured Bristol, so clearance |
 | Many-ways | B | same endpoints, different routes, three phases |
-| Maslar theme | D | critical move and interference |
+| Maslar theme | A | implemented, with the Black-White form; retiered from D: critical move, interference, capture of the interferer -- ply squares plus one attack test |
 | Mates on same square | A | group solutions by the last ply's destination |
 | Mating piece | A | the last ply's mover; battery cases are genuinely ambiguous |
 | Mating square | A | the last ply's destination, or the mated king's square |

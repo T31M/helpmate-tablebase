@@ -380,6 +380,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         if material not in rows:
             print(f"  {material}: not in materials.json, skipped", file=sys.stderr)
             continue
+        if not rows[material].get("done", True):     # rows from old data have no `done`
+            print(f"  {material}: not done in materials.json, skipped", file=sys.stderr)
+            continue
         try:
             doc = build_material(a.binary, a.tables, material,
                                  json.loads(sc.read_text()), rows[material], attrib)

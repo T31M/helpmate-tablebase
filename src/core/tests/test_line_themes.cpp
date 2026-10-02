@@ -868,7 +868,126 @@ TEST_CASE("an empty solution shows no line theme", "[themes][line]") {
     REQUIRE_FALSE(has_umnov(s));
     REQUIRE_FALSE(has_umnov_mate(s));
     REQUIRE_FALSE(has_klasinc(s));
+    REQUIRE_FALSE(has_indian(s));
+    REQUIRE_FALSE(has_maslar(s));
+    REQUIRE_FALSE(has_maslar_black_white(s));
     REQUIRE(promotion_multiset(s).empty());
+}
+
+// Indian fixture: white Ke5, Ra1, Bf3; black Kb3; White to move. The rook
+// crosses d1 (Ra1-h1, the critical move), the bishop interferes on d1, the
+// black king walks onto the shut-off first rank, and the bishop leaves d1
+// uncovering check from h1.
+static const char* kIndianFen = "8/8/8/4K3/8/1k3B2/8/R7 w - - 0 1";
+
+TEST_CASE("indian: critical move, own-colour interference, discovered check along the line",
+          "[themes][line]") {
+    auto s = play(kIndianFen,
+                  {{"a1", "h1", {}}, {"b3", "b2", {}}, {"f3", "d1", {}}, {"b2", "c1", {}}, {"d1", "e2", {}}});
+    REQUIRE(s.plies.back().is_check);
+    REQUIRE(has_indian(s));
+    REQUIRE_FALSE(has_maslar(s));  // nothing is captured
+}
+
+TEST_CASE("indian: the interferer leaving without check is not an Indian", "[themes][line]") {
+    // The king goes to a2 instead of c1, off the line: Be2 checks nothing.
+    auto s = play(kIndianFen,
+                  {{"a1", "h1", {}}, {"b3", "b2", {}}, {"f3", "d1", {}}, {"b2", "a2", {}}, {"d1", "e2", {}}});
+    REQUIRE_FALSE(s.plies.back().is_check);
+    REQUIRE_FALSE(has_indian(s));
+}
+
+TEST_CASE("indian: a check the departing unit gives by itself is not a discovered one", "[themes][line]") {
+    // Bd1-b3+ checks the king on a2 directly; the rook's line plays no part.
+    auto s = play(kIndianFen,
+                  {{"a1", "h1", {}}, {"b3", "b2", {}}, {"f3", "d1", {}}, {"b2", "a2", {}}, {"d1", "b3", {}}});
+    REQUIRE(s.plies.back().is_check);
+    REQUIRE_FALSE(has_indian(s));
+}
+
+TEST_CASE("indian: the line piece may not move between the critical move and the discovery",
+          "[themes][line]") {
+    // Rh1-g1 after the interference: the discovered check comes from g1, and
+    // the rook's move to g1 crossed nothing -- no critical move behind it.
+    auto s = play(kIndianFen, {{"a1", "h1", {}},
+                               {"b3", "b2", {}},
+                               {"f3", "d1", {}},
+                               {"b2", "c1", {}},
+                               {"h1", "g1", {}},
+                               {"c1", "b1", {}},
+                               {"d1", "e2", {}}});
+    REQUIRE(s.plies.back().is_check);
+    REQUIRE_FALSE(has_indian(s));
+}
+
+// Maslar fixture: white Kg5, Ra1; black Kb3, Ne3; White to move. The rook
+// crosses d1, the knight interferes on d1, the black king walks to c1 on the
+// line beyond d1, and the rook takes on d1 with check.
+static const char* kMaslarFen = "8/8/8/6K1/8/1k2n3/8/R7 w - - 0 1";
+
+TEST_CASE("maslar: critical move, black interference, king arrives on the line, capture with check",
+          "[themes][line]") {
+    auto s = play(kMaslarFen, {{"a1", "h1", {}},
+                               {"e3", "d1", {}},
+                               {"g5", "f5", {}},
+                               {"b3", "c2", {}},
+                               {"f5", "f4", {}},
+                               {"c2", "c1", {}},
+                               {"h1", "d1", {}}});
+    REQUIRE(s.plies.back().captured == PieceType::Knight);
+    REQUIRE(s.plies.back().is_check);
+    REQUIRE(has_maslar(s));
+    REQUIRE_FALSE(has_maslar_black_white(s));
+    REQUIRE_FALSE(has_indian(s));  // the interferer is the enemy's, and nothing uncovers a check
+}
+
+TEST_CASE("maslar: the capture must give check to a king that arrived on the line", "[themes][line]") {
+    // The king goes back to b3 instead of c1: Rxd1 is no check.
+    auto s = play(kMaslarFen, {{"a1", "h1", {}},
+                               {"e3", "d1", {}},
+                               {"g5", "f5", {}},
+                               {"b3", "c2", {}},
+                               {"f5", "f4", {}},
+                               {"c2", "b3", {}},
+                               {"h1", "d1", {}}});
+    REQUIRE(s.plies.back().captured == PieceType::Knight);
+    REQUIRE_FALSE(s.plies.back().is_check);
+    REQUIRE_FALSE(has_maslar(s));
+}
+
+TEST_CASE("maslar: the line piece may not move between the critical move and the capture", "[themes][line]") {
+    // Rh1-g1 instead of a king move: Rg1xd1+ still captures with check, but
+    // from g1, which the rook reached without crossing anything.
+    auto s = play(kMaslarFen, {{"a1", "h1", {}},
+                               {"e3", "d1", {}},
+                               {"g5", "f5", {}},
+                               {"b3", "c2", {}},
+                               {"h1", "g1", {}},
+                               {"c2", "c1", {}},
+                               {"g1", "d1", {}}});
+    REQUIRE(s.plies.back().is_check);
+    REQUIRE_FALSE(has_maslar(s));
+}
+
+// Black-White Maslar fixture: black Kb6, Ra8; white Kg4, Ne6; Black to move.
+static const char* kBlackWhiteMaslarFen = "r7/8/1k2N3/8/6K1/8/8/8 b - - 0 1";
+
+TEST_CASE("maslar:black-white: Black's critical move, White's interference, Black captures",
+          "[themes][line]") {
+    auto s = play(kBlackWhiteMaslarFen, {{"a8", "h8", {}}, {"e6", "d8", {}}, {"h8", "d8", {}}});
+    REQUIRE(s.plies.back().captured == PieceType::Knight);
+    REQUIRE(has_maslar_black_white(s));
+    REQUIRE_FALSE(has_maslar(s));  // the white-first form needs a white line piece
+}
+
+TEST_CASE("maslar:black-white: the capturing rook must be the one that made the critical move from b",
+          "[themes][line]") {
+    // Rh8-g8+ before the capture: the rook leaves b, and g8 was reached
+    // without crossing anything. (The white king steps off the g-file.)
+    auto s = play(kBlackWhiteMaslarFen,
+                  {{"a8", "h8", {}}, {"e6", "d8", {}}, {"h8", "g8", {}}, {"g4", "f3", {}}, {"g8", "d8", {}}});
+    REQUIRE(s.plies.back().captured == PieceType::Knight);
+    REQUIRE_FALSE(has_maslar_black_white(s));
 }
 
 TEST_CASE("umnov: a unit moves onto the square the opponent just vacated", "[themes][line]") {

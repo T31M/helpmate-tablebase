@@ -6,6 +6,13 @@
 # site/vendor AND runs tools/render_site.py, which generates the 302 material
 # pages and the theme index from that committed JSON. The gate is make
 # test-site, which runs render_site.py then the site's node tests.
+#
+# site/data/status.json (state per material, contributors) is the one file
+# built here, daily, on every deploy and after every Claims run, and never
+# committed: it comes from the dataset and the claim issues, so a new claim
+# shows on the site within minutes. The workflow_run trigger fires whatever
+# the Claims run's conclusion was: the site build does not depend on it. If
+# that step fails the site still deploys and says the state is unavailable.
 name: Pages
 
 on:
@@ -17,12 +24,20 @@ on:
       - "src/packages/web/helpmate_web/static/vendor/**"
       - ".github/workflows/pages.yml"
       - "Makefile"
+      - "data/contributions.json"
+      - "src/packages/api/helpmate_server/contrib/**"
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_run:
+    workflows: [Claims]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  issues: read
 
 concurrency:
   group: pages
@@ -30,14 +45,37 @@ concurrency:
 
 jobs:
   build:
+    # A Claims run skipped for an unrelated issue/comment still completes:
+    # do not rebuild for it. Success and failure runs rebuild.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # State per material (done / in review / claimed / ...) and the
+      # contributors, read from the dataset and the claim issues. If this
+      # fails the site still deploys and says the state is unavailable.
+      - name: Build the materials state
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          python -m pip install "huggingface_hub>=0.23"
+          python -m helpmate_server.tables_cli site-status --out site/data/status.json
+        env:
+          PYTHONPATH: src/packages/api
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Assemble and test the site
         run: make test-site
+      # Pages caches everything for ten minutes; without a per-deploy query a
+      # browser can pair an old js file with the new index.html. Stamps the
+      # artifact only, never the committed sources.
+      - name: Stamp the site with the deploy version
+        run: python3 tools/stamp_site.py site "${GITHUB_SHA::12}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

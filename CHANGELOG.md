@@ -9,6 +9,90 @@ bumps may change behavior).
 ## [Unreleased]
 
 ### Added
+- `helpmate-tables verify`: seven checks on a contributed table (PR contents,
+  header and identity, zstd blocks, sidecar recomputed from the payload,
+  deepest positions, local consistency with successors and sub-tables, and an
+  independent python-chess solver). Contributors run it with `--material`
+  before pushing; the maintainer runs it with `--pr`, which downloads the
+  dataset PR (after confirming its size) and posts the report.
+- `helpmate-tables accept`, `status`, `sync`, `claims`; `push --claim --github`.
+- Claim issue form and a Claims workflow that keeps one status comment per claim.
+- Site Materials page: all 1000 materials from three to six men with priority,
+  state, contributor and filters (state refreshed daily at deploy), and a
+  contributor section on the front page; `data/contributions.json` is the
+  record behind it.
+
+### Data
+- KRRvknp contributed by popeye37 (dataset PR #15, claim #39).
+- KRRvknn contributed by popeye37 (dataset PR #14, claim #39).
+- KRRvkbp contributed by popeye37 (dataset PR #13, claim #39).
+- KRRvkbn contributed by popeye37 (dataset PR #12, claim #39).
+- KRRvkbb contributed by popeye37 (dataset PR #11, claim #39).
+- KRRvkrp contributed by popeye37 (dataset PR #10, claim #39).
+- KRRvkrn contributed by popeye37 (dataset PR #9, claim #39).
+- KRRvkrb contributed by popeye37 (dataset PR #8, claim #39).
+- KRRvkrr contributed by popeye37 (dataset PR #7, claim #39).
+- KRRvkqp contributed by popeye37 (dataset PR #6, claim #39).
+- KRRvkqn contributed by popeye37 (dataset PR #5, claim #39).
+- KRRvkqb contributed by popeye37 (dataset PR #4, claim #39).
+- KRRvkqr contributed by popeye37 (dataset PR #3, claim #39).
+- KRRvkqq contributed by popeye37 (dataset PR #2, claim #39).
+- Marker tables for every six-piece class in which no helpmate exists: the 70
+  with a bare White king (Kvk...) and KBvkrrr, KNvkqqq, published to the
+  dataset. Six-piece progress is now counted over all 715 classes, markers
+  included; the docs and the site say how many of the done classes are proven
+  empty.
+
+### Fixed
+- Site: after a deploy a browser could pair a cached old `js/materials.js`
+  (GitHub Pages sends `max-age=600`) with the new `index.html`, and the
+  Materials screen crashed ("Cannot read properties of null"). The Pages
+  workflow now runs `tools/stamp_site.py`, which appends `?v=<commit>` to
+  every script, stylesheet, module import and data fetch of the built site.
+
+### Changed
+- Corpus counts in README, CONTRIBUTING-TABLES, COOPERATIVE-TABLEBASE and the
+  dataset card are generated (`helpmate-tables sync`).
+- `tools/verify_corpus.py` is a wrapper over the package's block check.
+
+## [0.20.0] - 2026-09-26
+
+### Data
+- **Fifteen new six-piece tables, contributed by T31M — the project's first
+  outside contribution. Thank you.** King, rook and bishop against every
+  three-man Black set: KRBvkqq, KRBvkqr, KRBvkqb, KRBvkqn, KRBvkrr, KRBvkrb,
+  KRBvkrn, KRBvkbb, KRBvkbn, KRBvknn, KRBvkqp, KRBvkrp, KRBvkbp, KRBvknp,
+  KRBvkpp (claim #41, dataset PR #1 on `osick/helpmate-tables`), generated
+  with 0.19.0 on a 192-thread, 369 GiB machine; the five pawn tables need
+  about 85 GiB of RAM each. The corpus grows from 302 tables and 52.2 GiB to
+  **317 tables and 172.5 GiB**, six-piece coverage from 16 to 31 of 645
+  classes, and the plane cells from 343.0 to 713.9 billion. KRBvkqp and
+  KRBvkrp tie KBvkqp for the deepest mate, h#17. Still missing at six
+  pieces: 614 tables, 269 of them in the 32 GiB pawnless tier. README,
+  CONTRIBUTING-TABLES, COOPERATIVE-TABLEBASE and the dataset card carry the
+  new figures and credit the contributor; DEEPEST and the showcase site
+  pick up the new tables in a later regeneration.
+
+### Added
+- **Three line-play themes: `indian`, `maslar`, `maslar:black-white`;
+  registry 30 → 33 entries.** All three share one skeleton: a critical move
+  (a queen, rook or bishop moves over a square c) followed by an
+  interference on c while the line piece stays put. `indian`: the
+  interferer is of the line piece's own colour and later leaves c giving
+  discovered check along the line through c (Loveday's Indian, either
+  colour). `maslar`, from the glossary text: a white line piece's critical
+  move, a black interference, the black king arriving on the line beyond c,
+  and the line piece capturing the interferer with check. `maslar:black-white`:
+  Black's critical move, White's interference, and the black line piece
+  capturing the interferer. The catalogue had tiered both Indian and Maslar
+  D ("critical square", "interference"); with these definitions they need
+  only ply squares plus one attack test, so both move to A. Castling themes
+  remain impossible: no table holds a castling move. Real examples in
+  USAGE: the textbook Indian in `KRBvk` (1.Ra8 Kb4 2.Ba7 Ka3 3.Bc5#) and
+  a unique-solution Maslar in `KRvkb` (1.Rh1 Bg1 2.Ka2 Kc1 3.Kb3 Kb1
+  4.Rxg1#), and a shallower one at h#2.5 in `KQvkr` (1.Qa8 Ra4 2.Kc1 Ka2
+  3.Qxa4#, one of 211 solutions); `maslar:black-white` needs five units
+  and is fixture-verified only.
 - **A page per material on the static showcase, and a corpus-wide theme
   index.** `tools/build_problems.py` (run by hand against a corpus, output
   committed) finds, per material, up to three deepest positions with a
@@ -50,6 +134,22 @@ bumps may change behavior).
   sibling is chosen the same way. A remaining weakness is stated in a *Note*
   on the card and in the booklet. The index tables gain a *published by*
   column (`Sheglow (1998)`).
+
+- **An authorship statement** (`docs/AUTHORSHIP.md`, linked from the README
+  and the site): these positions were enumerated, not composed; no
+  authorship is claimed, none will enter a composing tourney, and a
+  generated database anticipates nobody (#36).
+
+### Changed
+- **Setup instructions for contributors** in CONTRIBUTING-TABLES, written
+  for a fresh cloud instance (#42, by T31M), and BUILD documents virtual
+  environments and why `pipx install ./src/packages/api` fails (#33).
+- **The theme index is collapsed per theme**, 37,000 px → 1,900 px (#38).
+  The site's theme note counts the engine's 28 themes in 33 registry
+  entries (was 26 / 30).
+
+### Fixed
+- **The generated site pages had no stylesheet** (#35).
 
 ## [0.19.0] - 2026-09-11
 

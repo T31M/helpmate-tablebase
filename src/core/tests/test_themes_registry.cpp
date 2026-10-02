@@ -13,8 +13,8 @@ static Solution at(const std::string& fen) {
     return Solution{*b, {}};
 }
 
-TEST_CASE("the registry holds all thirty entries", "[themes][registry]") {
-    REQUIRE(theme_registry().size() == 30);
+TEST_CASE("the registry holds all thirty-three entries", "[themes][registry]") {
+    REQUIRE(theme_registry().size() == 33);
 }
 
 TEST_CASE("every entry has a name, a detector or a parameter, and a doc", "[themes][registry]") {
@@ -67,7 +67,10 @@ TEST_CASE("every documented theme is findable by name", "[themes][registry]") {
                           "klasinc",
                           "zilahi",
                           "allumwandlung",
-                          "promotions"})
+                          "promotions",
+                          "indian",
+                          "maslar",
+                          "maslar:black-white"})
         REQUIRE(find_theme(n) != nullptr);
 }
 

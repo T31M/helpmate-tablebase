@@ -4,29 +4,44 @@
 import { initFront } from "./front.js";
 import { initDeepest, showDeepest } from "./deepest.js";
 import { initPuzzles } from "./puzzles.js";
-import { initMaterials } from "./materials.js";
+import { initMaterials, showMaterials } from "./materials.js";
+import { validStatus } from "./lib/materials.js";
 
 const screens = {
-  front: { init: initFront, data: ["corpus", "deepest"] },
+  front: { init: initFront, data: ["corpus", "deepest", "status"] },
   deepest: { init: initDeepest, data: ["deepest"] },
   puzzles: { init: initPuzzles, data: ["puzzles"] },
-  materials: { init: initMaterials, data: ["materials", "corpus"] },
+  materials: { init: initMaterials, data: ["materials", "corpus", "status"] },
 };
+// Deploy stamp: CI (tools/stamp_site.py) rewrites this exact line to
+// `const V = "?v=<commit>";` so data fetches cannot mix with a stale cache.
+const V = "";
 const loaded = {};
 const cache = {};
 
+// status.json is never committed and may be missing or malformed; it is
+// optional, and an invalid one counts as missing.
+const OPTIONAL = { status: validStatus };
+
 async function data(name) {
   if (!cache[name]) {
-    cache[name] = fetch(`data/${name}.json`).then((r) => {
+    const req = fetch(`data/${name}.json${V}`).then((r) => {
       if (!r.ok) throw new Error(`${name}.json: HTTP ${r.status}`);
       return r.json();
     });
+    const valid = OPTIONAL[name];
+    cache[name] = valid
+      ? req.then((v) => {
+        if (!valid(v)) throw new Error("malformed");
+        return v;
+      }).catch((e) => { console.warn(`${name}.json unavailable: ${e.message}`); return null; })
+      : req;
   }
   return cache[name];
 }
 
 function route() {
-  const hash = location.hash.replace(/^#\/?/, "");
+  const hash = location.hash.replace(/^#\/?/, "").split("?")[0];
   const [name, ...rest] = hash.split("/");
   return { name: screens[name] ? name : "front", arg: rest.join("/") };
 }
@@ -48,6 +63,7 @@ async function show() {
     });
   }
   await loaded[name];
+  if (name === "materials") showMaterials();
   if (name === "deepest" && arg) showDeepest(arg);
 }
 

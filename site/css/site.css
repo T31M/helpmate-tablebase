@@ -210,3 +210,12 @@ a.theme:hover { color: var(--accent); border-color: var(--accent); text-decorati
   border-left: 2px solid var(--rule-strong); padding-left: .8rem; margin: 1rem 0 0;
 }
 footer .disclaimer { margin: 0; border-left: 0; padding-left: 0; max-width: 60rem; }
+
+.table-scroll { overflow-x: auto; max-width: 100%; }
+.status-line { font-size: var(--f0); color: var(--ink-faint); margin: .25rem 0; }
+table.data td.state-open { color: var(--ink); font-weight: 600; }
+table.data td.state-claimed, table.data td.state-in-review { color: var(--ink-soft); }
+table.data tr.state-not-needed td { color: var(--ink-faint); }
+.contributors { margin-top: 2rem; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; margin: .75rem 0; }
+.card { display: flex; flex-direction: column; gap: .25rem; padding: .75rem 1rem; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; font-size: var(--f1); }

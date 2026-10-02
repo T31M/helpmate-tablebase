@@ -139,6 +139,23 @@ const std::vector<ThemeDef>& theme_registry() {
          "promotions:<types> entry. On a saturated position only the first 100 "
          "solutions are counted.",
          Needs::Solutions, &kPromotionsParam},
+        {"indian", &any_of<&has_indian>,
+         "Indian: a line piece crosses a critical square, a unit of its own colour "
+         "then interferes on that square, and later that unit moves away giving "
+         "discovered check from the line piece along the line through the square. "
+         "Either colour.",
+         Needs::Solutions},
+        {"maslar", &any_of<&has_maslar>,
+         "Maslar: a white line piece plays a critical move along the thematic "
+         "line, a black unit interferes on the crossed square, the black king then "
+         "arrives on the line beyond it, and the white piece captures the "
+         "interfering unit giving check (or mate).",
+         Needs::Solutions},
+        {"maslar:black-white", &any_of<&has_maslar_black_white>,
+         "Black-White Maslar: Black makes the critical move with a line piece, "
+         "White interferes on the crossed square, and the black line piece "
+         "finally captures the interfering white unit.",
+         Needs::Solutions},
     };
     return kRegistry;
 }

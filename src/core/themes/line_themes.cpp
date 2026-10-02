@@ -266,6 +266,61 @@ bool passes_over(int from, int to, int sq) {
     return false;
 }
 
+bool is_line_piece(PieceType t) {
+    return t == PieceType::Queen || t == PieceType::Rook || t == PieceType::Bishop;
+}
+
+// The squares a straight move from `from` to `to` passes strictly over, in
+// order; empty for a knight's leap or a one-square step.
+std::vector<int> squares_between(int from, int to) {
+    std::vector<int> out;
+    for (int sq = 0; sq < 64; ++sq)
+        if (passes_over(from, to, sq)) out.push_back(sq);
+    return out;
+}
+
+// Where the king of colour `c` stands on `b`, or -1.
+int king_square(const Board& b, Color c) {
+    for (const auto& pp : b.pieces())
+        if (pp.piece.type == PieceType::King && pp.piece.color == c) return pp.square;
+    return -1;
+}
+
+// The unit standing on `sq`, if it has colour `c` and is a line piece.
+std::optional<PlacedPiece> line_piece_on(const Board& b, int sq, Color c) {
+    for (const auto& pp : b.pieces())
+        if (pp.square == sq && pp.piece.color == c && is_line_piece(pp.piece.type)) return pp;
+    return std::nullopt;
+}
+
+// The skeleton Indian and both Maslars share: a CRITICAL MOVE (ply i, a line
+// piece of colour `lc` moving a -> b over square c) followed by an
+// INTERFERENCE (ply j > i, a unit of colour `ic` arriving on c) while the
+// line piece still stands on b. Calls `finish(i, j, b, c)` for every such
+// pair and returns true as soon as it does; `finish` inspects the plies
+// after j. The line piece's identity is "the unit on b", which is exact
+// because the scan stops at the first ply that moves from b or captures on b.
+template <class Finish>
+bool critical_then_interference(const Solution& s, Color lc, Color ic, bool interferer_may_be_king,
+                                Finish&& finish) {
+    const int n = (int)s.plies.size();
+    for (int i = 0; i < n; ++i) {
+        const Ply& crit = s.plies[i];
+        if (crit.piece.color != lc || !is_line_piece(crit.piece.type)) continue;
+        const int b = crit.to;
+        for (int c : squares_between(crit.from, crit.to)) {
+            for (int j = i + 1; j < n; ++j) {
+                const Ply& p = s.plies[j];
+                if (p.from == b || p.to == b) break;  // the line piece moved or was taken
+                if (p.to != c || p.piece.color != ic) continue;
+                if (!interferer_may_be_king && p.piece.type == PieceType::King) continue;
+                if (finish(i, j, b, c)) return true;
+            }
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 bool has_klasinc(const Solution& s) {
@@ -292,6 +347,76 @@ bool has_klasinc(const Solution& s) {
         }
     }
     return false;
+}
+
+bool has_indian(const Solution& s) {
+    const int n = (int)s.plies.size();
+    for (Color lc : {Color::White, Color::Black}) {
+        const Color enemy = lc == Color::White ? Color::Black : Color::White;
+        // The interferer is of the line piece's own colour; it may be the
+        // king (a royal battery is still an Indian).
+        auto finish = [&](int, int j, int b, int c) {
+            for (int k = j + 1; k < n; ++k) {
+                const Ply& p = s.plies[k];
+                if (p.from == b || p.to == b) return false;  // the line piece moved or was taken
+                if (p.from != c) {
+                    if (p.to == c) return false;  // the interferer was captured on c
+                    continue;
+                }
+                // The interferer leaves c. It must uncover a check from the
+                // line piece along the line through c -- a check the moving
+                // unit gives by itself is not the theme.
+                if (!p.is_check) return false;
+                const int king = king_square(p.after, enemy);
+                const auto lp = line_piece_on(p.after, b, lc);
+                return king >= 0 && lp && passes_over(b, king, c) &&
+                       piece_attacks(p.after.pieces(), *lp, king);
+            }
+            return false;
+        };
+        if (critical_then_interference(s, lc, lc, true, finish)) return true;
+    }
+    return false;
+}
+
+bool has_maslar(const Solution& s) {
+    const int n = (int)s.plies.size();
+    auto finish = [&](int, int j, int b, int c) {
+        bool king_arrived = false;
+        for (int k = j + 1; k < n; ++k) {
+            const Ply& p = s.plies[k];
+            if (p.from == b) {
+                // The line piece moves at last: it must capture the
+                // interferer on c, giving check along the thematic line to a
+                // black king that arrived there after the interference.
+                if (p.to != c || !p.captured || !p.is_check || !king_arrived) return false;
+                const int king = king_square(p.after, Color::Black);
+                const auto lp = line_piece_on(p.after, c, Color::White);
+                return king >= 0 && lp && passes_over(b, king, c) &&
+                       piece_attacks(p.after.pieces(), *lp, king);
+            }
+            if (p.to == b || p.from == c || p.to == c) return false;  // line piece or interferer disturbed
+            // Beyond c as seen from b: between b and c is impossible, the line
+            // piece on b attacks those squares.
+            if (p.piece.color == Color::Black && p.piece.type == PieceType::King && passes_over(b, p.to, c))
+                king_arrived = true;
+        }
+        return false;
+    };
+    return critical_then_interference(s, Color::White, Color::Black, false, finish);
+}
+
+bool has_maslar_black_white(const Solution& s) {
+    const int n = (int)s.plies.size();
+    auto finish = [&](int, int j, int b, int c) {
+        for (int k = j + 1; k < n; ++k) {
+            const Ply& p = s.plies[k];
+            if (p.from == b) return p.to == c && p.captured.has_value();
+            if (p.to == b || p.from == c || p.to == c) return false;
+        }
+        return false;
+    };
+    return critical_then_interference(s, Color::Black, Color::White, false, finish);
 }
 
 namespace {

@@ -97,6 +97,29 @@ bool has_umnov_mate(const Solution& s);
 // and A's return must be the next time A stands on a after leaving it.
 bool has_klasinc(const Solution& s);
 
+// The three below share one skeleton: a CRITICAL MOVE, in which a line piece
+// L (queen, rook or bishop) moves a -> b passing strictly over square c,
+// followed by an INTERFERENCE, a unit arriving on c while L still stands on
+// b. What must happen next differs. Throughout, L must not move from b or be
+// captured there, and the interferer must not leave or be captured on c,
+// until the theme's last move.
+
+// Indian (Loveday): the interferer is of L's own colour (the king counts),
+// and later it moves off c giving check, with L on b attacking the enemy king
+// along the line through c -- a discovered check from the critical line.
+// Either colour.
+bool has_indian(const Solution& s);
+
+// Maslar: L is white, the interferer a black unit other than the king; after
+// the interference the black king arrives on the thematic line beyond c, and
+// then L captures the interferer on c giving check along that line.
+bool has_maslar(const Solution& s);
+
+// Black-White Maslar: L is black, the interferer a white unit other than the
+// king, and L finally captures it on c. The definition asks for no king
+// arrival and no check, so none is required.
+bool has_maslar_black_white(const Solution& s);
+
 // The solution's promotions as a canonical multiset string: one letter per
 // promotion, either colour, sorted in the fixed order q, r, b, n -- "qrr" for
 // one queen and two rooks. Empty when nothing promotes. `promotions:<types>`

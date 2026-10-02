@@ -8,7 +8,8 @@ committed, because the GitHub Pages workflow has no tables. Four files:
   deepest.json    docs/DEEPEST.json with every solution expanded ply by ply
   puzzles.json    the dashboard's puzzles.epd, each with its one solution and
                   the themes it shows (`helpmate probe --themes`, one call per puzzle)
-  materials.json  one row per table from the stats sidecars and file sizes
+  materials.json  one row per material (1000 + corpus extras such as Kvk), see
+                  helpmate_server/contrib/site_data.py
   corpus.json     the totals the front page states
 
 Every solution ply carries its SAN, its from/to squares (UCI, promotion piece
@@ -26,12 +27,20 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+try:
+    from helpmate_server.contrib.site_data import corpus_summary, write_site_data
+    from helpmate_server.contrib.site_data import stats_row as material_row
+except ImportError:  # running from a checkout without helpmate-api installed
+    sys.path.insert(0, str(ROOT / "src" / "packages" / "api"))
+    from helpmate_server.contrib.site_data import corpus_summary, write_site_data
+    from helpmate_server.contrib.site_data import stats_row as material_row
+
+__all__ = ["corpus_summary", "material_row"]
 PUZZLES_EPD = ROOT / "src/packages/web/helpmate_web/static/puzzles.epd"
 DEEPEST_JSON = ROOT / "docs/DEEPEST.json"
 
@@ -121,46 +130,6 @@ def material_of(fen: str) -> str:
     return "".join(white) + "v" + "".join(black).lower()
 
 
-def material_row(stats: dict, size_bytes: int) -> dict:
-    """One materials.json row from a stats sidecar and the table's on-disk size."""
-    cells = stats.get("cells", {})
-    total = 2 * int(stats["plane_size"])
-    invalid = sum(int(v) for v in cells.get("invalid", {}).values())
-    unsolvable = sum(int(v) for v in cells.get("unsolvable", {}).values())
-    unique = 0
-    for side in stats.get("uniqueness", {}).values():
-        for by_count in side.values():
-            unique += int(by_count.get("1", 0))
-    marker = bool(stats.get("all_unsolvable")) or int(stats.get("max_dtm", 255)) >= 255
-    return {
-        "material": stats["material"],
-        "pieces": piece_count(stats["material"]),
-        "max_dtm": None if marker else int(stats["max_dtm"]),
-        "solvable": 0 if marker else total - invalid - unsolvable,
-        "unique": 0 if marker else unique,
-        "size_bytes": size_bytes,
-    }
-
-
-def corpus_summary(rows: list[dict]) -> dict:
-    by_pieces: dict[str, int] = {}
-    for r in rows:
-        by_pieces[str(r["pieces"])] = by_pieces.get(str(r["pieces"]), 0) + 1
-    real = [r for r in rows if r["max_dtm"] is not None]
-    deepest = max(real, key=lambda r: r["max_dtm"]) if real else None
-    return {
-        "tables": len(rows),
-        "markers": len(rows) - len(real),
-        "size_bytes": sum(r["size_bytes"] for r in rows),
-        "solvable": sum(r["solvable"] for r in rows),
-        "unique": sum(r["unique"] for r in rows),
-        "by_pieces": by_pieces,
-        "deepest": {"material": deepest["material"], "dtm": deepest["max_dtm"]}
-        if deepest
-        else None,
-    }
-
-
 def helpmate_line(binary: str, fen: str, tables: str) -> str:
     p = subprocess.run([binary, "line", fen, "--tables", tables], capture_output=True, text=True)
     if p.returncode != 0:
@@ -231,17 +200,12 @@ def main(argv: list[str] | None = None) -> int:
     (out / "puzzles.json").write_text(json.dumps(puzzles, separators=(",", ":")))
     print(f"puzzles.json: {len(puzzles)} puzzles, {dropped} dropped", file=sys.stderr)
 
-    # materials + corpus
-    rows = []
-    for sc in sorted(tables.glob("*.stats.json")):
-        hm = sc.with_name(sc.name[: -len(".stats.json")] + ".hm")
-        if not hm.exists():
-            continue
-        rows.append(material_row(json.loads(sc.read_text()), os.path.getsize(hm)))
-    rows.sort(key=lambda r: (r["pieces"], r["material"]))
-    (out / "materials.json").write_text(json.dumps(rows, separators=(",", ":")))
-    (out / "corpus.json").write_text(json.dumps(corpus_summary(rows), indent=1))
-    print(f"materials.json: {len(rows)} rows", file=sys.stderr)
+    # materials + corpus: the same rows `helpmate-tables sync` writes
+    written = write_site_data(out, tables)
+    for p in written:
+        print(f"wrote {p.name}", file=sys.stderr)
+    if not written:
+        print("materials.json, corpus.json unchanged", file=sys.stderr)
     return 0
 
 

@@ -299,11 +299,12 @@ def test_booklet_excludes_classes_that_cannot_hold_a_mate(pieces, n):
 
 
 def test_six_man_count_agrees_with_the_repo():
-    # README.md and docs/CONTRIBUTING-TABLES.md both put the six-piece work at
-    # 645 classes. The booklet's denominator has to be the same number, or the
-    # two documents disagree about how much of the project is done.
+    # README.md counts six-piece progress over all 715 classes (the 70 with a
+    # bare White king are published as marker tables). The booklet counts the
+    # classes that can hold a problem: the same universe minus those 70.
     readme = (ROOT / "README.md").read_text()
-    assert f"| 6 | {booklet.mateable_classes(6)} |" in readme
+    assert f"| 6 | <!-- contrib:six-total -->{booklet.possible_classes(6)}<!-- /contrib --> |" in readme
+    assert booklet.possible_classes(6) - booklet.mateable_classes(6) == 70
 
 
 def test_booklet_declares_itself_a_draft(tex, rows):

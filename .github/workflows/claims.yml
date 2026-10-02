@@ -1,0 +1,44 @@
+# .github/workflows/claims.yml
+# Keeps one status comment on every open claim issue: which claimed materials
+# are done (in the dataset manifest), in review (in an open dataset PR),
+# conflicting or stale. Commits nothing; needs no C++ build -- tables_cli
+# imports nothing from the bindings (tested in test_contrib_verify.py).
+name: Claims
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: claims
+  cancel-in-progress: false
+
+jobs:
+  claims:
+    # Issue events fire for every issue and every PR comment: run only for claim
+    # issues (startsWith is case-insensitive in Actions expressions).
+    if: >-
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      (!github.event.issue.pull_request &&
+       (startsWith(github.event.issue.title, 'claim') ||
+        contains(github.event.issue.labels.*.name, 'claim')))
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "huggingface_hub>=0.23"
+      - run: python -m helpmate_server.tables_cli claims --github-repo "${{ github.repository }}"
+        env:
+          PYTHONPATH: src/packages/api
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

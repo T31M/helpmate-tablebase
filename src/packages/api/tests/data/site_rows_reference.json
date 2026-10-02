@@ -1,0 +1,60 @@
+{
+ "rows": [
+  {
+   "material": "KBvk",
+   "pieces": 3,
+   "max_dtm": null,
+   "solvable": 0,
+   "unique": 0
+  },
+  {
+   "material": "KNvk",
+   "pieces": 3,
+   "max_dtm": null,
+   "solvable": 0,
+   "unique": 0
+  },
+  {
+   "material": "KPvk",
+   "pieces": 3,
+   "max_dtm": 17,
+   "solvable": 165660,
+   "unique": 1782
+  },
+  {
+   "material": "KQvk",
+   "pieces": 3,
+   "max_dtm": 14,
+   "solvable": 45723,
+   "unique": 3064
+  },
+  {
+   "material": "KRvk",
+   "pieces": 3,
+   "max_dtm": 14,
+   "solvable": 49952,
+   "unique": 3910
+  },
+  {
+   "material": "Kvk",
+   "pieces": 2,
+   "max_dtm": null,
+   "solvable": 0,
+   "unique": 0
+  }
+ ],
+ "summary": {
+  "tables": 6,
+  "markers": 3,
+  "solvable": 261335,
+  "unique": 8756,
+  "by_pieces": {
+   "3": 5,
+   "2": 1
+  },
+  "deepest": {
+   "material": "KPvk",
+   "dtm": 17
+  }
+ }
+}

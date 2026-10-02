@@ -82,7 +82,7 @@ def test_theme_registry_exposes_needs():
     # Task 10: `needs` is how a caller tells which themes answer without
     # enumerating solutions -- and so still answer on positions whose stored
     # solution count saturates (capped at 255). set-play is the one
-    # non-Solutions theme among the 30 in this build.
+    # non-Solutions theme among the 33 in this build.
     entries = helpmate.themes()
     assert all("needs" in e for e in entries)
     by_name = {e["name"]: e for e in entries}
