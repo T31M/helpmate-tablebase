@@ -294,7 +294,16 @@ set_tests_properties(cli_mine_shape_negative PROPERTIES PASS_REGULAR_EXPRESSION 
 set_tests_properties(cli_mine_shape_no_count PROPERTIES PASS_REGULAR_EXPRESSION "8/8/8/8/8/2K5/7Q/1k6 b" DEPENDS cli_gen)
 set_tests_properties(cli_missing PROPERTIES PASS_REGULAR_EXPRESSION "helpmate gen" DEPENDS cli_gen)
 set_tests_properties(cli_badfen PROPERTIES PASS_REGULAR_EXPRESSION "error")
-set_tests_properties(cli_gen_verbose PROPERTIES PASS_REGULAR_EXPRESSION "cached" DEPENDS cli_gen)
+set_tests_properties(cli_gen_verbose PROPERTIES PASS_REGULAR_EXPRESSION "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\\.[0-9][0-9][0-9]Z cached Kvk" DEPENDS cli_gen)
+# Every generator log line starts with an ISO-8601 UTC timestamp with
+# milliseconds (2026-10-03T16:44:07.123Z). A fresh directory makes gen build
+# KQvk, so the progress lines appear too.
+set(CLI_STAMP_TT ${CMAKE_BINARY_DIR}/cli_stamp_tables)
+add_test(NAME cli_gen_stamp_clean COMMAND ${CMAKE_COMMAND} -E rm -rf ${CLI_STAMP_TT})
+add_test(NAME cli_gen_stamp COMMAND helpmate gen KQvk --tables ${CLI_STAMP_TT} --progress --verbose)
+set_tests_properties(cli_gen_stamp_clean PROPERTIES FIXTURES_SETUP cli_stamp)
+set_tests_properties(cli_gen_stamp PROPERTIES FIXTURES_REQUIRED cli_stamp
+    PASS_REGULAR_EXPRESSION "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\\.[0-9][0-9][0-9]Z   KQvk: pass d=1 resolved")
 # Regex-escape the dots so 0.7.1 does not also match 0X7Y1.
 string(REPLACE "." "\\." HELPMATE_VERSION_RE "${PROJECT_VERSION}")
 set_tests_properties(cli_version PROPERTIES PASS_REGULAR_EXPRESSION "helpmate ${HELPMATE_VERSION_RE}")

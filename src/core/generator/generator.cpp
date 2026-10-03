@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -34,6 +35,21 @@ std::string cell_context(const Material& mat, uint64_t cell, int stm, int depth)
 std::string gib(uint64_t bytes) {
     char buf[32];
     std::snprintf(buf, sizeof buf, "%.2f", (double)bytes / (1024.0 * 1024.0 * 1024.0));
+    return buf;
+}
+
+// "2026-10-03T16:44:07.123Z " -- ISO-8601 UTC with milliseconds and a
+// trailing space, written at the start of every progress/verbose log line.
+std::string log_stamp() {
+    using namespace std::chrono;
+    const auto now = system_clock::now();
+    const std::time_t secs = system_clock::to_time_t(now);
+    const auto ms = duration_cast<milliseconds>(now.time_since_epoch()).count() % 1000;
+    std::tm utc{};
+    gmtime_r(&secs, &utc);
+    char buf[64];  // 25 bytes in practice; room for the widest int fields keeps -Wformat-truncation quiet
+    std::snprintf(buf, sizeof buf, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ ", utc.tm_year + 1900, utc.tm_mon + 1,
+                  utc.tm_mday, utc.tm_hour, utc.tm_min, utc.tm_sec, (int)ms);
     return buf;
 }
 
@@ -128,7 +144,7 @@ void SliceGen::init_pass() {
             }
         }
     });
-    if (opt_.progress) std::cerr << "  " << mat_.name() << ": init pass done (" << secs_since(t0) << " s)\n";
+    if (opt_.progress) std::cerr << log_stamp() << "  " << mat_.name() << ": init pass done (" << secs_since(t0) << " s)\n";
 }
 
 const std::vector<uint8_t>& SliceGen::dtm(Color stm) const { return dtm_[(int)stm]; }
@@ -233,7 +249,7 @@ bool SliceGen::scan_pass(int d) {
     uint64_t n = resolved.load();
     // Reported from the coordinating thread at the pass boundary only.
     if (opt_.progress)
-        std::cerr << "  " << mat_.name() << ": pass d=" << d << " resolved " << n << " cells ("
+        std::cerr << log_stamp() << "  " << mat_.name() << ": pass d=" << d << " resolved " << n << " cells ("
                   << secs_since(t0) << " s)\n";
     return n > 0;
 }
@@ -369,7 +385,7 @@ std::vector<std::string> generate(const Material& root, const GenOptions& opt_in
         if (!std::filesystem::exists(opt.tables_dir + "/" + m.name() + ".hm"))
             missing.push_back({&m, SliceIndex(m).size()});
     if (opt.verbose) {
-        std::cerr << "gen " << root.name() << ": closure has " << closure.size() << " slice(s):";
+        std::cerr << log_stamp() << "gen " << root.name() << ": closure has " << closure.size() << " slice(s):";
         for (auto& m : closure) std::cerr << " " << m.name();
         std::cerr << "\n";
     }
@@ -378,7 +394,7 @@ std::vector<std::string> generate(const Material& root, const GenOptions& opt_in
         auto largest = std::max_element(missing.begin(), missing.end(),
                                         [](const Todo& a, const Todo& b) { return a.cells < b.cells; });
         if (opt.verbose) {
-            std::cerr << "gen " << root.name() << ": " << missing.size() << " slice(s) to build; largest "
+            std::cerr << log_stamp() << "gen " << root.name() << ": " << missing.size() << " slice(s) to build; largest "
                       << largest->m->name() << " (" << largest->cells << " cells, ~"
                       << gib(plane_ram_bytes(largest->cells)) << " GiB RAM";
             if (avail) std::cerr << "; " << gib(*avail) << " GiB available";
@@ -393,7 +409,7 @@ std::vector<std::string> generate(const Material& root, const GenOptions& opt_in
     for (auto& m : closure) {
         std::string path = opt.tables_dir + "/" + m.name() + ".hm";
         if (std::filesystem::exists(path)) {
-            if (opt.verbose) std::cerr << "cached " << m.name() << " (already on disk)\n";
+            if (opt.verbose) std::cerr << log_stamp() << "cached " << m.name() << " (already on disk)\n";
             continue;
         }
         if (opt.prune) {
@@ -453,7 +469,7 @@ std::vector<std::string> generate(const Material& root, const GenOptions& opt_in
                 TableWriter::write_unsolvable(path, m, ps, meta);
                 std::ofstream(opt.tables_dir + "/" + m.name() + ".stats.json", std::ios::trunc) << meta;
                 if (opt.verbose)
-                    std::cerr << "pruned " << m.name() << " (provably no helpmate; marker table written)\n";
+                    std::cerr << log_stamp() << "pruned " << m.name() << " (provably no helpmate; marker table written)\n";
                 written.push_back(path);
                 continue;
             }
@@ -467,14 +483,14 @@ std::vector<std::string> generate(const Material& root, const GenOptions& opt_in
             if (auto now_avail = mem_available_bytes())
                 if (auto err = ram_guard_error(m.name(), plane_ram_bytes(cells), *now_avail))
                     throw std::runtime_error(*err);
-        if (opt.verbose) std::cerr << "generating " << m.name() << " (" << cells << " cells)...\n";
+        if (opt.verbose) std::cerr << log_stamp() << "generating " << m.name() << " (" << cells << " cells)...\n";
         auto t0 = std::chrono::steady_clock::now();
         SliceGen g(m, opt);
         g.run_all_passes();
         g.finalize_and_write();
         if (opt.verbose) {
             int md = g.max_dtm() < 0 ? (int)DTM_UNSOLVABLE : g.max_dtm();
-            std::cerr << "done " << m.name() << " (max_dtm=" << md << ", " << secs_since(t0) << " seconds)\n";
+            std::cerr << log_stamp() << "done " << m.name() << " (max_dtm=" << md << ", " << secs_since(t0) << " seconds)\n";
         }
         written.push_back(path);
     }
