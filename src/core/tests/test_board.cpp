@@ -211,3 +211,19 @@ TEST_CASE("pieces with counts matches a tally of pieces()") {
         CHECK((counts[1] >> 48) == 0);
     }
 }
+TEST_CASE("legal_moves into caller storage matches the returned list") {
+    std::vector<Move> buffer = {Move{0, 1, 0}, Move{2, 3, 0}};  // stale content is replaced
+    for (const char* fen : {"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1",
+                            "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1", "7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"}) {
+        auto b = Board::from_fen(fen);
+        REQUIRE(b);
+        auto want = b->legal_moves();
+        b->legal_moves(buffer);
+        REQUIRE(buffer.size() == want.size());
+        for (size_t i = 0; i < want.size(); ++i) {
+            CHECK(buffer[i].from == want[i].from);
+            CHECK(buffer[i].to == want[i].to);
+            CHECK(buffer[i].flags == want[i].flags);
+        }
+    }
+}

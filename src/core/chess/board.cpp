@@ -241,6 +241,12 @@ bool Board::opponent_in_check() const {
 
 std::vector<Move> Board::legal_moves() const {
     std::vector<Move> out;
+    legal_moves(out);
+    return out;
+}
+
+void Board::legal_moves(std::vector<Move>& out) const {
+    out.clear();
     // unique_ptr::operator->() const still yields a non-const pointee, so no
     // const_cast is needed to get a mutable Position& from a const method.
     Position& p = impl_->pos;
@@ -274,7 +280,6 @@ std::vector<Move> Board::legal_moves() const {
         MoveList<BLACK> l(p);
         conv(l);
     }
-    return out;
 }
 
 void Board::make(const Move& m) {

@@ -170,7 +170,7 @@ bool SliceGen::scan_pass(int d) {
     // values only to check DTM_UNSET (never written by another cell). So two
     // workers touching different cells c1 != c2 never read-during-write or
     // write-during-write each other's data. The atomic cursor gives each
-    // worker disjoint tiles; Board/pp stay private and are reused across its
+    // worker disjoint tiles; Board/pp/moves stay private and are reused across its
     // tiles. Each worker adds its local resolved count only once after its
     // cell loop. Each depth joins before the next reads its counts.
     auto t0 = std::chrono::steady_clock::now();
@@ -189,6 +189,7 @@ bool SliceGen::scan_pass(int d) {
     std::atomic<uint64_t> next_cell{0};
     parallel_for(workers, workers, [this, s, mover, d, &resolved, &next_cell, tile_cells](uint64_t, uint64_t) {
         std::vector<PlacedPiece> pp;
+        std::vector<Move> moves;
         Board b;
         uint64_t local = 0;
         for (;;) {
@@ -205,7 +206,8 @@ bool SliceGen::scan_pass(int d) {
                 try {
                     unsigned total = 0;
                     bool found = false;
-                    for (const Move& m : b.legal_moves()) {
+                    b.legal_moves(moves);
+                    for (const Move& m : moves) {
                         b.make(m);
                         ValuePair v = eval_board(b, [this, &pp](Board& x) { return lookup_epless(x, pp); });
                         b.unmake(m);

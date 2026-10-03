@@ -84,7 +84,9 @@ bool SliceIndex::decode(uint64_t idx, std::vector<PlacedPiece>& out) const {
     if (idx >= size_) return false;
     out.clear();
     uint64_t rest = idx;
-    std::vector<int> dg(slots_.size());
+    // At most 62 non-king pieces fit beside two kings; a stack array avoids a
+    // heap allocation on every decoded cell.
+    std::array<int, 64> dg;
     for (int i = (int)slots_.size() - 1; i >= 0; --i) { dg[i] = rest % slots_[i].radix; rest /= slots_[i].radix; }
     auto [wk, bk] = kk_->squares_of[rest];            // remaining = kk index
     uint64_t occ = (1ull << wk) | (1ull << bk);

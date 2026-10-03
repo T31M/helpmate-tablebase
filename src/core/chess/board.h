@@ -31,6 +31,7 @@ public:
     bool opponent_in_check() const;    // true => position illegal
     PosState state() const;            // for side to move
     std::vector<Move> legal_moves() const;
+    void legal_moves(std::vector<Move>& out) const;  // fills reusable caller-owned storage
     void make(const Move&);
     void unmake(const Move&);
     uint64_t perft(int depth);
