@@ -1,12 +1,14 @@
 #include <unistd.h>
 
 #include <catch2/catch_test_macros.hpp>
+#include <atomic>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <random>
+#include <thread>
 #include <vector>
 
 #include "format/block_codec.h"
@@ -811,5 +813,69 @@ TEST_CASE("read_values on a marker table matches get() without touching a payloa
         REQUIRE(c[i] == 0);
     }
     CHECK_THROWS_AS(t->read_values(Color::White, ps, 1, d.data(), c.data()), std::out_of_range);
+    fs::remove_all(dir);
+}
+
+TEST_CASE("interleaved compressed readers never answer from each other's blocks") {
+    // TableReader keeps recently read blocks per thread, keyed by cache id and
+    // block index. Two tables with the same layout share every block index;
+    // a reader reopened after another is destroyed may reuse its address.
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "hm_local_blocks_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    const uint64_t ps = 3000;
+    std::vector<uint8_t> planes[2][4];
+    for (int t = 0; t < 2; ++t)
+        for (int k = 0; k < 4; ++k) {
+            planes[t][k].resize(ps);
+            for (uint64_t i = 0; i < ps; ++i) planes[t][k][i] = uint8_t((i * (t + 3) + k * 11 + t * 101) % 251);
+        }
+    std::string path[2] = {(dir / "a.hm").string(), (dir / "b.hm").string()};
+    for (int t = 0; t < 2; ++t)
+        TableWriter::write_compressed(path[t], mat, ps, 30, "{}", planes[t][0].data(), planes[t][1].data(),
+                                      planes[t][2].data(), planes[t][3].data(), 1024);
+    auto check_cell = [&](const TableReader& r, int t, Color stm, uint64_t i) {
+        ValuePair v = r.get(stm, i);
+        int s = stm == Color::White ? 0 : 1;
+        return v.dtm == planes[t][s][i] && v.count == planes[t][2 + s][i];
+    };
+
+    {
+        auto a = TableReader::open(path[0]);
+        auto b = TableReader::open(path[1]);
+        REQUIRE(a);
+        REQUIRE(b);
+        bool ok = true;
+        for (uint64_t i = 0; i < ps; ++i)
+            for (Color stm : {Color::White, Color::Black}) ok = ok && check_cell(*a, 0, stm, i) && check_cell(*b, 1, stm, i);
+        CHECK(ok);
+
+        std::atomic<bool> mismatch{false};
+        std::vector<std::thread> workers;
+        for (unsigned seed = 1; seed <= 8; ++seed)
+            workers.emplace_back([&, seed] {
+                std::mt19937_64 rng(seed);
+                for (int n = 0; n < 20000; ++n) {
+                    uint64_t i = rng() % ps;
+                    int t = (int)(rng() & 1);
+                    Color stm = (rng() & 2) ? Color::Black : Color::White;
+                    if (!check_cell(t ? *b : *a, t, stm, i)) mismatch = true;
+                }
+            });
+        for (auto& w : workers) w.join();
+        CHECK_FALSE(mismatch.load());
+    }
+    // This thread still holds blocks of the destroyed readers; reopened
+    // readers must not be served from them.
+    for (int round = 0; round < 3; ++round) {
+        int t = round % 2 ? 0 : 1;
+        auto r = TableReader::open(path[t]);
+        REQUIRE(r);
+        bool ok = true;
+        for (uint64_t i = 0; i < ps; i += 7) ok = ok && check_cell(*r, t, Color::Black, i);
+        CHECK(ok);
+    }
     fs::remove_all(dir);
 }

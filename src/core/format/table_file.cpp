@@ -6,12 +6,14 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <stdexcept>
 #include <system_error>
 #include <vector>
@@ -622,13 +624,34 @@ void TableReader::read_values(Color stm, uint64_t first_cell, size_t n, uint8_t*
 uint8_t TableReader::byte_at(uint64_t logical) const {
     const uint64_t b = logical / block_size_;
     const uint64_t begin = b * block_size_;
+    const size_t offset = static_cast<size_t>(logical - begin);
+    // Each thread keeps the last few blocks it read, so the common repeat
+    // probe of a block skips the cache's shard mutex. A slot names a block by
+    // (cache id, block index): ids are never reused and a cached block never
+    // changes, so a slot cannot answer for the wrong table or stale bytes,
+    // and its shared owner keeps the block alive after the cache evicts it.
+    // The cost is up to kLocalBlocks blocks per thread beyond the cache's
+    // capacity (512 KiB at the 64 KiB maximum block size).
+    struct LocalBlock {
+        uint64_t cache_id = 0;
+        uint64_t index = 0;
+        std::shared_ptr<const BlockCache::Block> data;
+    };
+    constexpr size_t kLocalBlocks = 8;
+    thread_local std::array<LocalBlock, kLocalBlocks> local;
+    const uint64_t id = cache_->id();
+    LocalBlock& slot = local[(b ^ (id * 0x9E3779B97F4A7C15ull)) % kLocalBlocks];
+    if (slot.cache_id == id && slot.index == b) return (*slot.data)[offset];
+
     const size_t len = static_cast<size_t>(std::min<uint64_t>(block_size_, 4 * ps_ - begin));
     const uint64_t off_b = load_u64(offsets_ + b * sizeof(uint64_t));
     const uint64_t off_b1 = load_u64(offsets_ + (b + 1) * sizeof(uint64_t));
     const uint8_t* src = blocks_ + off_b;
     const size_t clen = static_cast<size_t>(off_b1 - off_b);
-    return cache_->byte_at(b, static_cast<size_t>(logical - begin), len,
-                           [&](uint8_t* dst, size_t n) { decompress_block(src, clen, dst, n); });
+    slot.data = cache_->block(b, len, [&](uint8_t* dst, size_t n) { decompress_block(src, clen, dst, n); });
+    slot.cache_id = id;
+    slot.index = b;
+    return (*slot.data)[offset];
 }
 
 void TableReader::read_range(uint64_t logical_offset, size_t len, uint8_t* dst) const {

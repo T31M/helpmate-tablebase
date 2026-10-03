@@ -172,3 +172,20 @@ TEST_CASE("the cache is safe under concurrent byte_at from multiple threads, wit
     CHECK_FALSE(mismatch.load());
     CHECK(c.fills() > kNumIndices);  // capacity < working set forces repeated refills
 }
+
+TEST_CASE("block() shares the cached block, keeps it alive past eviction, and counts like read_range") {
+    BlockCache c(1, 16);
+    auto fill_with = [](uint8_t v) {
+        return [v](uint8_t* dst, size_t len) { std::fill(dst, dst + len, v); };
+    };
+    auto first = c.block(1, 16, fill_with(1));
+    REQUIRE(first->size() == 16);
+    CHECK(c.block(1, 16, fill_with(9)) == first);  // a hit returns the same block
+    CHECK(c.fills() == 1);
+    CHECK(c.hits() == 1);
+    c.block(2, 16, fill_with(2));  // capacity 1: evicts block 1
+    CHECK((*first)[15] == 1);      // the shared owner still reads the old bytes
+    CHECK(c.byte_at(1, 0, 16, fill_with(3)) == 3);  // the cache itself refills
+    CHECK(c.fills() == 3);
+    CHECK(BlockCache(1, 16).id() != c.id());
+}
