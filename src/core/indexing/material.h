@@ -1,11 +1,12 @@
 #pragma once
-#include "chess/types.h"
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include "chess/types.h"
 
 namespace hm {
 

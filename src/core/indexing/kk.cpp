@@ -1,7 +1,9 @@
 #include "indexing/kk.h"
-#include "chess/types.h"
+
 #include <cstdlib>
 #include <stdexcept>
+
+#include "chess/types.h"
 
 namespace hm {
 
@@ -38,11 +40,9 @@ static KKTable build(bool pawns) {
             choices.fill(KKTable::kNoChoice);
             size_t count = 0;
             for (int transform = 0; transform < (pawns ? 2 : 8); ++transform) {
-                int canonical = t.index_of[transform_sq(wk, transform) * 64 +
-                                           transform_sq(bk, transform)];
+                int canonical = t.index_of[transform_sq(wk, transform) * 64 + transform_sq(bk, transform)];
                 if (canonical < 0) continue;
-                if (count == choices.size())
-                    throw std::logic_error("too many eligible king transforms");
+                if (count == choices.size()) throw std::logic_error("too many eligible king transforms");
                 choices[count++] = static_cast<uint16_t>((canonical << 3) | transform);
             }
         }

@@ -1,4 +1,5 @@
 #include "indexing/slice_index.h"
+
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -16,6 +17,9 @@ SliceIndex::SliceIndex(const Material& m) : mat_(m) {
         }
     size_ = kk_->size;
     for (auto& s : slots_) size_ *= (uint64_t)s.radix;
+    slot_weight_.assign(slots_.size(), 1);
+    for (int k = (int)slots_.size() - 2; k >= 0; --k)
+        slot_weight_[k] = slot_weight_[k + 1] * (uint64_t)slots_[k + 1].radix;
     for (size_t k = 0; k < slots_.size(); ++k) {
         int kind = (int)slots_[k].piece.color * 6 + (int)slots_[k].piece.type;
         if (run_count_[kind] == 0) run_first_[kind] = (uint8_t)k;
@@ -55,7 +59,10 @@ std::optional<uint64_t> SliceIndex::encode_for_material(const std::vector<Placed
         for (auto& p : pp) {
             if (p.piece.type == PieceType::King) continue;
             int kind = (int)p.piece.color * 6 + (int)p.piece.type;
-            if (fill[kind] == run_count_[kind]) { ok = false; break; }  // more than the material holds
+            if (fill[kind] == run_count_[kind]) {
+                ok = false;
+                break;
+            }  // more than the material holds
             sqs[run_first_[kind] + fill[kind]++] = transform_sq(p.square, t);
             ++placed;
         }
@@ -71,13 +78,32 @@ std::optional<uint64_t> SliceIndex::encode_for_material(const std::vector<Placed
             }
         for (size_t k = 0; k < ns; ++k) {
             int digit = sqs[k] - (slots_[k].radix == 48 ? 8 : 0);
-            if (digit < 0 || digit >= slots_[k].radix) { ok = false; break; }
+            if (digit < 0 || digit >= slots_[k].radix) {
+                ok = false;
+                break;
+            }
             idx = idx * slots_[k].radix + (uint64_t)digit;
         }
         if (ok) best = std::min(best, idx);
     }
     if (best == UINT64_MAX) return std::nullopt;      // e.g. kings adjacent
     return best;
+}
+
+uint64_t SliceIndex::moved_index(uint64_t c, const std::vector<PlacedPiece>& pp, int from, int to) const {
+    // decode() lays out both kings first, then one piece per slot in slot order.
+    if (pp.size() != slots_.size() + 2) return kNoIndex;
+    if (kk_->choices_of[pp[0].square * 64 + pp[1].square][1] != KKTable::kNoChoice) return kNoIndex;
+    for (size_t k = 0; k < slots_.size(); ++k) {
+        if (pp[k + 2].square != from) continue;
+        const Piece piece = slots_[k].piece;
+        if (run_count_[(int)piece.color * 6 + (int)piece.type] != 1) return kNoIndex;
+        const int base = slots_[k].radix == 48 ? 8 : 0;
+        const int digit = to - base;
+        if (digit < 0 || digit >= slots_[k].radix) return kNoIndex;  // a pawn reaching its last rank
+        return c - (uint64_t)(from - base) * slot_weight_[k] + (uint64_t)digit * slot_weight_[k];
+    }
+    return kNoIndex;  // `from` holds a king
 }
 
 bool SliceIndex::decode(uint64_t idx, std::vector<PlacedPiece>& out) const {

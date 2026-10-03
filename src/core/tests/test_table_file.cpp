@@ -1,7 +1,7 @@
 #include <unistd.h>
 
-#include <catch2/catch_test_macros.hpp>
 #include <atomic>
+#include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
@@ -830,7 +830,8 @@ TEST_CASE("interleaved compressed readers never answer from each other's blocks"
     for (int t = 0; t < 2; ++t)
         for (int k = 0; k < 4; ++k) {
             planes[t][k].resize(ps);
-            for (uint64_t i = 0; i < ps; ++i) planes[t][k][i] = uint8_t((i * (t + 3) + k * 11 + t * 101) % 251);
+            for (uint64_t i = 0; i < ps; ++i)
+                planes[t][k][i] = uint8_t((i * (t + 3) + k * 11 + t * 101) % 251);
         }
     std::string path[2] = {(dir / "a.hm").string(), (dir / "b.hm").string()};
     for (int t = 0; t < 2; ++t)
@@ -849,7 +850,8 @@ TEST_CASE("interleaved compressed readers never answer from each other's blocks"
         REQUIRE(b);
         bool ok = true;
         for (uint64_t i = 0; i < ps; ++i)
-            for (Color stm : {Color::White, Color::Black}) ok = ok && check_cell(*a, 0, stm, i) && check_cell(*b, 1, stm, i);
+            for (Color stm : {Color::White, Color::Black})
+                ok = ok && check_cell(*a, 0, stm, i) && check_cell(*b, 1, stm, i);
         CHECK(ok);
 
         std::atomic<bool> mismatch{false};

@@ -104,18 +104,15 @@ TEST_CASE("6-piece identical multiples: swapped order encodes identically") {
     auto ea = idx.encode(a);
     REQUIRE(ea);
     CHECK(idx.encode(b) == ea);
-    CHECK(*ea == 541775588);                         // pre-change on-disk index
+    CHECK(*ea == 541775588);  // pre-change on-disk index
 }
 
 TEST_CASE("6-piece KRBvkqq canonical numeric index is stable") {
     SliceIndex idx(*Material::parse("KRBvkqq"));
     std::vector<PlacedPiece> pieces = {
-        {{Color::White, PieceType::King}, 0},
-        {{Color::White, PieceType::Rook}, 10},
-        {{Color::White, PieceType::Bishop}, 27},
-        {{Color::Black, PieceType::King}, 18},
-        {{Color::Black, PieceType::Queen}, 41},
-        {{Color::Black, PieceType::Queen}, 55}};
+        {{Color::White, PieceType::King}, 0},    {{Color::White, PieceType::Rook}, 10},
+        {{Color::White, PieceType::Bishop}, 27}, {{Color::Black, PieceType::King}, 18},
+        {{Color::Black, PieceType::Queen}, 41},  {{Color::Black, PieceType::Queen}, 55}};
     auto encoded = idx.encode(pieces);
     REQUIRE(encoded);
     CHECK(*encoded == 204061303);

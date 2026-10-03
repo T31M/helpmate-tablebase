@@ -1,9 +1,11 @@
-#include <catch2/catch_test_macros.hpp>
-#include "indexing/slice_index.h"
-#include "indexing/material.h"
 #include <algorithm>
+#include <catch2/catch_test_macros.hpp>
 #include <random>
 #include <tuple>
+
+#include "chess/board.h"
+#include "indexing/material.h"
+#include "indexing/slice_index.h"
 using namespace hm;
 TEST_CASE("plane sizes") {
     CHECK(SliceIndex(*Material::parse("Kvk")).size()   == 462);
@@ -65,28 +67,26 @@ TEST_CASE("encode rejects garbage") {
         {{Color::Black, PieceType::King}, 1}};
     CHECK(!idx.encode(adj));                          // adjacent kings
     adj[0].square = 64;
-    CHECK(!idx.encode(adj));                          // malformed square is not a table index
+    CHECK(!idx.encode(adj));  // malformed square is not a table index
 }
 
 TEST_CASE("canonical numeric indices retain the existing table layout") {
     // The a1/c3 kings permit identity and transpose. The queen position makes
     // transpose the lower complete index, so both choices must be considered.
     SliceIndex pawnless(*Material::parse("KQvkr"));
-    std::vector<PlacedPiece> two_choices = {
-        {{Color::White, PieceType::King}, 0},
-        {{Color::White, PieceType::Queen}, 17},
-        {{Color::Black, PieceType::King}, 18},
-        {{Color::Black, PieceType::Rook}, 41}};
+    std::vector<PlacedPiece> two_choices = {{{Color::White, PieceType::King}, 0},
+                                            {{Color::White, PieceType::Queen}, 17},
+                                            {{Color::Black, PieceType::King}, 18},
+                                            {{Color::Black, PieceType::Rook}, 41}};
     auto pawnless_index = pawnless.encode(two_choices);
     REQUIRE(pawnless_index);
     CHECK(*pawnless_index == 49805);
 
     SliceIndex pawns(*Material::parse("KPvkp"));
-    std::vector<PlacedPiece> mirrored = {
-        {{Color::White, PieceType::King}, 4},
-        {{Color::White, PieceType::Pawn}, 28},
-        {{Color::Black, PieceType::King}, 20},
-        {{Color::Black, PieceType::Pawn}, 35}};
+    std::vector<PlacedPiece> mirrored = {{{Color::White, PieceType::King}, 4},
+                                         {{Color::White, PieceType::Pawn}, 28},
+                                         {{Color::Black, PieceType::King}, 20},
+                                         {{Color::Black, PieceType::Pawn}, 35}};
     auto pawn_index = pawns.encode(mirrored);
     REQUIRE(pawn_index);
     CHECK(*pawn_index == 436396);
@@ -120,11 +120,17 @@ std::optional<uint64_t> reference_encode(const Material& m, const std::vector<Pl
             std::vector<int> sqs;
             for (auto& p : pp)
                 if (p.piece == slots[i].piece) sqs.push_back(transform_sq(p.square, t));
-            if (sqs.size() != j - i) { ok = false; break; }
+            if (sqs.size() != j - i) {
+                ok = false;
+                break;
+            }
             std::sort(sqs.begin(), sqs.end());
             for (size_t k = i; k < j; ++k) {
                 int digit = sqs[k - i] - (slots[k].radix == 48 ? 8 : 0);
-                if (digit < 0 || digit >= slots[k].radix) { ok = false; break; }
+                if (digit < 0 || digit >= slots[k].radix) {
+                    ok = false;
+                    break;
+                }
                 idx = idx * slots[k].radix + (uint64_t)digit;
             }
             i = j;
@@ -138,8 +144,8 @@ std::optional<uint64_t> reference_encode(const Material& m, const std::vector<Pl
 
 TEST_CASE("encode matches the reference encoder on transformed, shuffled positions") {
     std::mt19937_64 rng(20261002);
-    for (const char* name : {"KQvkr", "KRBvkq", "KBBBvk", "KNNvknn", "KQQvkq", "KPPvkpp", "KPPPvk", "KBBvkpp",
-                             "KRPvkp"}) {
+    for (const char* name :
+         {"KQvkr", "KRBvkq", "KBBBvk", "KNNvknn", "KQQvkq", "KPPvkpp", "KPPPvk", "KBBvkpp", "KRPvkp"}) {
         Material m = *Material::parse(name);
         SliceIndex idx(m);
         const int transforms = m.has_pawns() ? 2 : 8;
@@ -160,11 +166,74 @@ TEST_CASE("encode matches the reference encoder on transformed, shuffled positio
     }
     // Wrong material and adjacent kings still have no index.
     SliceIndex krb(*Material::parse("KRBvkq"));
-    std::vector<PlacedPiece> adjacent{{{Color::White, PieceType::King}, 0}, {{Color::Black, PieceType::King}, 1},
-                                      {{Color::White, PieceType::Rook}, 20}, {{Color::White, PieceType::Bishop}, 30},
+    std::vector<PlacedPiece> adjacent{{{Color::White, PieceType::King}, 0},
+                                      {{Color::Black, PieceType::King}, 1},
+                                      {{Color::White, PieceType::Rook}, 20},
+                                      {{Color::White, PieceType::Bishop}, 30},
                                       {{Color::Black, PieceType::Queen}, 40}};
     CHECK_FALSE(krb.encode(adjacent).has_value());
     CHECK(reference_encode(*Material::parse("KRBvkq"), adjacent) == std::nullopt);
     adjacent.pop_back();
     CHECK_FALSE(krb.encode(adjacent).has_value());
+}
+
+TEST_CASE("moved_index equals the full encoder for every quiet move it accepts") {
+    std::mt19937_64 rng(20261003);
+    // Lone pieces, twins (never accepted), pawns with double pushes and
+    // promotions, and pawnless materials with two-choice king pairs. The six-
+    // and seven-piece materials keep the fast path pinned to encode() for
+    // larger slot counts too (no table files needed).
+    for (const char* name : {"KRBvkq", "KQvkr", "KBBvk", "KBPvkp", "KPPvkp", "KNvkp", "KRvkb", "KRBvkqq",
+                             "KRBNvkq", "KRBPvkqp"}) {
+        Material m = *Material::parse(name);
+        SliceIndex idx(m);
+        std::vector<PlacedPiece> pp;
+        uint64_t accepted = 0, checked_cells = 0;
+        for (int trial = 0; trial < 4000; ++trial) {
+            uint64_t c = rng() % idx.size();
+            if (!idx.decode(c, pp) || idx.encode(pp) != std::optional<uint64_t>(c))
+                continue;  // canonical cells only
+            ++checked_cells;
+            for (Color stm : {Color::White, Color::Black}) {
+                Board b = Board::from_pieces(pp, stm);
+                if (b.opponent_in_check()) continue;
+                for (const Move& mv : b.legal_moves()) {
+                    if (mv.is_capture() || mv.promotion()) continue;
+                    uint64_t quick = idx.moved_index(c, pp, mv.from, mv.to);
+                    if (quick == SliceIndex::kNoIndex) continue;
+                    b.make(mv);
+                    auto full = idx.encode(b.pieces());
+                    b.unmake(mv);
+                    INFO(name << " cell " << c << " move " << mv.uci());
+                    REQUIRE(full.has_value());
+                    REQUIRE(quick == *full);
+                    ++accepted;
+                }
+            }
+        }
+        INFO(name);
+        CHECK(checked_cells > 100);
+        if (std::string(name) == "KBBvk")
+            CHECK(accepted == 0);  // the bishops are twins, the king never qualifies
+        else CHECK(accepted > 1000);
+    }
+}
+
+TEST_CASE("moved_index refuses kings, twins and two-choice king pairs") {
+    SliceIndex krb(*Material::parse("KRBvkq"));
+    // a1/c3 kings: two eligible transforms (identity and transpose).
+    std::vector<PlacedPiece> two_choice = {{{Color::White, PieceType::King}, 0},
+                                           {{Color::Black, PieceType::King}, 18},
+                                           {{Color::White, PieceType::Rook}, 33},
+                                           {{Color::White, PieceType::Bishop}, 44},
+                                           {{Color::Black, PieceType::Queen}, 60}};
+    auto c = krb.encode(two_choice);
+    REQUIRE(c);
+    CHECK(krb.moved_index(*c, two_choice, 33, 35) == SliceIndex::kNoIndex);
+    SliceIndex kbb(*Material::parse("KBBvk"));
+    std::vector<PlacedPiece> pp;
+    uint64_t cell = 12345;
+    while (!kbb.decode(cell, pp)) ++cell;
+    CHECK(kbb.moved_index(cell, pp, pp[2].square, (pp[2].square + 9) % 64) == SliceIndex::kNoIndex);  // twin
+    CHECK(kbb.moved_index(cell, pp, pp[0].square, (pp[0].square + 1) % 64) == SliceIndex::kNoIndex);  // king
 }

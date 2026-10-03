@@ -1,5 +1,6 @@
-#include <catch2/catch_test_macros.hpp>
 #include <algorithm>
+#include <catch2/catch_test_macros.hpp>
+
 #include "chess/board.h"
 using namespace hm;
 
@@ -59,15 +60,15 @@ TEST_CASE("pieces can fill and reuse caller-owned storage") {
     }
 
     Move capture{};
-    for (const Move& m : b->legal_moves()) if (m.uci() == "b4f4") capture = m;
+    for (const Move& m : b->legal_moves())
+        if (m.uci() == "b4f4") capture = m;
     REQUIRE(capture.uci() == "b4f4");
     b->make(capture);
     b->pieces(storage);
     CHECK(storage.data() == buffer);
     CHECK(storage.size() == 9);
-    auto moved_rook = std::find_if(storage.begin(), storage.end(), [](const PlacedPiece& p) {
-        return p.square == 29;
-    });
+    auto moved_rook =
+        std::find_if(storage.begin(), storage.end(), [](const PlacedPiece& p) { return p.square == 29; });
     REQUIRE(moved_rook != storage.end());
     CHECK((moved_rook->piece == Piece{Color::White, PieceType::Rook}));
     CHECK(std::none_of(storage.begin(), storage.end(), [](const PlacedPiece& p) { return p.square == 25; }));
@@ -183,15 +184,19 @@ TEST_CASE("reset on a reused board matches a freshly built one") {
         // Leave the board one ply deep (capture recorded in history) before reset.
         reused.reset(ep_pos, Color::White, 43);
         for (auto& m : reused.legal_moves())
-            if (m.is_ep()) { reused.make(m); break; }
+            if (m.is_ep()) {
+                reused.make(m);
+                break;
+            }
         REQUIRE(reused.stm() == Color::Black);
         reused.reset(mate, Color::Black);
         same(reused, Board::from_pieces(mate, Color::Black));
     }
 }
 TEST_CASE("pieces with counts matches a tally of pieces()") {
-    for (const char* fen : {"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1",
-                            "7k/6Q1/5K2/8/8/8/8/8 b - - 0 1", "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1"}) {
+    for (const char* fen :
+         {"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1",
+          "7k/6Q1/5K2/8/8/8/8/8 b - - 0 1", "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1"}) {
         auto b = Board::from_fen(fen);
         REQUIRE(b);
         std::array<uint8_t, 6> want[2] = {};
@@ -213,8 +218,9 @@ TEST_CASE("pieces with counts matches a tally of pieces()") {
 }
 TEST_CASE("legal_moves into caller storage matches the returned list") {
     std::vector<Move> buffer = {Move{0, 1, 0}, Move{2, 3, 0}};  // stale content is replaced
-    for (const char* fen : {"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1",
-                            "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1", "7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"}) {
+    for (const char* fen :
+         {"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1",
+          "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1", "7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"}) {
         auto b = Board::from_fen(fen);
         REQUIRE(b);
         auto want = b->legal_moves();

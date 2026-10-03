@@ -119,7 +119,8 @@ private:
     std::vector<Loaded> by_material_;
 
     // Generator hot path: material arrives packed from Board::pieces(out, counts).
-    ValuePair lookup_for_counts(const Material::Counts& c, const std::vector<PlacedPiece>& pp, Color stm) const {
+    ValuePair lookup_for_counts(const Material::Counts& c, const std::vector<PlacedPiece>& pp,
+                                Color stm) const {
         for (auto& l : by_material_)
             if (l.counts == c) return lookup_in(l, l.mat, pp, stm, true);
         throw_not_loaded(Material::from_counts(c), pp, stm);
@@ -132,7 +133,8 @@ private:
         throw_not_loaded(m, pp, stm);
     }
 
-    [[noreturn]] static void throw_not_loaded(const Material& m, const std::vector<PlacedPiece>& pp, Color stm) {
+    [[noreturn]] static void throw_not_loaded(const Material& m, const std::vector<PlacedPiece>& pp,
+                                              Color stm) {
         throw GeneratorLookupError("no sub-table loaded for material " + m.name() +
                                    " (only direct successors are loaded); position after move " +
                                    describe_position(pp, stm));

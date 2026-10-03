@@ -13,8 +13,10 @@ std::atomic<uint64_t> next_cache_id{1};  // 0 never names a cache
 
 BlockCache::BlockCache(size_t capacity_blocks, uint32_t block_size)
     : id_(next_cache_id.fetch_add(1, std::memory_order_relaxed)),
-      cap_(capacity_blocks ? capacity_blocks : 1), block_size_(block_size),
-      shard_count_(std::min<size_t>(cap_, 32)), shards_(std::make_unique<Shard[]>(shard_count_)) {
+      cap_(capacity_blocks ? capacity_blocks : 1),
+      block_size_(block_size),
+      shard_count_(std::min<size_t>(cap_, 32)),
+      shards_(std::make_unique<Shard[]>(shard_count_)) {
     // Divide the existing block budget exactly: sharding must not multiply
     // the reader's memory ceiling as the thread count grows.
     for (size_t i = 0; i < shard_count_; ++i)
@@ -39,14 +41,14 @@ void BlockCache::read_range(uint64_t index, size_t offset, size_t count, size_t 
     std::memcpy(dst, acquire(index, len, fill)->data() + offset, count);
 }
 
-std::shared_ptr<const BlockCache::Block> BlockCache::block(uint64_t index, size_t len,
-                                                           const std::function<void(uint8_t*, size_t)>& fill) {
+std::shared_ptr<const BlockCache::Block> BlockCache::block(
+    uint64_t index, size_t len, const std::function<void(uint8_t*, size_t)>& fill) {
     if (len > block_size_) throw std::runtime_error("BlockCache: len exceeds block_size");
     return acquire(index, len, fill);
 }
 
-std::shared_ptr<const BlockCache::Block> BlockCache::acquire(uint64_t index, size_t len,
-                                                             const std::function<void(uint8_t*, size_t)>& fill) {
+std::shared_ptr<const BlockCache::Block> BlockCache::acquire(
+    uint64_t index, size_t len, const std::function<void(uint8_t*, size_t)>& fill) {
     Shard& shard = shards_[index % shard_count_];
 
     {
