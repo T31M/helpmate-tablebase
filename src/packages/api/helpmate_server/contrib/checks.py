@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -53,11 +54,14 @@ def _load_sidecar(path: Path) -> tuple[dict | None, str]:
     return sc, ""
 
 
+_VERSION = re.compile(r"(\d+(?:\.\d+)*)(?:[-+][0-9A-Za-z.+-]+)?")
+
+
 def _version(v: str) -> tuple[int, ...] | None:
-    try:
-        return tuple(int(x) for x in v.split("."))
-    except ValueError:
-        return None
+    """The numeric part of a generator version. A build may tag it ("0.20.0-t31m",
+    "0.21.0-dev+abc"): the tag is ignored, anything else is not a version."""
+    m = _VERSION.fullmatch(v)
+    return tuple(int(x) for x in m.group(1).split(".")) if m else None
 
 
 def check_header(path: Path, installed_version: str) -> Check:

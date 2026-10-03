@@ -102,3 +102,30 @@ def test_v4_reports_a_bad_header_as_fail(table_copy):
     p = table_copy / "KQvk.hm"
     p.write_bytes(b"XXXX" + p.read_bytes()[4:])
     assert check_sidecar(p).status == "fail"
+
+
+def test_generator_versions_with_a_suffix_are_versions():
+    """A contributor's build may tag its version (T31M's fork wrote "0.20.0-t31m" into
+    KBvkppp, dataset PR #18). The numeric part is the version; anything else is no version."""
+    from helpmate_server.contrib.checks import _version
+    assert _version("0.20.0") == (0, 20, 0)
+    assert _version("0.20.0-t31m") == (0, 20, 0)
+    assert _version("0.21.0-dev+abc.1") == (0, 21, 0)
+    assert _version("1.2") == (1, 2)
+    for bad in ("", "abc", "0.20.x", "-t31m", "0..1", "v0.20.0"):
+        assert _version(bad) is None, bad
+
+
+def test_v2_accepts_a_table_whose_generator_version_has_a_suffix(table_copy):
+    p = table_copy / "KQvk.hm"
+    import struct
+    raw = bytearray(p.read_bytes())
+    jl = struct.unpack_from("<I", raw, 60)[0]
+    meta = json.loads(raw[64:64 + jl])
+    meta["generator_version"] = "0.20.0-t31m"
+    js = json.dumps(meta, indent=2, sort_keys=True).encode()
+    struct.pack_into("<I", raw, 60, len(js))
+    p.write_bytes(bytes(raw[:64]) + js + bytes(raw[64 + jl:]))
+    (table_copy / "KQvk.stats.json").write_bytes(js)
+    c = check_header(p, V)
+    assert c.status == "pass", c.detail
