@@ -1,10 +1,11 @@
 // Hash-routed single page: #/ (front), #/deepest[/MATERIAL], #/puzzles,
-// #/materials. Each screen is a module with init(data) run once on first
+// #/materials, #/stats[/MATERIAL]. Each screen is a module with init(data) run once on first
 // show; data files are fetched once and shared.
 import { initFront } from "./front.js";
 import { initDeepest, showDeepest } from "./deepest.js";
 import { initPuzzles } from "./puzzles.js";
 import { initMaterials, showMaterials } from "./materials.js";
+import { initStats, showStats } from "./stats.js";
 import { validStatus } from "./lib/materials.js";
 
 const screens = {
@@ -12,6 +13,7 @@ const screens = {
   deepest: { init: initDeepest, data: ["deepest"] },
   puzzles: { init: initPuzzles, data: ["puzzles"] },
   materials: { init: initMaterials, data: ["materials", "corpus", "status"] },
+  stats: { init: initStats, data: ["stats"] },
 };
 // Deploy stamp: CI (tools/stamp_site.py) rewrites this exact line to
 // `const V = "?v=<commit>";` so data fetches cannot mix with a stale cache.
@@ -65,6 +67,7 @@ async function show() {
   await loaded[name];
   if (name === "materials") showMaterials();
   if (name === "deepest" && arg) showDeepest(arg);
+  if (name === "stats") showStats(arg);
 }
 
 window.addEventListener("hashchange", show);

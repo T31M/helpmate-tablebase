@@ -20,6 +20,7 @@
     <a href="#/deepest" data-screen="deepest">Deepest</a>
     <a href="#/puzzles" data-screen="puzzles">Puzzles</a>
     <a href="#/materials" data-screen="materials">Materials</a>
+    <a href="#/stats" data-screen="stats">Statistics</a>
     <a href="themes.html">Themes</a>
   </nav>
 </header>
@@ -174,6 +175,26 @@
       <tbody></tbody>
     </table>
     </div>
+  </section>
+  <section id="screen-stats" hidden>
+    <h2>Statistics</h2>
+    <p>From every table's statistics file; updated with each accepted contribution.
+      The full data is on Hugging Face as Parquet (<code>stats/materials.parquet</code>,
+      <code>stats/histogram.parquet</code>).</p>
+    <p class="stats-controls">
+      <label><input type="checkbox" id="stats-stm"> White to move (default: Black)</label>
+      <label><input type="checkbox" id="stats-log" checked> logarithmic scale</label>
+    </p>
+    <div class="stats-grid">
+      <figure><figcaption>Positions per depth, all tables (highlighted: exactly one solution)</figcaption><div id="stats-total"></div></figure>
+      <figure><figcaption>Share of solvable positions with exactly one solution</figcaption><div id="stats-share"></div></figure>
+      <figure><figcaption>Materials per maximum depth
+        <select id="stats-pieces"><option value="all">all</option><option>3</option><option>4</option><option>5</option><option>6</option></select></figcaption>
+        <div id="stats-maxdtm"></div><ol id="stats-deepest"></ol></figure>
+    </div>
+    <h3>One material</h3>
+    <p><input id="stats-pick" list="stats-names" placeholder="e.g. KRvkrb" aria-label="material"><datalist id="stats-names"></datalist></p>
+    <div id="stats-material"></div>
   </section>
 </main>
 

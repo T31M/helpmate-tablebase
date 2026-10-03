@@ -52,7 +52,7 @@ def test_done_rows_and_summary_equal_the_old_tool(compressed_tables):
 
 def test_write_site_data_only_rewrites_on_change(compressed_tables, tmp_path):
     first = write_site_data(tmp_path, compressed_tables)
-    assert {p.name for p in first} == {"materials.json", "corpus.json"}
+    assert {p.name for p in first} == {"materials.json", "corpus.json", "stats.json"}
     assert write_site_data(tmp_path, compressed_tables) == []
     assert json.loads((tmp_path / "corpus.json").read_text())["tables"] == \
         len(list(compressed_tables.glob("*.stats.json")))

@@ -68,11 +68,14 @@ def corpus_summary(rows: list[dict]) -> dict:
 
 
 def write_site_data(out_dir: Path, tables: Path) -> list[Path]:
+    from .corpus_stats import collect, site_stats
+
     out_dir = Path(out_dir)
     rows = material_rows(tables, out_dir / "material")
     written = []
     for name, text in (("materials.json", json.dumps(rows, separators=(",", ":"))),
-                       ("corpus.json", json.dumps(corpus_summary(rows), indent=1))):
+                       ("corpus.json", json.dumps(corpus_summary(rows), indent=1)),
+                       ("stats.json", json.dumps(site_stats(collect(tables)), separators=(",", ":")))):
         p = out_dir / name
         if not p.exists() or p.read_text() != text:
             p.write_text(text)
