@@ -15,8 +15,8 @@ SliceIndex::SliceIndex(const Material& m) : mat_(m) {
             for (int k = 0; k < cnt[t]; ++k)
                 slots_.push_back({{(Color)color, (PieceType)t}, t == 5 ? 48 : 64});
         }
-    size_ = kk_->size;
-    for (auto& s : slots_) size_ *= (uint64_t)s.radix;
+    for (auto& s : slots_) kk_weight_ *= (uint64_t)s.radix;
+    size_ = (uint64_t)kk_->size * kk_weight_;
     slot_weight_.assign(slots_.size(), 1);
     for (int k = (int)slots_.size() - 2; k >= 0; --k)
         slot_weight_[k] = slot_weight_[k + 1] * (uint64_t)slots_[k + 1].radix;
@@ -27,6 +27,13 @@ SliceIndex::SliceIndex(const Material& m) : mat_(m) {
     }
     for (int kind = 0; kind < 12; ++kind)
         if (run_count_[kind] > 1) multi_runs_.push_back({run_first_[kind], run_count_[kind]});
+    for (const Slot& slot : slots_) {
+        int kind = (int)slot.piece.color * 6 + (int)slot.piece.type;
+        slot_run_first_.push_back(run_first_[kind]);
+        slot_run_count_.push_back(run_count_[kind]);
+        const int k = (int)slot_entry_.size();
+        slot_entry_.push_back((int8_t)(run_count_[kind] == 1 ? k : kTwin + k));
+    }
 }
 
 uint64_t SliceIndex::size() const { return size_; }
@@ -91,19 +98,43 @@ std::optional<uint64_t> SliceIndex::encode_for_material(const std::vector<Placed
 }
 
 uint64_t SliceIndex::moved_index(uint64_t c, const std::vector<PlacedPiece>& pp, int from, int to) const {
+    MoveContext ctx;
+    prepare_moves(c, pp, ctx);
+    return moved_index(ctx, from, to);
+}
+
+void SliceIndex::prepare_moves(uint64_t c, const std::vector<PlacedPiece>& pp, MoveContext& ctx) const {
+    ctx.c = c;
+    ctx.slot.fill(-1);
     // decode() lays out both kings first, then one piece per slot in slot order.
-    if (pp.size() != slots_.size() + 2) return kNoIndex;
-    if (kk_->choices_of[pp[0].square * 64 + pp[1].square][1] != KKTable::kNoChoice) return kNoIndex;
-    for (size_t k = 0; k < slots_.size(); ++k) {
-        if (pp[k + 2].square != from) continue;
-        const Piece piece = slots_[k].piece;
-        if (run_count_[(int)piece.color * 6 + (int)piece.type] != 1) return kNoIndex;
-        const int base = slots_[k].radix == 48 ? 8 : 0;
-        const int digit = to - base;
-        if (digit < 0 || digit >= slots_[k].radix) return kNoIndex;  // a pawn reaching its last rank
-        return c - (uint64_t)(from - base) * slot_weight_[k] + (uint64_t)digit * slot_weight_[k];
-    }
-    return kNoIndex;  // `from` holds a king
+    if (pp.size() != slots_.size() + 2) return;
+    ctx.kk = c / kk_weight_;
+    ctx.wk = pp[0].square;
+    ctx.bk = pp[1].square;
+    ctx.slot[ctx.wk] = kWhiteKing;
+    ctx.slot[ctx.bk] = kBlackKing;
+    if (kk_->choices_of[ctx.wk * 64 + ctx.bk][1] != KKTable::kNoChoice) return;
+    for (size_t k = 0; k < slots_.size(); ++k) ctx.slot[pp[k + 2].square] = slot_entry_[k];
+    if (multi_runs_.empty()) return;  // only a twin's run needs the digits
+    for (size_t k = 0; k < slots_.size(); ++k)
+        ctx.digit[k] = (uint8_t)(pp[k + 2].square - (slots_[k].radix == 48 ? 8 : 0));
+}
+
+uint64_t SliceIndex::twin_moved_index(const MoveContext& ctx, int k, int digit) const {
+    // The run is sorted in the canonical cell and `to` is empty, so the moved
+    // digit only has to slide to its place among the others.
+    const int first = slot_run_first_[k];
+    const int count = slot_run_count_[k];
+    std::array<int, 62> run;
+    for (int j = 0; j < count; ++j) run[j] = ctx.digit[first + j];
+    int j = k - first;
+    for (; j > 0 && run[j - 1] > digit; --j) run[j] = run[j - 1];
+    for (; j + 1 < count && run[j + 1] < digit; ++j) run[j] = run[j + 1];
+    run[j] = digit;
+    uint64_t idx = ctx.c;
+    for (j = 0; j < count; ++j)
+        idx += (uint64_t)(int64_t)(run[j] - (int)ctx.digit[first + j]) * slot_weight_[first + j];
+    return idx;
 }
 
 bool SliceIndex::decode(uint64_t idx, std::vector<PlacedPiece>& out) const {

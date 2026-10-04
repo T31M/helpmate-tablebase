@@ -210,6 +210,7 @@ bool SliceGen::scan_pass(int d) {
                      std::vector<PlacedPiece> pp;       // the cell being resolved, as decoded
                      std::vector<PlacedPiece> scratch;  // successor pieces for full lookups
                      std::vector<Move> moves;
+                     SliceIndex::MoveContext moved;
                      Board b;
                      uint64_t local = 0;
                      for (;;) {
@@ -222,6 +223,7 @@ bool SliceGen::scan_pass(int d) {
                                  throw GeneratorLookupError(cell_context(mat_, c, s, d) +
                                                             ": UNSET cell does not decode");
                              b.reset(pp, mover);
+                             idx_.prepare_moves(c, pp, moved);
                              // Catch here rather than tracking the current cell in a variable:
                              // zero-cost EH puts nothing on the happy path.
                              try {
@@ -230,14 +232,15 @@ bool SliceGen::scan_pass(int d) {
                                  b.legal_moves(moves);
                                  for (const Move& m : moves) {
                                      // A quiet move of a lone non-king piece keeps the material, the
-                                     // king pair and its transform: the successor's index is this
-                                     // cell's index with one digit changed, so its EP-less value needs
-                                     // neither a piece walk nor an encode. eval_board's first lookup
+                                     // king pair and its transform, and a king move often keeps the
+                                     // transform: the successor's index is this cell's index with one
+                                     // digit changed, so its EP-less value needs neither a piece walk
+                                     // nor an encode. eval_board's first lookup
                                      // is that position; any later one (after an en-passant capture)
                                      // takes the full path.
                                      const uint64_t quick = m.is_capture() || m.promotion()
                                                                 ? SliceIndex::kNoIndex
-                                                                : idx_.moved_index(c, pp, m.from, m.to);
+                                                                : idx_.moved_index(moved, m.from, m.to);
                                      bool first = true;
                                      b.make(m);
                                      ValuePair v = eval_board(b, [this, &scratch, &first, quick](Board& x) {
