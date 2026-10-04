@@ -9,7 +9,12 @@ tags:
   - helpmate
   - tablebase
   - endgame
-viewer: false
+configs:
+  - config_name: materials
+    data_files: stats/materials.parquet
+    default: true
+  - config_name: histogram
+    data_files: stats/histogram.parquet
 ---
 
 # Helpmate tablebases
@@ -99,6 +104,26 @@ Or take a file directly, if you have your own reader:
 ```python
 from huggingface_hub import hf_hub_download
 p = hf_hub_download("osick/helpmate-tables", "KQvk.hm", repo_type="dataset")
+```
+
+## Statistics
+
+Two Parquet files, rebuilt with every accepted contribution, hold the statistics of every
+table (the viewer above shows them):
+
+- `stats/materials.parquet` — one row per table: material, pieces, pawns, the pieces besides
+  the kings (`white`, `black`), `marker` (provably no helpmate), `max_dtm`, `plane_size`, invalid
+  and unsolvable cells per side to move, `solvable`, `unique` (positions with exactly one
+  solution), compressed size, generator version, contributor, dataset PR and merge date.
+- `stats/histogram.parquet` — the full distribution: one row per material, side to move
+  (`wtm`/`btm`), depth `dtm` (plies) and solution `count` (255 = 255 or more), with the number
+  of positions in `cells`.
+
+```python
+import pandas as pd
+m = pd.read_parquet("hf://datasets/osick/helpmate-tables/stats/materials.parquet")
+h = pd.read_parquet("hf://datasets/osick/helpmate-tables/stats/histogram.parquet")
+m.sort_values("max_dtm", ascending=False).head(10)
 ```
 
 ## Contributing

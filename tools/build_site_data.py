@@ -3,7 +3,7 @@
     python3 tools/build_site_data.py --tables ~/tb [--binary helpmate] [--out site/data]
 
 Run by hand against a corpus, like tools/deepest_showcase.py; the output is
-committed, because the GitHub Pages workflow has no tables. Four files:
+committed, because the GitHub Pages workflow has no tables. Five files:
 
   deepest.json    docs/DEEPEST.json with every solution expanded ply by ply
   puzzles.json    the dashboard's puzzles.epd, each with its one solution and
@@ -11,6 +11,8 @@ committed, because the GitHub Pages workflow has no tables. Four files:
   materials.json  one row per material (1000 + corpus extras such as Kvk), see
                   helpmate_server/contrib/site_data.py
   corpus.json     the totals the front page states
+  stats.json      per-table statistics for the Statistics screen, see
+                  helpmate_server/contrib/corpus_stats.py
 
 Every solution ply carries its SAN, its from/to squares (UCI, promotion piece
 appended) and the FEN after the move. The browser therefore needs no chess

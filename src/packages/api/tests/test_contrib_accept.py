@@ -14,6 +14,7 @@ class FakeGit:
     def __init__(self, fail_at=None):
         self.calls, self.fail_at = [], fail_at
         self.main_card = b"x\n"          # docs/hf-dataset-card.md as origin/main has it right now
+        self.main_registry = b'{"schema":1,"contributors":{},"tables":{}}'
 
     def _do(self, name, *a):
         self.calls.append((name, *a))
@@ -30,7 +31,9 @@ class FakeGit:
     def wait_and_merge(self, url, branch): self._do("wait_and_merge", url)
     def back(self, ref): self._do("back", ref)
     def close_pr(self, url): self._do("close_pr", url)
-    def main_file(self, path): self._do("main_file", path); return self.main_card
+    def main_file(self, path):
+        self._do("main_file", path)
+        return self.main_registry if path == "data/contributions.json" else self.main_card
 
 
 class ConflictingGit(FakeGit):
@@ -238,7 +241,8 @@ def test_accept_resumes_after_ci_failure_without_merging_twice(tmp_path):
     git = FakeGit()
     assert _run(checkout, staging, hub, gh, tables, git) == 0
     assert hub.merged == [2]                                     # not merged again
-    assert [c[0] for c in git.calls] == ["back", "wait_and_merge", "main_file"]   # resumes at the docs PR, then the card
+    assert [c[0] for c in git.calls][:3] == ["back", "wait_and_merge", "main_file"]   # resumes at the docs PR, then main's card
+    assert ("main_file", "docs/hf-dataset-card.md") in git.calls
 
 
 class ManifestFails(FakeHub):
@@ -466,7 +470,8 @@ def test_card_uploaded_is_mains_current_card_not_this_runs_snapshot(tmp_path):
     git.main_card = b"newer card from a later accept run\n"
     assert _run(checkout, staging, hub, gh, tables, git) == 0
     assert ("main_file", "docs/hf-dataset-card.md") in git.calls
-    assert [f for m, f in hub.commits if "Dataset card" in m] == [{"README.md": git.main_card}]
+    (card_files,) = [f for m, f in hub.commits if "Dataset card" in m]
+    assert card_files["README.md"] == git.main_card
     assert not list(staging.glob("*.card.md"))
 
 
@@ -483,7 +488,8 @@ def test_resume_with_docs_done_uploads_mains_card_and_ignores_an_old_card_file(t
     git = FakeGit()
     git.main_card = b"main card with 403 tables\n"
     assert _run(checkout, staging, hub, gh, tables, git) == 0
-    assert [f for m, f in hub.commits if "Dataset card" in m] == [{"README.md": b"main card with 403 tables\n"}]
+    (card_files,) = [f for m, f in hub.commits if "Dataset card" in m]
+    assert card_files["README.md"] == b"main card with 403 tables\n"
 
 
 def test_claim_comment_not_posted_twice_after_rerun(tmp_path):
@@ -1097,3 +1103,42 @@ def test_git_runs_with_english_messages(tmp_path, monkeypatch):
 
     Git(tmp_path, runner=runner).commit_all("m")
     assert seen and all(e.get("LC_ALL") == "C" and e.get("LANGUAGE") == "C" for e in seen)
+
+
+def test_docs_step_commits_the_statistics():
+    from helpmate_server.contrib.accept import DOCS_PATHS
+    assert "site/data/stats.json" in DOCS_PATHS
+
+
+def test_card_step_uploads_statistics_when_the_local_corpus_is_complete(tmp_path, capsys):
+    pytest.importorskip("pyarrow")
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    (msg, files), = [(m, f) for m, f in hub.commits if "Dataset card" in m]
+    assert msg == "Dataset card and statistics"
+    assert set(files) == {"README.md", "stats/materials.parquet", "stats/histogram.parquet"}
+    from helpmate_server.contrib.corpus_stats import parquet_materials
+    assert parquet_materials(hub.main["stats/materials.parquet"]) == ["KRRvkqq"]
+    assert "statistics uploaded" in capsys.readouterr().err
+
+
+def test_card_step_skips_statistics_for_an_incomplete_local_corpus(tmp_path, capsys):
+    pytest.importorskip("pyarrow")
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    hub.main["KQvk.hm"] = b"t"  # the manifest step rebuilds from the hub: lists a table `tables` lacks
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    (msg, files), = [(m, f) for m, f in hub.commits if "Dataset card" in m]
+    assert msg == "Dataset card: contributors and counts" and set(files) == {"README.md"}
+    err = capsys.readouterr().err
+    assert "statistics not uploaded" in err and "KQvk" in err
+
+
+def test_card_step_fails_when_the_published_statistics_do_not_match(tmp_path, monkeypatch):
+    pytest.importorskip("pyarrow")
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    monkeypatch.setattr("helpmate_server.contrib.stats_push.check", lambda hub: ["statistics lack X"])
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 2
+    state = json.loads((staging / "accept-2.json").read_text())
+    assert "card" not in state["done"]            # a rerun resumes at the card step
+    monkeypatch.undo()
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0

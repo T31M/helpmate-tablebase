@@ -21,6 +21,19 @@ bumps may change behavior).
   state, contributor and filters (state refreshed daily at deploy), and a
   contributor section on the front page; `data/contributions.json` is the
   record behind it.
+- Corpus statistics per table (positions, mates, depth, the unique share and the
+  depth histogram) as Parquet on Hugging Face: `stats/materials.parquet` and
+  `stats/histogram.parquet`, declared as viewer configs in the dataset card, which
+  gets a "Statistics" section.
+- `helpmate-tables stats-push --tables DIR [--dry-run]` uploads them;
+  `stats-push --check` compares the published statistics with the manifest.
+  `accept` uploads them together with the card.
+- Site Statistics screen (`#/stats`, `#/stats/<material>`): corpus charts and a
+  material picker, from the committed `site/data/stats.json`, which `sync`,
+  `accept` and `tools/build_site_data.py` keep current.
+- Stats check workflow (daily and after each Pages run) fails when the published
+  statistics miss a table of the manifest; a repo test fails a PR whose
+  `stats.json` disagrees with `materials.json`.
 
 ### Data
 - KRNvkbb, KRNvkbn, KRNvkbp, KRNvknn, KRNvknp, KRNvkpp, KRNvkqb, KRNvkqn, KRNvkqp, KRNvkqq, KRNvkqr, KRNvkrb, KRNvkrn, KRNvkrp, KRNvkrr contributed by T31M (dataset PR #17, claim #45).

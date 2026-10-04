@@ -72,10 +72,11 @@ function render() {
       ? `<a href="https://huggingface.co/datasets/osick/helpmate-tables/discussions/${Number(r.hf_pr)}">in review</a>`
       : r.state === "claimed" && r.claim
         ? `<a href="https://github.com/osick/helpmate-tablebase/issues/${Number(r.claim)}">claimed</a>` : esc(r.state);
+    const statsLink = r.done ? ` <a class="stats-link" href="#/stats/${esc(r.material)}">stats</a>` : "";
     const marker = r.done && r.max_dtm === null;
     const stat = (v, f) => (r.done ? f(v) : "");
     return `<tr class="state-${cls}">
-      <td class="mono">${name}</td><td class="num">${r.pieces}</td>
+      <td class="mono">${name}${statsLink}</td><td class="num">${r.pieces}</td>
       <td class="num">${priorityLabel(r.priority)}</td><td class="state-${cls}">${state}</td>
       <td>${esc(r.contributor || "")}</td><td class="num">${r.ram_gib ? `${r.ram_gib} GiB` : ""}</td>
       <td class="num">${r.done ? (marker ? "—" : stipulation(r.max_dtm)) : ""}</td>

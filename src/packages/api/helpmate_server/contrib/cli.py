@@ -10,7 +10,7 @@ from pathlib import Path
 
 from . import DATASET_REPO, DEFAULT_STAGING, GITHUB_REPO
 
-CONTRIB_COMMANDS = {"verify", "status", "accept", "sync", "claims", "site-status"}
+CONTRIB_COMMANDS = {"verify", "status", "accept", "sync", "claims", "site-status", "stats-push"}
 
 
 class UsageError(Exception):
@@ -68,6 +68,13 @@ def add_parsers(sub) -> None:
     ss.add_argument("--repo", default=DATASET_REPO, metavar="USER/DATASET")
     ss.add_argument("--github-repo", default=GITHUB_REPO)
     ss.add_argument("--registry", type=Path, default=Path("data/contributions.json"))
+    sp = sub.add_parser("stats-push", help="(maintainer) upload or check the corpus statistics on the dataset")
+    sp.add_argument("--tables", metavar="DIR", help="the complete local corpus (not needed with --check)")
+    sp.add_argument("--check", action="store_true",
+                    help="only compare the published statistics with the manifest; exit 1 if stale")
+    sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--checkout", type=Path, default=Path("."))
+    sp.add_argument("--repo", default=DATASET_REPO, metavar="USER/DATASET")
 
 
 def _absolute_binary(given: str | None) -> str | None:
@@ -99,7 +106,7 @@ def _tool() -> str:
     return f"helpmate-tables {__version__}"
 
 
-def run(a: argparse.Namespace, hub_factory=None, gh_factory=None) -> int:
+def run(a: argparse.Namespace, hub_factory=None, gh_factory=None, git_factory=None) -> int:
     try:
         if a.cmd == "verify":
             return _verify(a, hub_factory, gh_factory)
@@ -159,6 +166,44 @@ def run(a: argparse.Namespace, hub_factory=None, gh_factory=None) -> int:
                           tables=Path(a.tables).expanduser(), staging=Path(a.staging).expanduser(),
                           contributor=a.contributor, today=date.today().isoformat(),
                           binary=_absolute_binary(a.binary))
+        if a.cmd == "stats-push":
+            from .hf import Hub
+            from .stats_push import StatsError, check, push
+            hub = (hub_factory or Hub)(a.repo)
+            try:
+                from .corpus_stats import require_pyarrow
+                require_pyarrow()
+            except ImportError as exc:
+                raise UsageError(str(exc)) from exc
+            if a.check:
+                problems = check(hub)
+                for problem in problems:
+                    print(f"stale: {problem}", file=sys.stderr)
+                if problems:
+                    print("fix: helpmate-tables stats-push --tables DIR (with the complete corpus)",
+                          file=sys.stderr)
+                    return 1
+                print("statistics match the manifest")
+                return 0
+            if not a.tables:
+                raise UsageError("stats-push needs --tables DIR (or --check)")
+            import subprocess
+            from .accept import Git
+            from .registry import Registry
+            git = (git_factory or Git)(Path(a.checkout).resolve())
+            try:  # the card and the registry as main has them, like accept (fetches origin first)
+                card = git.main_file("docs/hf-dataset-card.md")
+                registry = Registry(Path("data/contributions.json"),
+                                    json.loads(git.main_file("data/contributions.json")))
+            except (subprocess.CalledProcessError, OSError, ValueError) as exc:
+                raise UsageError(f"cannot read the card and registry from origin/main in "
+                                 f"{Path(a.checkout).resolve()} (needs a git checkout of "
+                                 f"helpmate-tablebase with an origin remote): {exc}") from exc
+            try:
+                print(push(hub, Path(a.tables).expanduser(), registry, card, a.dry_run))
+            except StatsError as exc:
+                raise UsageError(str(exc)) from exc
+            return 0
         raise UsageError(f"{a.cmd}: not implemented yet")
     except UsageError as exc:
         print(f"error: {exc}", file=sys.stderr)

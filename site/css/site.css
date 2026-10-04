@@ -219,3 +219,15 @@ table.data tr.state-not-needed td { color: var(--ink-faint); }
 .contributors { margin-top: 2rem; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; margin: .75rem 0; }
 .card { display: flex; flex-direction: column; gap: .25rem; padding: .75rem 1rem; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; font-size: var(--f1); }
+.stats-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.stats-grid figure { margin: 0; }
+.stats-grid svg, #stats-material svg { width: 100%; height: auto; }
+#stats-material svg { max-width: 640px; }
+.stats-controls { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; }
+.stats-link { font-size: var(--f1); }
+svg .bar { fill: var(--rule-strong); }
+svg .part { fill: var(--ink); }
+svg .axis { fill: var(--ink-soft); stroke: var(--ink-soft); font-size: 13px; stroke-width: 0.5; }
+svg text.axis { stroke: none; }
+svg .empty { fill: var(--ink-faint); }
+@media (max-width: 600px) { svg .axis { font-size: 22px; } }

@@ -189,3 +189,20 @@ def test_the_spa_still_routes_after_the_nav_change(server, browser):
     assert page.locator("#screen-materials").is_visible()
     assert not bad_responses, f"4xx/5xx responses: {bad_responses}"
     page.close()
+
+
+def test_statistics_screen_renders(server, browser):
+    page = browser.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(f"{server}/index.html#/stats")
+    page.wait_for_selector("#screen-stats svg rect.bar")
+    assert page.locator("#screen-stats svg").count() >= 3
+    page.goto(f"{server}/index.html#/stats/KQvk")
+    page.wait_for_selector("#stats-material svg rect.bar")
+    page.goto(f"{server}/index.html#/stats/Nonsense")
+    page.wait_for_selector("#stats-material :text('unknown material')")
+    page.goto(f"{server}/index.html#/stats/%E0%A4%A")
+    page.wait_for_selector("#stats-material :text('unknown material')")
+    page.close()
+    assert errors == []

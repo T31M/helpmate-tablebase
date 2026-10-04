@@ -268,6 +268,107 @@ tooling gap, not a naming one.
 - Small. Consider folding the same information into `stats` output.
 
 
+### Major question 1 — smaller tables and leaner generation
+
+Our tables are still too large: 4 bytes per cell (dtm and solution count for both
+sides to move), a pawnless six-piece table is 28.9 GiB raw / ~1–3 GiB compressed,
+a one-pawn one up to ~85 GiB raw / ~12.6 GiB compressed, about half of all cells
+are illegal positions the dense index reserves. Open question: how far can storage
+and generation be condensed? To be answered by a deep analysis that reads the
+other tablebase projects' algorithms carefully (Syzygy WDL/DTZ with one side to
+move, don't-care filling and per-table index ordering; Nalimov; Gaviota;
+Lomonosov; bitbases; checkers databases; Bourzutschky/Konoval) and measures what
+transfers to cooperative DTM plus solution counts: one stored side to move plus a
+one-ply search, reduced or on-demand counts, don't-care filling of illegal cells,
+better index, entropy coding, memory-lean / out-of-core generation.
+
+Status: **analysed 2026-10-03** — `docs/research/2026-10-condensed-tables.md`. Findings:
+the count planes are 66–80 % of every compressed file; counts as a 2-bit class
+{0, 1, 2, 3+} (exact under the generator's rule), don't-care filling of illegal
+cells and zstd 19 with larger blocks together make tables **4.8–11.6× smaller**
+(corpus ≈ 341 → 45–70 GiB) by conversion, no regeneration; storing only Black to
+move reaches ~16× at the cost of slower wtm probes and odd-DTM mining. A better
+index helps generation RAM, not disk. Generator: 2-bit counts in RAM (−37 %), then
+a bitmap frontier (~1 B/cell, every six-piece class within 32 GiB).
+Proposed order: zstd-19 re-blocking (no format change) → format v4 with converter
+→ optional two download tiers → generator RAM. Open decisions: keep wtm (h#n.5,
+set play) in the default download? exact counts beyond "3+" needed, or on demand?
+Measure one-pawn six-piece tables before committing to v4.
+
+### Major question 2 — other stipulations
+
+How to extend the tablebase mechanism beyond helpmates: (a) selfmate s#n,
+(b) series helpmate ser-h#n, (c) direct mate #n, and further genres (reflexmate,
+helpselfmate, series selfmate / series direct mate, stalemate stipulations h= s= =,
+…). Needs per genre: the rules and edge cases (checks in series movers, stalemate),
+the value (cooperative min/min vs adversarial min/max), the retrograde recurrence
+in our generator, what "number of solutions" and soundness mean, cost; and a
+common "genre" abstraction, file-format and dataset layout, verify checks, and an
+order of genres by value × effort.
+
+Status: **analysed 2026-10-03** — `docs/research/2026-10-other-stipulations.md`. Findings:
+the forward-scan generator generalises with four parameters (goal, MIN/MAX per side,
+alternating or series schedule, reflex/no-check obligations); adversarial genres need
+no unmove generator to be correct. Soundness differs: help and series genres keep
+"one solution", direct play needs a unique key (store the number of optimal moves per
+node). Proposed order: genre layer (helpmate byte-identical) → h= and hs# → **ser-h#**
+(half the memory, terminal = existing helpmate tables; best value for effort) → # as
+validation vehicle (exhaustive Gaviota check, depth cap needed: deepest 6-man mate is
+#262) → s# (no public selfmate tablebase found), r#, =, s=. Non-helpmate files as
+format v4 in per-genre folders. Proof games and fairy conditions out of scope.
+Open decisions: merge final promotion duals (Q/R, Q/B) in counts? depth cap for # and
+s#? one Hugging Face repo or one per genre?
+
+### Ideas from the 2026-10-03 brainstorm
+
+Unprioritised unless noted. Agreed next small PRs are marked **next**.
+
+**Contributors — more tables, faster**
+- **next** — *Delta verify*: `verify --pr N` re-checks only tables that failed or are
+  missing in the existing report and reuses the passed ones when the PR head, the file
+  and the tool version are unchanged (PR #18 had to be re-verified fully, ~3 h, for one
+  table). `accept` keeps trusting only a complete, consistent report.
+- **next** — *Per-table progress lines in `verify`*: long PRs looked stuck.
+- **next** — *Sub-table block cache fix* (analysed 2026-10-03): round the cache capacity
+  up, dtm-only probes in the scan passes, thread-local zstd context (6× on KQvkr), then
+  `gen --subtable-cache auto|0|N` resident sub-tables inside a RAM-guard-counted budget
+  (est. 2–3× for six-piece tables on 64/96 GiB machines). After T31M's performance fork
+  is merged (his PR).
+- `helpmate-tables contribute KBvk???`: one command from claim to dataset PR (fetch only
+  the needed sub-tables, generate, verify, push with `--claim`).
+- Pull only a material's sub-table closure instead of the whole corpus.
+- PyPI wheels and a Docker image for contributors (`docker run … contribute X`).
+- Merge T31M's performance fork (1.5–4×; T31M opens the PR).
+- Out-of-core generator for seven pieces (see v0.9).
+
+**Trust and provenance**
+- Generator commit hash / build id in every sidecar: a version string alone cannot show
+  which build wrote a table.
+- Second-builder confirmation: a second contributor regenerates a table; a matching
+  sha256 marks it "independently confirmed".
+- C++ `helpmate verify` with the internal oracle on large samples.
+
+**Chess problems**
+- Soundness check of the published-problems database (23,807 problems): verdict sound /
+  cooked / longer than stated per problem in covered materials, as a site page.
+- Records page: longest mate per material class, most unique positions, "the only
+  position at depth N".
+- Theme search across the corpus on the site.
+- Problem of the day on the site, with an RSS feed.
+- Exports: Popeye input, PGN/EPD per material, a LaTeX booklet per material.
+
+**Access and reach**
+- Probe in the browser: WASM reader plus HTTP range requests on Hugging Face (only the
+  needed blocks), no server.
+- Statistics as Parquet on Hugging Face (all sidecars in one table).
+- Statistics page with charts (DTM distribution, unique share per material).
+- A small public API ("is this a helpmate, how deep?") for Lichess and other tools.
+
+**Community**
+- Contributor statistics on the site (tables, CPU hours).
+- Claim expiry with reminder and release (the bot only labels stale claims today).
+- Write-up of the first community-computed six-piece tables and the h#17 records.
+
 ### Compression — promoted to v0.7.5
 
 Moved out of the Backlog on 2026-08-02 after the decision spike this entry

@@ -1,0 +1,33 @@
+# The corpus statistics on Hugging Face (stats/materials.parquet) must list exactly
+# the tables in the dataset manifest. helpmate-tables accept uploads them with every
+# contribution; this check catches a missed or failed upload. Read-only, no token:
+# both files are public. A failing run is the notification; the log names the
+# missing tables and the fix (helpmate-tables stats-push --tables DIR).
+name: Stats check
+
+on:
+  schedule:
+    - cron: "47 4 * * *"
+  workflow_run:
+    workflows: [Pages]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compare the published statistics with the manifest
+        run: |
+          python -m pip install "huggingface_hub>=0.23" "pyarrow>=14"
+          python -m helpmate_server.tables_cli stats-push --check
+        env:
+          PYTHONPATH: src/packages/api
