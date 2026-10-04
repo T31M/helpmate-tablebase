@@ -621,6 +621,8 @@ void TableReader::read_values(Color stm, uint64_t first_cell, size_t n, uint8_t*
     if (cnt) read_range(2 * ps_ + o, n, cnt);
 }
 
+size_t TableReader::cache_lookups() const { return cache_ ? cache_->hits() + cache_->fills() : 0; }
+
 uint8_t TableReader::byte_at(uint64_t logical) const {
     const uint64_t b = logical / block_size_;
     const uint64_t begin = b * block_size_;
@@ -630,17 +632,25 @@ uint8_t TableReader::byte_at(uint64_t logical) const {
     // (cache id, block index): ids are never reused and a cached block never
     // changes, so a slot cannot answer for the wrong table or stale bytes,
     // and its shared owner keeps the block alive after the cache evicts it.
-    // The cost is up to kLocalBlocks blocks per thread beyond the cache's
-    // capacity (512 KiB at the 64 KiB maximum block size).
+    // get() reads a DTM byte and then its count byte 2 * ps_ further on, so
+    // the two halves have separate banks: with one shared bank, any table
+    // whose 2 * ps_ is a multiple of kLocalBlocks blocks (every five-piece
+    // pawnless table at the default block size) mapped both reads to one
+    // slot, and they evicted each other on every probe. A multiplicative hash
+    // spreads the white and black planes of a half the same way. The cost is
+    // up to 2 * kLocalBlocks blocks per thread beyond the cache's capacity
+    // (1 MiB at the 64 KiB maximum block size).
     struct LocalBlock {
         uint64_t cache_id = 0;
         uint64_t index = 0;
         std::shared_ptr<const BlockCache::Block> data;
     };
-    constexpr size_t kLocalBlocks = 8;
-    thread_local std::array<LocalBlock, kLocalBlocks> local;
+    constexpr int kSlotBits = 3;
+    constexpr size_t kLocalBlocks = size_t{1} << kSlotBits;
+    thread_local std::array<std::array<LocalBlock, kLocalBlocks>, 2> local;
     const uint64_t id = cache_->id();
-    LocalBlock& slot = local[(b ^ (id * 0x9E3779B97F4A7C15ull)) % kLocalBlocks];
+    constexpr uint64_t kGolden = 0x9E3779B97F4A7C15ull;
+    LocalBlock& slot = local[logical >= 2 * ps_][((b + id * kGolden) * kGolden) >> (64 - kSlotBits)];
     if (slot.cache_id == id && slot.index == b) return (*slot.data)[offset];
 
     const size_t len = static_cast<size_t>(std::min<uint64_t>(block_size_, 4 * ps_ - begin));

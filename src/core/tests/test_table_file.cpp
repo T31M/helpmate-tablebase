@@ -881,3 +881,38 @@ TEST_CASE("interleaved compressed readers never answer from each other's blocks"
     }
     fs::remove_all(dir);
 }
+
+TEST_CASE("a cell's DTM and count bytes stay in the per-thread slots together") {
+    // get() reads the DTM byte at o and the count byte at 2 * ps + o. Here
+    // 2 * ps is exactly 8 blocks, the geometry of every five-piece pawnless
+    // table at the default block size: both blocks once mapped to the same
+    // slot and evicted each other, so every get() went to the shared cache.
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "hm_slot_pair_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    const uint32_t block = 1024;
+    const uint64_t ps = 4 * block;
+    std::vector<uint8_t> planes[4];
+    for (int k = 0; k < 4; ++k) {
+        planes[k].resize(ps);
+        for (uint64_t i = 0; i < ps; ++i) planes[k][i] = uint8_t((i * 7 + k * 31) % 253);
+    }
+    std::string path = (dir / "pair.hm").string();
+    TableWriter::write_compressed(path, mat, ps, 30, "{}", planes[0].data(), planes[1].data(),
+                                  planes[2].data(), planes[3].data(), block);
+    auto r = TableReader::open(path);
+    REQUIRE(r);
+    REQUIRE(r->block_size() == block);
+    bool ok = true;
+    for (int pass = 0; pass < 4; ++pass)
+        for (uint64_t i = 0; i < block; ++i) {  // all in DTM block 0 and count block 8
+            ValuePair v = r->get(Color::White, i);
+            ok = ok && v.dtm == planes[0][i] && v.count == planes[2][i];
+        }
+    CHECK(ok);
+    // One fill per block; every later probe is a slot hit.
+    CHECK(r->cache_lookups() == 2);
+    fs::remove_all(dir);
+}

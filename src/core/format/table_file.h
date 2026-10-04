@@ -152,6 +152,11 @@ public:
     // of blocks to decompress.
     void read_values(Color stm, uint64_t first_cell, size_t n, uint8_t* dtm, uint8_t* cnt) const;
 
+    // Block lookups that reached the shared block cache (hits plus fills),
+    // that is, the ones its per-thread slots did not answer. 0 for a raw
+    // table or a marker. For tests and diagnostics.
+    size_t cache_lookups() const;
+
 private:
     TableReader() = default;
     void reset();
