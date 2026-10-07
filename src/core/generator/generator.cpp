@@ -209,7 +209,7 @@ bool SliceGen::scan_pass(int d) {
                  [this, s, mover, d, &resolved, &next_cell, tile_cells](uint64_t, uint64_t) {
                      std::vector<PlacedPiece> pp;       // the cell being resolved, as decoded
                      std::vector<PlacedPiece> scratch;  // successor pieces for full lookups
-                     std::vector<Move> moves;
+                     MoveBuffer moves;
                      SliceIndex::MoveContext moved;
                      Board b;
                      uint64_t local = 0;
@@ -241,6 +241,17 @@ bool SliceGen::scan_pass(int d) {
                                      const uint64_t quick = m.is_capture() || m.promotion()
                                                                 ? SliceIndex::kNoIndex
                                                                 : idx_.moved_index(moved, m.from, m.to);
+                                     // Only a double push can give the successor an EP square.
+                                     // Without one, eval_board is just the first lookup, and a
+                                     // value above DTM_MAX can never equal d - 1, so the raw
+                                     // cell is read without making the move at all.
+                                     if (quick != SliceIndex::kNoIndex && !m.is_double_push()) {
+                                         if (dtm_[1 - s][quick] == d - 1) {
+                                             found = true;
+                                             total = std::min(255u, total + (unsigned)cnt_[1 - s][quick]);
+                                         }
+                                         continue;
+                                     }
                                      bool first = true;
                                      b.make(m);
                                      ValuePair v = eval_board(b, [this, &scratch, &first, quick](Board& x) {

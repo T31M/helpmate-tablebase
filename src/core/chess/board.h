@@ -8,6 +8,18 @@
 
 namespace hm {
 
+// Fixed storage for one position's legal moves, for callers that list moves
+// in a hot loop: unlike a std::vector it is never resized or initialized.
+struct MoveBuffer {
+    // surge lists at most 218 moves; legal_moves() may expand one into four
+    // (see board.cpp), so this bound holds whatever the list contains.
+    static constexpr size_t kCapacity = 4 * 218;
+    std::array<Move, kCapacity> moves;
+    size_t size = 0;
+    const Move* begin() const { return moves.data(); }
+    const Move* end() const { return moves.data() + size; }
+};
+
 class Board {  // pimpl over surge Position; copyable
 public:
     Board();
@@ -33,6 +45,7 @@ public:
     PosState state() const;            // for side to move
     std::vector<Move> legal_moves() const;
     void legal_moves(std::vector<Move>& out) const;  // fills reusable caller-owned storage
+    void legal_moves(MoveBuffer& out) const;
     void make(const Move&);
     void unmake(const Move&);
     uint64_t perft(int depth);

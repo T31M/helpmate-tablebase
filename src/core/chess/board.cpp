@@ -22,19 +22,6 @@ std::string sq_name(int sq) {
     return s;
 }
 
-// --- Move flag helpers (surge MoveFlags encoding, verified against libsurge.h) ---
-bool Move::is_capture() const { return flags & 0b1000; }
-bool Move::is_double_push() const { return flags == 0b0001; }
-bool Move::is_ep() const { return flags == 0b1010; }  // EN_PASSANT
-std::optional<PieceType> Move::promotion() const {
-    if ((flags & 0b0100) == 0) return std::nullopt;  // PR_*/PC_* have bit 2 set
-    switch (flags & 0b0011) {
-        case 0: return PieceType::Knight;
-        case 1: return PieceType::Bishop;
-        case 2: return PieceType::Rook;
-        default: return PieceType::Queen;
-    }
-}
 std::string Move::uci() const {
     std::string s = sq_name(from) + sq_name(to);
     if (auto pr = promotion()) {
@@ -70,6 +57,10 @@ static std::optional<Piece> from_surge(int sp) {
 
 struct Board::Impl {
     Position pos;
+    // Output space for generate_legals. surge's MoveList holds the same array,
+    // but its ::Move elements zero themselves on construction, and clearing
+    // 218 of them for every listing was a fifth of legal_moves' time.
+    ::Move scratch[218];
 };
 
 // Position's (compiler-generated) copy constructor copy-constructs its
@@ -246,40 +237,42 @@ std::vector<Move> Board::legal_moves() const {
 }
 
 void Board::legal_moves(std::vector<Move>& out) const {
-    out.clear();
+    MoveBuffer buf;
+    legal_moves(buf);
+    out.assign(buf.begin(), buf.end());
+}
+
+void Board::legal_moves(MoveBuffer& out) const {
     // unique_ptr::operator->() const still yields a non-const pointee, so no
     // const_cast is needed to get a mutable Position& from a const method.
     Position& p = impl_->pos;
-    auto conv = [&](auto& list) {
-        for (::Move sm : list) {
-            uint8_t from = (uint8_t)sm.from(), to = (uint8_t)sm.to(), flags = (uint8_t)sm.flags();
-            // Workaround for a ChessMG/surge defect: when the side to move is in check
-            // from a knight (or, via case fallthrough, the pawn that just double-pushed),
-            // surge's single-check branch answers with "capture the checker" moves that
-            // are unconditionally flagged plain CAPTURE -- even when the capturing piece
-            // is a pawn landing on its own promotion rank. That silently drops the
-            // promotion, so play() would leave an actual pawn sitting on rank 1/8 (an
-            // impossible position). Recover the four promotion-capture variants surge's
-            // ordinary (not-in-check) pawn code would have produced for the same capture.
-            if (flags == CAPTURE) {
-                auto sp = p.at(static_cast<Square>(from));
-                if (sp != NO_PIECE && type_of(static_cast<::Piece>(sp)) == PAWN &&
-                    (sq_rank(to) == 0 || sq_rank(to) == 7)) {
-                    for (MoveFlags pf : {PC_KNIGHT, PC_BISHOP, PC_ROOK, PC_QUEEN})
-                        out.push_back(Move{from, to, (uint8_t)pf});
-                    continue;
-                }
+    ::Move* const first = impl_->scratch;
+    ::Move* const last =
+        p.turn() == WHITE ? p.generate_legals<WHITE>(first) : p.generate_legals<BLACK>(first);
+    Move* dst = out.moves.data();
+    for (const ::Move* it = first; it != last; ++it) {
+        const ::Move sm = *it;
+        uint8_t from = (uint8_t)sm.from(), to = (uint8_t)sm.to(), flags = (uint8_t)sm.flags();
+        // Workaround for a ChessMG/surge defect: when the side to move is in check
+        // from a knight (or, via case fallthrough, the pawn that just double-pushed),
+        // surge's single-check branch answers with "capture the checker" moves that
+        // are unconditionally flagged plain CAPTURE -- even when the capturing piece
+        // is a pawn landing on its own promotion rank. That silently drops the
+        // promotion, so play() would leave an actual pawn sitting on rank 1/8 (an
+        // impossible position). Recover the four promotion-capture variants surge's
+        // ordinary (not-in-check) pawn code would have produced for the same capture.
+        if (flags == CAPTURE) {
+            auto sp = p.at(static_cast<Square>(from));
+            if (sp != NO_PIECE && type_of(static_cast<::Piece>(sp)) == PAWN &&
+                (sq_rank(to) == 0 || sq_rank(to) == 7)) {
+                for (MoveFlags pf : {PC_KNIGHT, PC_BISHOP, PC_ROOK, PC_QUEEN})
+                    *dst++ = Move{from, to, (uint8_t)pf};
+                continue;
             }
-            out.push_back(Move{from, to, flags});
         }
-    };
-    if (p.turn() == WHITE) {
-        MoveList<WHITE> l(p);
-        conv(l);
-    } else {
-        MoveList<BLACK> l(p);
-        conv(l);
+        *dst++ = Move{from, to, flags};
     }
+    out.size = static_cast<size_t>(dst - out.moves.data());
 }
 
 void Board::make(const Move& m) {
