@@ -637,15 +637,19 @@ uint8_t TableReader::byte_at(uint64_t logical) const {
     // whose 2 * ps_ is a multiple of kLocalBlocks blocks (every five-piece
     // pawnless table at the default block size) mapped both reads to one
     // slot, and they evicted each other on every probe. A multiplicative hash
-    // spreads the white and black planes of a half the same way. The cost is
-    // up to 2 * kLocalBlocks blocks per thread beyond the cache's capacity
-    // (1 MiB at the 64 KiB maximum block size).
+    // spreads the white and black planes of a half the same way. All tables
+    // share the banks, and one cell's successors probe many of them (a pawn
+    // table's promotion and capture predecessors are a dozen or more): with
+    // 8 slots per bank, KBPvkp missed the slots on 30% of probes and spent
+    // more time in shard-mutex futex waits than in decompression. 32 slots
+    // cut that to 8.5%. The cost is up to 2 * kLocalBlocks blocks per thread
+    // beyond the cache's capacity (4 MiB at the 64 KiB maximum block size).
     struct LocalBlock {
         uint64_t cache_id = 0;
         uint64_t index = 0;
         std::shared_ptr<const BlockCache::Block> data;
     };
-    constexpr int kSlotBits = 3;
+    constexpr int kSlotBits = 5;
     constexpr size_t kLocalBlocks = size_t{1} << kSlotBits;
     thread_local std::array<std::array<LocalBlock, kLocalBlocks>, 2> local;
     const uint64_t id = cache_->id();
