@@ -10,7 +10,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <map>
 
 #include "chess/board.h"
 #include "generator/eval.h"
@@ -319,35 +318,37 @@ nlohmann::json SliceGen::stats_json() const {
 
     json cells_invalid, cells_unsolvable, histogram, uniqueness;
     for (int s = 0; s < 2; ++s) {
+        // Every (dtm, count) pair is a byte pair, so a flat 256x256 table
+        // replaces the per-cell std::map lookups. Only nonzero entries reach
+        // the JSON, exactly the keys the maps used to hold; the JSON object
+        // orders its keys itself, so the output is unchanged.
+        std::vector<uint64_t> uniq(256 * 256, 0);
+        const uint8_t* dtm = dtm_[s].data();
+        const uint8_t* cnt = cnt_[s].data();
+        for (uint64_t c = 0; c < ps_; ++c) ++uniq[(size_t)dtm[c] * 256 + cnt[c]];
         uint64_t invalid = 0, unsolvable = 0;
-        std::map<int, uint64_t> hist;
-        std::map<int, std::map<int, uint64_t>> uniq;
-        for (uint64_t c = 0; c < ps_; ++c) {
-            uint8_t d = dtm_[s][c];
-            if (d == DTM_INVALID) {
-                ++invalid;
-                continue;
-            }
-            if (d == DTM_UNSOLVABLE) {
-                ++unsolvable;
-                continue;
-            }
-            ++hist[d];
-            ++uniq[d][cnt_[s][c]];
+        for (int k = 0; k < 256; ++k) {
+            invalid += uniq[(size_t)DTM_INVALID * 256 + k];
+            unsolvable += uniq[(size_t)DTM_UNSOLVABLE * 256 + k];
         }
         cells_invalid[kStm[s]] = invalid;
         cells_unsolvable[kStm[s]] = unsolvable;
 
-        json hj = json::object();
-        for (auto& [depth, count] : hist) hj[std::to_string(depth)] = count;
-        histogram[kStm[s]] = hj;
-
-        json uj = json::object();
-        for (auto& [depth, counts] : uniq) {
+        json hj = json::object(), uj = json::object();
+        for (int d = 0; d < 256; ++d) {
+            if (d == DTM_INVALID || d == DTM_UNSOLVABLE) continue;
+            uint64_t total = 0;
             json cj = json::object();
-            for (auto& [cnt, n] : counts) cj[std::to_string(cnt)] = n;
-            uj[std::to_string(depth)] = cj;
+            for (int k = 0; k < 256; ++k)
+                if (uint64_t n = uniq[(size_t)d * 256 + k]) {
+                    cj[std::to_string(k)] = n;
+                    total += n;
+                }
+            if (total == 0) continue;
+            hj[std::to_string(d)] = total;
+            uj[std::to_string(d)] = cj;
         }
+        histogram[kStm[s]] = hj;
         uniqueness[kStm[s]] = uj;
     }
 

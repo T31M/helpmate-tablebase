@@ -916,3 +916,34 @@ TEST_CASE("a cell's DTM and count bytes stay in the per-thread slots together") 
     CHECK(r->cache_lookups() == 2);
     fs::remove_all(dir);
 }
+
+TEST_CASE("write_compressed gathers blocks that span one, two or all four planes") {
+    // Plane sizes below, at and above the block size, and not multiples of it:
+    // a block may sit inside one plane, cross one boundary, or cover several
+    // whole planes. Reading the logical payload back must give the planes in
+    // order (dtm_w, dtm_b, cnt_w, cnt_b).
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "hm_gather_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    for (uint64_t ps : {1000ull, 4096ull, 5000ull, 12289ull}) {
+        std::vector<uint8_t> planes[4];
+        std::vector<uint8_t> logical;
+        for (int k = 0; k < 4; ++k) {
+            planes[k].resize(ps);
+            for (uint64_t i = 0; i < ps; ++i) planes[k][i] = uint8_t((i * 7 + k * 61 + (i >> 5)) % 251);
+            logical.insert(logical.end(), planes[k].begin(), planes[k].end());
+        }
+        std::string path = (dir / ("t" + std::to_string(ps) + ".hm")).string();
+        TableWriter::write_compressed(path, mat, ps, 30, "{}", planes[0].data(), planes[1].data(),
+                                      planes[2].data(), planes[3].data(), 4096);
+        auto r = TableReader::open(path);
+        REQUIRE(r);
+        std::vector<uint8_t> back(logical.size());
+        r->read_range(0, back.size(), back.data());
+        INFO("plane_size " << ps);
+        CHECK(back == logical);
+    }
+    fs::remove_all(dir);
+}

@@ -297,20 +297,28 @@ void TableWriter::write_compressed(const std::string& path, const Material& mat,
 
     // The four planes are one logical byte range, in the same order the raw
     // layout uses: dtm_w, dtm_b, cnt_w, cnt_b. They are four separate
-    // buffers, so each block is gathered into a small reusable scratch
-    // buffer -- unlike compress_existing below, whose source planes are
-    // already contiguous in its mmap and need no gathering at all.
+    // buffers. A block inside one plane is read straight from it; a block
+    // that crosses a plane boundary (or several, when a plane is smaller than
+    // a block) is copied piecewise into a small reusable scratch buffer --
+    // unlike compress_existing below, whose source planes are already
+    // contiguous in its mmap and need no gathering at all.
     const uint8_t* planes[4] = {dtm_w, dtm_b, cnt_w, cnt_b};
     const uint64_t logical = 4 * plane_size;
     std::vector<uint8_t> scratch(block_size);
-    write_block_compressed(path, hdr, meta_json, logical, block_size, level,
-                           [&](uint64_t begin, size_t len) -> const uint8_t* {
-                               for (size_t i = 0; i < len; ++i) {
-                                   const uint64_t o = begin + i;
-                                   scratch[i] = planes[o / plane_size][o % plane_size];
-                               }
-                               return scratch.data();
-                           });
+    write_block_compressed(
+        path, hdr, meta_json, logical, block_size, level, [&](uint64_t begin, size_t len) -> const uint8_t* {
+            const uint64_t off = begin % plane_size;
+            if (plane_size - off >= len) return planes[begin / plane_size] + off;
+            size_t copied = 0;
+            while (copied < len) {
+                const uint64_t o = begin + copied;
+                const uint64_t in_plane = o % plane_size;
+                const size_t n = static_cast<size_t>(std::min<uint64_t>(len - copied, plane_size - in_plane));
+                std::memcpy(scratch.data() + copied, planes[o / plane_size] + in_plane, n);
+                copied += n;
+            }
+            return scratch.data();
+        });
 }
 
 void TableWriter::compress_existing(const std::string& path, const TableReader& src, uint32_t block_size,
