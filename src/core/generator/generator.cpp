@@ -395,7 +395,8 @@ void SliceGen::finalize_and_write() {
     uint8_t max_dtm_byte = max_dtm_ < 0 ? DTM_UNSOLVABLE : (uint8_t)max_dtm_;
     if (opt_.compress) {
         TableWriter::write_compressed(base + ".hm", mat_, ps_, max_dtm_byte, meta, dtm_[0].data(),
-                                      dtm_[1].data(), cnt_[0].data(), cnt_[1].data(), opt_.block_size);
+                                      dtm_[1].data(), cnt_[0].data(), cnt_[1].data(), opt_.block_size,
+                                      kDefaultZstdLevel, opt_.threads);
     } else {
         TableWriter::write(base + ".hm", mat_, ps_, max_dtm_byte, meta, dtm_[0].data(), dtm_[1].data(),
                            cnt_[0].data(), cnt_[1].data());

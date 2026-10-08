@@ -73,11 +73,13 @@ struct TableWriter {  // writes "<path>.tmp" then atomic-renames to path
                                  const std::string& meta_json);
 
     // Block-compressed variant: version 3, encoding 2. Compresses at finalize,
-    // never inside the generator's hot loop.
+    // never inside the generator's hot loop. `threads` compresses blocks in
+    // parallel; the file is byte-identical for every thread count.
     static void write_compressed(const std::string& path, const Material&, uint64_t plane_size,
                                  uint8_t max_dtm, const std::string& meta_json, const uint8_t* dtm_w,
                                  const uint8_t* dtm_b, const uint8_t* cnt_w, const uint8_t* cnt_b,
-                                 uint32_t block_size = kDefaultBlockSize, int level = kDefaultZstdLevel);
+                                 uint32_t block_size = kDefaultBlockSize, int level = kDefaultZstdLevel,
+                                 int threads = 1);
 
     // Rewrites a table (raw OR already block-compressed) as block-compressed
     // at `block_size`, streaming rather than buffering the four planes --

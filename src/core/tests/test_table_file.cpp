@@ -947,3 +947,41 @@ TEST_CASE("write_compressed gathers blocks that span one, two or all four planes
     }
     fs::remove_all(dir);
 }
+
+TEST_CASE("write_compressed writes byte-identical files for every thread count") {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "hm_parallel_write_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    // 4 * 300001 bytes at 4096-byte blocks: 293 blocks, several batches at
+    // low thread counts, a partial last block and blocks across planes.
+    const uint64_t ps = 300001;
+    std::vector<uint8_t> planes[4];
+    std::mt19937 rng(11);
+    for (int k = 0; k < 4; ++k) {
+        planes[k].resize(ps);
+        for (uint64_t i = 0; i < ps; ++i)
+            planes[k][i] = (rng() % 100 < 80) ? uint8_t(k == 0 ? DTM_INVALID : 0) : uint8_t(rng() % 40);
+    }
+    auto bytes_of = [](const std::string& path) {
+        std::ifstream in(path, std::ios::binary);
+        return std::vector<uint8_t>(std::istreambuf_iterator<char>(in), {});
+    };
+    std::vector<uint8_t> reference;
+    for (int threads : {1, 2, 7, 32}) {
+        std::string path = (dir / ("t" + std::to_string(threads) + ".hm")).string();
+        TableWriter::write_compressed(path, mat, ps, 30, R"({"material":"KQvk"})", planes[0].data(),
+                                      planes[1].data(), planes[2].data(), planes[3].data(), 4096,
+                                      kDefaultZstdLevel, threads);
+        auto bytes = bytes_of(path);
+        INFO("threads " << threads);
+        REQUIRE(!bytes.empty());
+        if (threads == 1) reference = bytes;
+        else CHECK(bytes == reference);
+        auto r = TableReader::open(path);
+        REQUIRE(r);
+        for (uint64_t i = 0; i < ps; i += 997) CHECK(r->get(Color::Black, i).dtm == planes[1][i]);
+    }
+    fs::remove_all(dir);
+}

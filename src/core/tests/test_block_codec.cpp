@@ -189,3 +189,24 @@ TEST_CASE("block() shares the cached block, keeps it alive past eviction, and co
     CHECK(c.fills() == 3);
     CHECK(BlockCache(1, 16).id() != c.id());
 }
+
+TEST_CASE("a reused BlockCompressor writes the same frames as compress_block") {
+    // write_block_compressed keeps one context per thread across many blocks;
+    // its frames must not depend on what that context compressed before.
+    std::mt19937 rng(7);
+    BlockCompressor reused(kDefaultZstdLevel);
+    std::vector<uint8_t> out;
+    for (int n = 0; n < 200; ++n) {
+        size_t len = 1 + rng() % 70000;
+        std::vector<uint8_t> src(len);
+        int kind = n % 4;  // constant, runs, small-alphabet noise, full noise
+        for (size_t i = 0; i < len; ++i)
+            src[i] = kind == 0   ? 0xFE
+                     : kind == 1 ? uint8_t((i / 97) % 7)
+                     : kind == 2 ? uint8_t(rng() % 4)
+                                 : uint8_t(rng());
+        reused.compress(src.data(), len, out);
+        INFO("block " << n << " len " << len);
+        REQUIRE(out == compress_block(src.data(), len, kDefaultZstdLevel));
+    }
+}
