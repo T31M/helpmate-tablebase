@@ -84,6 +84,44 @@ std::optional<std::string> ram_guard_error(const std::string& slice, uint64_t re
            " GiB is available (MemAvailable, /proc/meminfo); re-run with --force-ram to override";
 }
 
+namespace {
+// Splits [0, n) into `tasks` contiguous ranges and runs fn(task, begin, end)
+// for each on its own thread. The task number lets a caller keep per-range
+// results and merge them in index order.
+template <class Fn>
+void for_each_range(uint64_t n, int tasks, Fn&& fn) {
+    const int t = (int)std::max<uint64_t>(1, std::min<uint64_t>((uint64_t)std::max(1, tasks), n));
+    const uint64_t chunk = n / t + (n % t != 0);
+    parallel_for((uint64_t)t, t, [&](uint64_t lo, uint64_t hi) {
+        for (uint64_t k = lo; k < hi; ++k) fn(k, k * chunk, std::min(n, (k + 1) * chunk));
+    });
+}
+
+// The first `want` cells c of [0, n) in increasing order for which match(c,
+// scratch) holds -- the same cells a sequential scan would stop at. Searches
+// on `threads` threads in rounds, so a match near the start ends the search
+// early. `match` gets a per-thread piece vector as scratch.
+template <class Match>
+std::vector<uint64_t> first_matches(uint64_t n, size_t want, int threads, Match&& match) {
+    std::vector<uint64_t> found;
+    const int workers = std::max(1, threads);
+    const uint64_t round = (uint64_t)workers << 22;  // 4M cells per thread per round
+    for (uint64_t base = 0; base < n && found.size() < want; base += round) {
+        const uint64_t len = std::min(round, n - base);
+        std::vector<std::vector<uint64_t>> part(workers);
+        for_each_range(len, workers, [&](uint64_t k, uint64_t lo, uint64_t hi) {
+            std::vector<PlacedPiece> pp;
+            for (uint64_t c = base + lo; c < base + hi && part[k].size() < want; ++c)
+                if (match(c, pp)) part[k].push_back(c);
+        });
+        for (auto& cells : part)
+            for (uint64_t c : cells)
+                if (found.size() < want) found.push_back(c);
+    }
+    return found;
+}
+}  // namespace
+
 bool slice_has_any_mate(const Material& m) {
     SliceIndex idx(m);
     std::vector<PlacedPiece> pp;
@@ -322,10 +360,21 @@ nlohmann::json SliceGen::stats_json() const {
         // replaces the per-cell std::map lookups. Only nonzero entries reach
         // the JSON, exactly the keys the maps used to hold; the JSON object
         // orders its keys itself, so the output is unchanged.
-        std::vector<uint64_t> uniq(256 * 256, 0);
+        // Each thread tallies its own range; the per-range tables are summed,
+        // which gives the same totals in any order.
         const uint8_t* dtm = dtm_[s].data();
         const uint8_t* cnt = cnt_[s].data();
-        for (uint64_t c = 0; c < ps_; ++c) ++uniq[(size_t)dtm[c] * 256 + cnt[c]];
+        const int tasks = std::max(1, opt_.threads);
+        std::vector<std::vector<uint64_t>> part(tasks);
+        for_each_range(ps_, tasks, [&](uint64_t k, uint64_t lo, uint64_t hi) {
+            std::vector<uint64_t> tally(256 * 256, 0);
+            for (uint64_t c = lo; c < hi; ++c) ++tally[(size_t)dtm[c] * 256 + cnt[c]];
+            part[k] = std::move(tally);
+        });
+        std::vector<uint64_t> uniq(256 * 256, 0);
+        for (auto& tally : part)
+            if (!tally.empty())
+                for (size_t i = 0; i < uniq.size(); ++i) uniq[i] += tally[i];
         uint64_t invalid = 0, unsolvable = 0;
         for (int k = 0; k < 256; ++k) {
             invalid += uniq[(size_t)DTM_INVALID * 256 + k];
@@ -352,20 +401,28 @@ nlohmann::json SliceGen::stats_json() const {
         uniqueness[kStm[s]] = uj;
     }
 
+    // The first five qualifying cells in index order, as a sequential scan
+    // would find them; the search runs on opt_.threads threads.
     json deepest = json::array(), deepest_unique = json::array();
     if (max_dtm_ >= 0) {
         std::vector<PlacedPiece> pp;
         int s = (max_dtm_ % 2) ? 0 : 1;  // parity: odd depths are wtm, even are btm
-        for (uint64_t c = 0; c < ps_ && deepest.size() < 5; ++c) {
-            if (dtm_[s][c] != (uint8_t)max_dtm_) continue;
-            if (!idx_.decode(c, pp)) continue;
+        const uint8_t md = (uint8_t)max_dtm_;
+        for (uint64_t c :
+             first_matches(ps_, 5, opt_.threads, [&](uint64_t c, std::vector<PlacedPiece>& scratch) {
+                 return dtm_[s][c] == md && idx_.decode(c, scratch);
+             })) {
+            idx_.decode(c, pp);
             deepest.push_back(Board::from_pieces(pp, (Color)s).fen());
         }
         for (int d = max_dtm_; d >= 0 && deepest_unique.empty(); --d) {
             int ss = (d % 2) ? 0 : 1;
-            for (uint64_t c = 0; c < ps_ && deepest_unique.size() < 5; ++c) {
-                if (dtm_[ss][c] != (uint8_t)d || cnt_[ss][c] != 1) continue;
-                if (!idx_.decode(c, pp)) continue;
+            const uint8_t dd = (uint8_t)d;
+            for (uint64_t c :
+                 first_matches(ps_, 5, opt_.threads, [&](uint64_t c, std::vector<PlacedPiece>& scratch) {
+                     return dtm_[ss][c] == dd && cnt_[ss][c] == 1 && idx_.decode(c, scratch);
+                 })) {
+                idx_.decode(c, pp);
                 deepest_unique.push_back(Board::from_pieces(pp, (Color)ss).fen());
             }
         }
@@ -385,9 +442,13 @@ nlohmann::json SliceGen::stats_json() const {
 }
 
 void SliceGen::finalize_and_write() {
-    for (int s = 0; s < 2; ++s)
-        for (uint64_t c = 0; c < ps_; ++c)
-            if (dtm_[s][c] == DTM_UNSET) dtm_[s][c] = DTM_UNSOLVABLE;
+    for (int s = 0; s < 2; ++s) {
+        uint8_t* dtm = dtm_[s].data();
+        parallel_for(ps_, opt_.threads, [dtm](uint64_t lo, uint64_t hi) {
+            for (uint64_t c = lo; c < hi; ++c)
+                if (dtm[c] == DTM_UNSET) dtm[c] = DTM_UNSOLVABLE;
+        });
+    }
     nlohmann::json j = stats_json();
     std::string meta = j.dump(2);
     std::filesystem::create_directories(opt_.tables_dir);

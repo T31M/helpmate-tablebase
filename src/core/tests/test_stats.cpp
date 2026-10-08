@@ -97,3 +97,44 @@ TEST_CASE("stats_json counts match a per-cell map tally, before and after the UN
     }
     std::filesystem::remove_all(d);
 }
+
+TEST_CASE("stats_json is identical for every thread count, deepest positions included") {
+    // Counts are summed per thread range and the deepest positions are found
+    // by an ordered search over thread ranges; both must give exactly the
+    // single-threaded document.
+    auto d = std::filesystem::temp_directory_path() / "hm_stats_threads";
+    std::filesystem::remove_all(d);
+    std::filesystem::create_directories(d);
+    GenOptions opt;
+    opt.tables_dir = d.string();
+    opt.threads = 4;
+    generate(*Material::parse("KBNvk"), opt);  // KBNvk and its predecessors
+    for (const char* name : {"KQvk", "KBNvk"}) {
+        std::string reference_before, reference_after;
+        for (int threads : {1, 3, 8}) {
+            GenOptions o = opt;
+            o.threads = threads;
+            o.tables_dir = (d / ("t" + std::to_string(threads))).string();
+            std::filesystem::create_directories(o.tables_dir);
+            for (auto& f : std::filesystem::directory_iterator(d))
+                if (f.path().extension() == ".hm" && f.path().stem() != name)
+                    std::filesystem::copy_file(f.path(), o.tables_dir + "/" + f.path().filename().string(),
+                                               std::filesystem::copy_options::overwrite_existing);
+            SliceGen g(*Material::parse(name), o);
+            g.run_all_passes();
+            std::string before = g.stats_json().dump();
+            g.finalize_and_write();
+            std::string after = g.stats_json().dump();
+            INFO(name << " threads " << threads);
+            CHECK(!nlohmann::json::parse(after)["deepest"].empty());
+            if (threads == 1) {
+                reference_before = before;
+                reference_after = after;
+            } else {
+                CHECK(before == reference_before);
+                CHECK(after == reference_after);
+            }
+        }
+    }
+    std::filesystem::remove_all(d);
+}
