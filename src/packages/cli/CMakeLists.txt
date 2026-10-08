@@ -304,6 +304,13 @@ add_test(NAME cli_gen_stamp COMMAND helpmate gen KQvk --tables ${CLI_STAMP_TT} -
 set_tests_properties(cli_gen_stamp_clean PROPERTIES FIXTURES_SETUP cli_stamp)
 set_tests_properties(cli_gen_stamp PROPERTIES FIXTURES_REQUIRED cli_stamp
     PASS_REGULAR_EXPRESSION "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\\.[0-9][0-9][0-9]Z   KQvk: pass d=1 resolved")
+# The finalize steps report like passes: the last one names the written table.
+set(CLI_FINAL_TT ${CMAKE_BINARY_DIR}/cli_final_tables)
+add_test(NAME cli_gen_final_log_clean COMMAND ${CMAKE_COMMAND} -E rm -rf ${CLI_FINAL_TT})
+add_test(NAME cli_gen_final_log COMMAND helpmate gen KQvk --tables ${CLI_FINAL_TT} --progress --compress)
+set_tests_properties(cli_gen_final_log_clean PROPERTIES FIXTURES_SETUP cli_final)
+set_tests_properties(cli_gen_final_log PROPERTIES FIXTURES_REQUIRED cli_final
+    PASS_REGULAR_EXPRESSION "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\\.[0-9][0-9][0-9]Z   KQvk: table written \\([0-9.]+ s, [0-9]+ blocks, [0-9]+ bytes\\)")
 # Regex-escape the dots so 0.7.1 does not also match 0X7Y1.
 string(REPLACE "." "\\." HELPMATE_VERSION_RE "${PROJECT_VERSION}")
 set_tests_properties(cli_version PROPERTIES PASS_REGULAR_EXPRESSION "helpmate ${HELPMATE_VERSION_RE}")

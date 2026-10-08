@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include "chess/board.h"
+#include "format/block_codec.h"
 #include "generator/eval.h"
 #include "generator/parallel.h"
 #include "version.h"
@@ -442,6 +443,11 @@ nlohmann::json SliceGen::stats_json() const {
 }
 
 void SliceGen::finalize_and_write() {
+    // Each step reports like a pass line, so a long finalize shows where it is.
+    auto report = [this](const std::string& what) {
+        if (opt_.progress) std::cerr << log_stamp() << "  " << mat_.name() << ": " << what << "\n";
+    };
+    auto t0 = std::chrono::steady_clock::now();
     for (int s = 0; s < 2; ++s) {
         uint8_t* dtm = dtm_[s].data();
         parallel_for(ps_, opt_.threads, [dtm](uint64_t lo, uint64_t hi) {
@@ -449,18 +455,31 @@ void SliceGen::finalize_and_write() {
                 if (dtm[c] == DTM_UNSET) dtm[c] = DTM_UNSOLVABLE;
         });
     }
+    report("unsolved cells marked (" + secs_since(t0) + " s)");
+
+    t0 = std::chrono::steady_clock::now();
     nlohmann::json j = stats_json();
     std::string meta = j.dump(2);
+    report("stats done (" + secs_since(t0) + " s)");
+
     std::filesystem::create_directories(opt_.tables_dir);
     std::string base = opt_.tables_dir + "/" + mat_.name();
     uint8_t max_dtm_byte = max_dtm_ < 0 ? DTM_UNSOLVABLE : (uint8_t)max_dtm_;
+    t0 = std::chrono::steady_clock::now();
     if (opt_.compress) {
+        const uint64_t blocks = block_count(4 * ps_, opt_.block_size);
+        report("writing table (" + std::to_string(blocks) + " blocks)...");
         TableWriter::write_compressed(base + ".hm", mat_, ps_, max_dtm_byte, meta, dtm_[0].data(),
                                       dtm_[1].data(), cnt_[0].data(), cnt_[1].data(), opt_.block_size,
                                       kDefaultZstdLevel, opt_.threads);
+        report("table written (" + secs_since(t0) + " s, " + std::to_string(blocks) + " blocks, " +
+               std::to_string(std::filesystem::file_size(base + ".hm")) + " bytes)");
     } else {
+        report("writing table (raw)...");
         TableWriter::write(base + ".hm", mat_, ps_, max_dtm_byte, meta, dtm_[0].data(), dtm_[1].data(),
                            cnt_[0].data(), cnt_[1].data());
+        report("table written (" + secs_since(t0) + " s, " +
+               std::to_string(std::filesystem::file_size(base + ".hm")) + " bytes)");
     }
     std::ofstream out(base + ".stats.json", std::ios::trunc);
     out << meta;
