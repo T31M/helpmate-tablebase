@@ -55,7 +55,7 @@ Today `verify._stage` deletes `staging/pr-N/files` whenever the PR head changes.
 ## 3. Confirmations (identical duplicates)
 
 ### Payload hash
-`payload_sha256` = SHA-256 over the decompressed planes in file order (all blocks, concatenated). It is
+`payload_sha256` = SHA-256 over the concatenated hex SHA-256 digests of the four decompressed planes (planes 0..3 in file order), so V4 can compute it from the chunks it already reads. It is
 independent of the header and the embedded metadata (generator version), so two builds of the same
 material compare equal exactly when their content is equal. V4 already decodes every block
 (`checks.recompute_stats`); the hash is computed in the same pass (`BlockReader.plane_chunks`), no extra read.
