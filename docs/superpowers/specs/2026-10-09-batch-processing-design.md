@@ -59,7 +59,7 @@ Today `verify._stage` deletes `staging/pr-N/files` whenever the PR head changes.
 independent of the header and the embedded metadata (generator version), so two builds of the same
 material compare equal exactly when their content is equal. V4 already decodes every block
 (`checks.recompute_stats`); the hash is computed in the same pass (`BlockReader.plane_chunks`), no extra read.
-Marker tables: `payload_sha256` = SHA-256 of the canonical JSON of the sidecar's `cells` (markers have no
+Marker tables: `payload_sha256` = SHA-256 of the canonical JSON of the sidecar's `cells`, prefixed `marker:` (markers have no
 payload).
 
 ### Verify
