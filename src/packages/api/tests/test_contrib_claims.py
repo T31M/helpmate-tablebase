@@ -159,13 +159,126 @@ def test_wildcard_over_a_done_material_is_just_done(tmp_path):
     assert "done" in row
 
 
-def test_wildcard_overlapping_an_earlier_open_claim_is_still_a_conflict(tmp_path):
+def test_wildcard_overlapping_an_earlier_open_claim_is_excluded_not_a_conflict(tmp_path):
     hub = FakeHub()
     gh = FakeGitHub([_gh_issue(30, "early", "KRRvkpp"), _gh_issue(39, "popeye37", ISSUE_39)])
     reg = Registry(tmp_path / "c.json", {"contributors": {}, "tables": {}})
     run_claims(hub, gh, reg, date(2026, 9, 30))
+    assert "claim-conflict" not in gh.labels[39] and "claim-conflict" not in gh.labels[30]
+    text = _status(gh, 39)
+    assert "| KRRvkpp | claimed in #30 by @early |" in text
+    assert "(1 excluded: claimed earlier by others)" in text and "covers 14 materials" in text
+
+
+def test_explicit_overlap_with_an_earlier_claim_is_a_conflict(tmp_path):
+    hub = FakeHub()
+    gh = FakeGitHub([_gh_issue(30, "early", "KRRvkpp"), _gh_issue(39, "popeye37", "KRRvkpp KRRvkqq")])
+    reg = Registry(tmp_path / "c.json", {"contributors": {}, "tables": {}})
+    run_claims(hub, gh, reg, date(2026, 9, 30))
     assert "claim-conflict" in gh.labels[39] and "claim-conflict" not in gh.labels[30]
-    assert "KRRvkpp is already claimed in #30" in gh.posted[-1][1]
+    assert "KRRvkpp is already claimed in #30" in _status(gh, 39)
+
+
+def _status(gh, issue):
+    return next(b for n, b in gh.posted if n == issue and "<!-- contrib-status" in b)
+
+
+def test_confirm_claim_never_conflicts_or_holds(tmp_path):
+    gh = FakeGitHub([_gh_issue(30, "early", "KQvkqqq"),
+                     _gh_issue(31, "checker", "confirm: KQvkqqq"),
+                     _gh_issue(32, "later", "KQvkqqq")])
+    idx = load_index(gh)
+    assert [c.confirm for c in idx.claims] == [False, True, False]
+    assert idx.claim_for("KQvkqqq").issue == 30
+    run_claims(FakeHub(), gh, Registry(tmp_path / "c.json", {"contributors": {}, "tables": {}}),
+               date(2026, 9, 30))
+    assert "claim-conflict" not in gh.labels[31]
+    assert "confirming" in _status(gh, 31)
+    assert not any("contrib-overlap" in b for n, b in gh.posted if n == 31)
+    assert "claim-conflict" in gh.labels[32]          # blocked by #30, not by the confirm claim
+
+
+def test_confirm_claim_alone_holds_nothing():
+    idx = ClaimIndex([_claim(5, "a", "x"), Claim(6, "b", "2026-09-20T00:00:00Z", ["KQvkqqq"], [], "", confirm=True),
+                      Claim(7, "c", "2026-09-20T00:00:00Z", ["KQvkqqq"], [], "")])
+    assert idx.claim_for("KQvkqqq").issue == 7
+
+
+@pytest.mark.parametrize("body,confirm", [
+    ("Confirm: KQvkqqq", True), ("\n  CONFIRM: KQvk???", True), ("I confirm: KQvkqqq", False),
+    ("### Materials\n\nconfirm: KQvkqqq\n\n### Credit\n\nx", True),
+    ("### Materials\n\nKQvkqqq\n\n### Credit\n\nconfirm: x", False),
+])
+def test_confirm_detection(body, confirm):
+    assert load_index(FakeGitHub([_gh_issue(1, "a", body)])).claims[0].confirm is confirm
+
+
+def test_released_material_goes_to_the_next_claim():
+    gh = FakeGitHub([_gh_issue(30, "early", "KRRvk?? ~~KRRvkpp~~"), _gh_issue(31, "next", "KRRvkpp")])
+    idx = load_index(gh)
+    assert idx.claim_for("KRRvkpp").issue == 31 and idx.claim_for("KRRvkqq").issue == 30
+    assert load_index(FakeGitHub([_gh_issue(30, "e", "KRRvkqq ~~KRRvkpp~~")])).claim_for("KRRvkpp") is None
+
+
+def test_overlap_notice_is_posted_once_on_the_later_claim(tmp_path):
+    hub = FakeHub()
+    gh = FakeGitHub([_gh_issue(30, "early", "KRRvkpp KRRvkqq"), _gh_issue(39, "popeye37", ISSUE_39)])
+    reg = Registry(tmp_path / "c.json", {"contributors": {}, "tables": {}})
+    run_claims(hub, gh, reg, date(2026, 9, 30))
+    notes = [(n, b) for n, b in gh.posted if "<!-- contrib-overlap e=30 -->" in b]
+    assert len(notes) == 1 and notes[0][0] == 39
+    assert "@popeye37 @early" in notes[0][1] and "KRRvkqq, KRRvkpp" in notes[0][1]
+    assert not any("contrib-overlap" in b for n, b in gh.posted if n == 30)
+    n_posted = len(gh.posted)
+    run_claims(hub, gh, reg, date(2026, 10, 1))
+    assert len(gh.posted) == n_posted and gh.edited == []     # nothing changed: nothing posted or edited
+
+
+def test_overlap_notice_lists_ten_then_counts_the_rest(tmp_path):
+    gh = FakeGitHub([_gh_issue(30, "early", "KRRvk??"), _gh_issue(39, "popeye37", "KRRvk??")])
+    run_claims(FakeHub(), gh, Registry(tmp_path / "c.json", {"contributors": {}, "tables": {}}),
+               date(2026, 9, 30))
+    note = next(b for n, b in gh.posted if "contrib-overlap" in b)
+    assert "and 5 more." in note
+
+
+def test_row_produced_by_two_producers(tmp_path):
+    hub = FakeHub({"manifest.json": _DONE_KRRVKQQ})
+    gh = FakeGitHub([_gh_issue(39, "popeye37", "KRRvkqq KRRvkqr")])
+    reg = Registry(tmp_path / "c.json", {
+        "contributors": {"p": {"github": "popeye37", "hf": "popeye37", "display": "Popeye"},
+                         "t": {"github": "t31m", "hf": "T31M", "display": "Tim"}},
+        "tables": {"KRRvkqq": {"contributor": "p", "producers": [
+            {"contributor": "p", "hf_pr": 1}, {"contributor": "t", "hf_pr": 2}]}}})
+    run_claims(hub, gh, reg, date(2026, 9, 30))
+    row = next(x for x in _status(gh, 39).splitlines() if x.startswith("| KRRvkqq"))
+    assert "done" in row and "produced by Popeye and Tim" in row
+
+
+def test_delivery_by_a_non_holder_is_held_for_the_claim_in_both_tables(tmp_path):
+    hub = FakeHub()
+    hub.add_pr(3, {"KRRvkqr.hm": b"x", "KRRvkqr.stats.json": b"{}"}, author="hfuser",
+               description="GitHub: @other")
+    gh = FakeGitHub([_gh_issue(39, "popeye37", "KRRvkqr"),
+                     _gh_issue(50, "other", "KRRvkqr")])
+    reg = Registry(tmp_path / "c.json", {"contributors": {}, "tables": {}})
+    run_claims(hub, gh, reg, date(2026, 9, 30))
+    holder = next(x for x in _status(gh, 39).splitlines() if x.startswith("| KRRvkqr"))
+    other = next(x for x in _status(gh, 50).splitlines() if x.startswith("| KRRvkqr"))
+    assert "delivered by hfuser, held for you" in holder
+    assert "held for claim #39" in other
+    assert "claim-conflict" not in gh.labels[39]
+
+
+def test_a_second_run_with_nothing_changed_posts_and_edits_nothing(tmp_path):
+    hub = FakeHub({"manifest.json": _DONE_KRRVKQQ})
+    gh = FakeGitHub([_gh_issue(30, "early", "KRRvkpp"), _gh_issue(39, "popeye37", ISSUE_39),
+                     _gh_issue(40, "chk", "confirm: KRRvkqq")])
+    reg = Registry(tmp_path / "c.json", {"contributors": {}, "tables": {}})
+    run_claims(hub, gh, reg, date(2026, 9, 30))
+    posted = list(gh.posted)
+    run_claims(hub, gh, reg, date(2026, 9, 30))
+    assert gh.posted == posted and gh.edited == []
 
 
 def test_explicit_names_are_recorded_on_the_claim():
@@ -175,7 +288,7 @@ def test_explicit_names_are_recorded_on_the_claim():
     assert "KRRvkqr" in c.materials and "KRRvkqr" not in c.explicit
 
 
-@pytest.mark.parametrize("desc,by_hf,conflict", [
+@pytest.mark.parametrize("desc,by_hf,held", [
     ("Claim: osick/helpmate-tablebase#60", False, True),
     ("GitHub: @someoneelse", False, True),
     ("Claim: osick/helpmate-tablebase#39", False, False),
@@ -183,7 +296,7 @@ def test_explicit_names_are_recorded_on_the_claim():
     ("", True, True),       # registry maps the HF user to another login
     ("", False, False),     # unknown identity
 ])
-def test_in_review_by_someone_else(tmp_path, desc, by_hf, conflict):
+def test_in_review_by_someone_else_is_held_not_a_conflict(tmp_path, desc, by_hf, held):
     hub = FakeHub()
     hub.add_pr(3, {"KRRvkqr.hm": b"x", "KRRvkqr.stats.json": b"{}"}, author="hfuser",
                description=desc)
@@ -191,8 +304,9 @@ def test_in_review_by_someone_else(tmp_path, desc, by_hf, conflict):
     contribs = {"o": {"github": "other", "hf": "hfuser", "display": "O"}} if by_hf else {}
     reg = Registry(tmp_path / "c.json", {"contributors": contribs, "tables": {}})
     run_claims(hub, gh, reg, date(2026, 9, 30))
-    assert ("claim-conflict" in gh.labels[39]) is conflict
-    assert ("in review by someone else (HF PR #3)" in gh.posted[0][1]) is conflict
+    assert "claim-conflict" not in gh.labels[39]
+    assert ("held for you" in gh.posted[0][1]) is held
+    assert "in review by someone else" not in gh.posted[0][1]
 
 
 def test_marker_in_a_user_comment_is_ignored(tmp_path):

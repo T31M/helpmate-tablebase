@@ -772,8 +772,12 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
         for n, pr in pulls.items():
             c = people[n]["claim"]
             if c is not None and recorded[n] and n not in state.setdefault("commented", []):
+                repro = [m for m in recorded[n] if decisions[m].kind == "reproduction"
+                         or len(decisions[m].producers) > 1]
                 gh.comment(c, f"Accepted: {', '.join(recorded[n])} ([HF PR #{n}]({pr.url})) — "
-                              f"now in the dataset and credited on {SITE_MATERIALS_URL}. Thank you!")
+                              f"now in the dataset and credited on {SITE_MATERIALS_URL}. Thank you!"
+                              + (f" {', '.join(repro)}: independently reproduced — credited to both."
+                                 if repro else ""))
                 state["commented"].append(n)
                 save()
         reg = Registry.load(reg_path)

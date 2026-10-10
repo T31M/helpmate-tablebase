@@ -231,6 +231,8 @@ def test_two_prs_same_material_publish_the_later_claim_holders_file(tmp_path):
     assert _producers(checkout, "KRRvkqq") == [("T31M", 2), ("popeye37", 3)]
     assert reg["tables"]["KRRvkqq"]["published_from"] == 3 and reg["tables"]["KRRvkqq"]["hf_pr"] == 3
     assert reg["tables"]["KRRvkqq"]["claim"] == 39
+    accepted = [b for n, b in gh.posted if n == 39 and b.startswith("Accepted")]
+    assert accepted and "independently reproduced — credited to both" in accepted[0]
     changelog = (checkout / "CHANGELOG.md").read_text()
     assert "KRRvkqq contributed by popeye37 (dataset PR #3" in changelog
     assert "KRRvkqq (independently reproduced by T31M and popeye37)." in changelog

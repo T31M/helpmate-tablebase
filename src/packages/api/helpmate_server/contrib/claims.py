@@ -16,6 +16,7 @@ _STRUCK = re.compile(r"~~(.*?)~~", re.S)
 _MARKER = re.compile(r"<!-- contrib-status body-sha=(\w+) seen=(\d{4}-\d{2}-\d{2}) -->")
 _SECTION = re.compile(r"^###[ \t]+(.+?)[ \t]*$", re.M)
 _ANON = re.compile(r"^\s*-\s*\[[xX]\]\s*Do not name me", re.M)
+_CONFIRM = re.compile(r"\s*confirm:", re.I)
 _NO_RESPONSE = "_No response_"
 STALE_DAYS = 21
 BOT_NOTE = ("*Updated automatically from the dataset and the other claims — "
@@ -55,6 +56,17 @@ def _sections(body: str) -> dict[str, str]:
     return {parts[i].strip(): parts[i + 1].strip() for i in range(1, len(parts) - 1, 2)}
 
 
+def is_confirm(body: str) -> bool:
+    """A confirmation claim: its Materials section (issue form) or, on a free-text claim, the
+    first non-empty line of the body starts with `confirm:`."""
+    sec = _sections(body)
+    if "Materials" in sec:
+        text = sec["Materials"]
+    else:
+        text = next((ln for ln in (body or "").splitlines() if ln.strip()), "")
+    return bool(_CONFIRM.match(text))
+
+
 def parse_form(body: str) -> tuple[str | None, str | None, bool]:
     """(Hugging Face username, name to credit, anonymous) from the claim form.
     A free-text claim has no sections and yields the defaults."""
@@ -82,6 +94,7 @@ class Claim:
     credit: str | None = None
     anonymous: bool = False
     explicit: set[str] = field(default_factory=set)   # named plainly, not only via a `?` wildcard
+    confirm: bool = False          # a deliberate reproduction: never holds, never conflicts
 
 
 class ClaimIndex:
@@ -89,8 +102,11 @@ class ClaimIndex:
         self.claims = sorted(claims, key=lambda c: c.issue)
         self._first: dict[str, Claim] = {}
         for c in self.claims:
+            if c.confirm:
+                continue        # expected overlap: holds nothing, blocks nobody
             for m in c.materials:
-                self._first.setdefault(m, c)
+                if m not in c.released:
+                    self._first.setdefault(m, c)
 
     def claim_for(self, material: str) -> Claim | None:
         return self._first.get(material)
@@ -103,7 +119,8 @@ def load_index(gh) -> ClaimIndex:
         body = i.get("body") or ""
         mats, rel = parse_claim(f"{i['title']}\n{body}")
         out.append(Claim(i["number"], i["user"]["login"], i["created_at"], mats, rel, body,
-                         *parse_form(body), explicit=explicit_names(f"{i['title']}\n{body}")))
+                         *parse_form(body), explicit=explicit_names(f"{i['title']}\n{body}"),
+                         confirm=is_confirm(body)))
     return ClaimIndex(out)
 
 
@@ -139,16 +156,40 @@ ICON = {"done": "✅ done", "in review": "🔍 in review", "claimed": "🚧 clai
         "open": "⬜ open", "not needed": "➖ not needed"}
 
 
+def _names_of(keys: list[str], registry) -> str:
+    out = []
+    for k in keys:
+        c = registry.contributors.get(k)
+        out.append("maintainer" if k == "maintainer" and c is None else k if c is None
+                   else "an anonymous contributor" if c.anonymous else c.display)
+    return out[0] if len(out) == 1 else ", ".join(out[:-1]) + " and " + out[-1]
+
+
 def status_comment(claim: Claim, statuses: dict[str, Status], conflicts: list[str],
-                   stale: bool, body_sha: str, seen: str, hf_url: str) -> str:
+                   stale: bool, body_sha: str, seen: str, hf_url: str, *,
+                   excluded: dict[str, Claim] | None = None,
+                   notes: dict[str, str] | None = None) -> str:
+    """`excluded`: materials an earlier claim holds (shown, not counted); `notes`: extra row text
+    (producers, held for)."""
+    excluded, notes = excluded or {}, notes or {}
     rows = []
     for m in claim.materials:
         s = statuses[m]
         extra = f" — [HF PR #{s.hf_pr}]({hf_url}/discussions/{s.hf_pr})" if s.state == "in review" else ""
-        rows.append(f"| {m} | {ICON[s.state]}{extra} |")
-    parts = [f"<!-- contrib-status body-sha={body_sha} seen={seen} -->",
-             f"**Claim status** — {sum(statuses[m].state == 'done' for m in claim.materials)} "
-             f"of {len(claim.materials)} done", "", BOT_NOTE, "",
+        if m in excluded:
+            e = excluded[m]
+            text = f"claimed in #{e.issue} by @{e.author}" + (" — ✅ done" if s.state == "done" else "")
+        else:
+            text = ICON[s.state]
+        rows.append(f"| {m} | {text}{extra}{notes.get(m, '')} |")
+    covered = [m for m in claim.materials if m not in excluded]
+    head = (f"**Claim status** — {sum(statuses[m].state == 'done' for m in covered)} of {len(covered)} done")
+    if excluded:
+        head += (f" — covers {len(covered)} materials ({len(excluded)} excluded: "
+                 "claimed earlier by others)")
+    if claim.confirm:
+        head += " — confirming (independent reproduction of tables that may already exist)"
+    parts = [f"<!-- contrib-status body-sha={body_sha} seen={seen} -->", head, "", BOT_NOTE, "",
              "| material | status |", "|---|---|", *rows]
     if conflicts:
         parts += ["", "**Conflicts** (the earlier claim or the finished table wins; "
@@ -198,14 +239,23 @@ def run_claims(hub, gh, registry, today: date) -> int:
 def _update_claim(c: Claim, index: ClaimIndex, statuses: dict[str, Status], in_review: dict,
                   registry, gh, today: date, hf_url: str) -> None:
     """The status comment and labels of one claim issue."""
-    conflicts = []
+    conflicts: list[str] = []
+    excluded: dict[str, Claim] = {}
+    notes: dict[str, str] = {}
     for m in c.materials:
-        first = index.claim_for(m)
-        if first and first.issue != c.issue:
-            conflicts.append(f"{m} is already claimed in #{first.issue}")
         s = statuses[m]
+        first = index.claim_for(m)
+        holder = first if first is not None and first.issue != c.issue else None
+        if holder is not None and not c.confirm:
+            if m in c.explicit:
+                conflicts.append(f"{m} is already claimed in #{holder.issue}")
+            else:
+                excluded[m] = holder        # a wildcard never fights an earlier claim
         if s.state == "done":
-            if m not in c.explicit:
+            producers = registry.producers_of(m)
+            if len(producers) >= 2:
+                notes[m] = f" — produced by {_names_of(producers, registry)}"
+            if c.confirm or m not in c.explicit:
                 continue        # only covered by a wildcard: listed as done, not a conflict
             entry = registry.tables.get(m)
             if entry is None:
@@ -215,8 +265,11 @@ def _update_claim(c: Claim, index: ClaimIndex, statuses: dict[str, Status], in_r
                 login = person.github if person else None
                 if (login or "").lower() != c.author.lower():
                     conflicts.append(f"{m} is already done")
-        elif s.state == "in review" and ownership_conflict(in_review[m], c, registry):
-            conflicts.append(f"{m} is in review by someone else (HF PR #{in_review[m].num})")
+        elif s.state == "in review" and first is not None:
+            pr = in_review[m]
+            if ownership_conflict(pr, first, registry):     # held for the claim holder (rule 4)
+                notes[m] = (f" — delivered by {pr.author}, held for you" if first.issue == c.issue
+                            else f" — held for claim #{first.issue}")
     comments = gh.comments(c.issue)
     mine = next((x for x in comments if x["user"].endswith("[bot]")
                  and _MARKER.search(x["body"])), None)
@@ -228,14 +281,35 @@ def _update_claim(c: Claim, index: ClaimIndex, statuses: dict[str, Status], in_r
     activity = max([_day(c.created_at), date.fromisoformat(seen)]
                    + [_day(x["created_at"]) for x in comments if x["user"] == c.author])
     stale = (today - activity).days >= STALE_DAYS
-    text = status_comment(c, statuses, conflicts, stale, body_sha, seen, hf_url)
+    text = status_comment(c, statuses, conflicts, stale, body_sha, seen, hf_url,
+                          excluded=excluded, notes=notes)
     if mine is None:
         gh.comment(c.issue, text)
     elif mine["body"] != text:
         gh.edit_comment(mine["id"], text)
+    _overlap_notices(c, index, comments, gh)
     gh.add_labels(c.issue, ["claim"])
     for label, on in (("claim-conflict", bool(conflicts)), ("claim-stale", stale)):
         if on:
             gh.add_labels(c.issue, [label])
         else:
             gh.remove_label(c.issue, label)
+
+
+def _overlap_notices(c: Claim, index: ClaimIndex, comments: list[dict], gh) -> None:
+    """Once per (this claim, earlier claim) pair: tell both authors that materials overlap.
+    Never on a confirmation claim (its overlaps are deliberate); never for an earlier one."""
+    if c.confirm:
+        return
+    done = {x["body"] for x in comments if x["user"].endswith("[bot]")}
+    for e in index.claims:
+        if e.issue >= c.issue or e.confirm:
+            continue
+        shared = [m for m in c.materials if m in set(e.materials)]
+        marker = f"<!-- contrib-overlap e={e.issue} -->"
+        if not shared or any(marker in b for b in done):
+            continue
+        listed = ", ".join(shared[:10]) + (f" and {len(shared) - 10} more" if len(shared) > 10 else "")
+        gh.comment(c.issue, f"{marker}@{c.author} @{e.author} — these materials are also claimed in "
+                            f"#{e.issue}: {listed}. The earlier claim holds them; identical deliveries "
+                            "are credited to both.")
