@@ -6,8 +6,10 @@ import re
 import secrets
 import shutil
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from .checks import (
     Check, MissingPublished, TableReport, check_block_integrity, check_deepest, check_header,
@@ -68,39 +70,73 @@ class PublishedHashes:
         return payload
 
 
+REUSE_SETTINGS = ("samples", "oracle_samples", "oracle_plies")
+
+
+def reusable(prev: dict | None, material: str, shas: tuple[str, str], tool: str,
+             settings: dict, source_payload: str | None = None) -> dict | None:
+    """The table entry of the previous report if its result may be taken over: same tool and
+    sampling, the table passed, its files are unchanged, and it was compared against the same
+    source (the published table, an earlier delivery, or none) as it would be now."""
+    if not prev or prev.get("tool") != tool:
+        return None
+    if any(prev.get(k) != settings.get(k) for k in REUSE_SETTINGS):
+        return None
+    entry = prev.get("tables", {}).get(material)
+    if not entry or not entry.get("passed"):
+        return None
+    if (entry.get("hm_sha256"), entry.get("stats_sha256")) != shas:
+        return None
+    if entry.get("source_payload") != source_payload:
+        return None
+    return entry
+
+
 def verify_table(material: str, tables: Path, opts: VerifyOptions,
                  installed_version: str, *, published: str | None = None,
-                 source: str = "the published table") -> TableReport:
+                 source: str = "the published table",
+                 progress: Callable[[str], None] | None = None) -> TableReport:
     rep = TableReport(material)
     path = tables / f"{material}.hm"
+    t0 = time.monotonic()
+
+    def note(check: Check) -> Check:
+        nonlocal t0
+        rep.checks.append(check)
+        if progress is not None:
+            now = time.monotonic()
+            progress(f"{material} {check.id} {check.title} … {check.status} ({now - t0:.1f}s)")
+            t0 = now
+        return check
+
     if not path.exists():
-        rep.checks.append(Check("V2", "header and identity", "fail", f"{path} not found"))
+        note(Check("V2", "header and identity", "fail", f"{path} not found"))
         return rep
     for check in (lambda: check_header(path, installed_version),
                   lambda: check_block_integrity(path)):
-        rep.checks.append(check())
+        note(check())
         if not rep.passed:
             return rep  # later checks would only restate a structural failure
     v4, payload = check_sidecar(path)
-    rep.checks.append(v4)
+    note(v4)
     rep.payload_sha256 = payload
     if published is not None:
-        rep.checks.append(check_identical(rep.payload_sha256, published, source))
+        note(check_identical(rep.payload_sha256, published, source))
         why = (f"independent reproduction: identical to {source}" if rep.passed
                else "an earlier check failed")
         for cid, title in (("V5", "deepest positions probe as recorded"),
                            ("V6", "local consistency"), ("V7", "independent solver")):
-            rep.checks.append(Check(cid, title, "skip", why))
+            note(Check(cid, title, "skip", why))
         return rep
-    rep.checks.append(check_deepest(path, tables))
+    note(check_deepest(path, tables))
     if read_header(path).marker:
-        rep.checks.append(Check("V6", "local consistency", "skip", "marker table"))
-        rep.checks.append(Check("V7", "independent solver", "skip", "marker table"))
+        note(Check("V6", "local consistency", "skip", "marker table"))
+        note(Check("V7", "independent solver", "skip", "marker table"))
         return rep
     if not rep.passed:
         why = "an earlier check failed"
-        rep.checks.append(Check("V6", "local consistency", "skip", why))
-        rep.checks.append(Check("V7", "independent solver", "skip", why))
+        note(Check("V6", "local consistency", "skip", why))
+        note(Check("V7", "independent solver", "skip", why))
         return rep
     seed = opts.resolved_seed()
     try:
@@ -108,13 +144,13 @@ def verify_table(material: str, tables: Path, opts: VerifyOptions,
         extra = list(sc.get("deepest", [])) + list(sc.get("deepest_unique", []))
     except (OSError, ValueError, AttributeError, TypeError) as exc:
         why = f"sidecar unreadable: {exc}"
-        rep.checks.append(Check("V6", "local consistency", "skip", why))
-        rep.checks.append(Check("V7", "independent solver", "skip", why))
+        note(Check("V6", "local consistency", "skip", why))
+        note(Check("V7", "independent solver", "skip", why))
         return rep
     v6, fens = check_consistency(material, tables, opts.samples, seed, extra)
-    rep.checks.append(v6)
-    rep.checks.append(check_oracle(material, tables, samples=opts.oracle_samples,
-                                   max_plies=opts.oracle_plies, seed=seed, others=fens))
+    note(v6)
+    note(check_oracle(material, tables, samples=opts.oracle_samples,
+                      max_plies=opts.oracle_plies, seed=seed, others=fens))
     return rep
 
 
@@ -387,13 +423,26 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         if notes or claims_note:
             v1.detail += ("; " + ", ".join(notes) if notes else "") + claims_note
         reports: list = []
+        table_meta: dict[str, dict] = {}
         subtables_from: list[int] = []
+        prev = None
+        old = d / "report.json"
+        if old.exists():
+            try:
+                prev = json.loads(old.read_text())
+            except ValueError:
+                prev = None
+            old.replace(d / "report.prev.json")
+        if getattr(a, "full", False) or not isinstance(prev, dict):
+            prev = None
+        n = len(pr.materials)
         try:
             if not any(_unsafe(f) for f in pr.files):
                 _stage(hub, pr, files_dir)
                 subtables_from = _build_overlay(tables, files_dir, d / "overlay",
                                                 _verified_files(staging, pr.num, open_heads))
-                for m in pr.materials:
+                recorded = _files_record(files_dir)["files"]
+                for i, m in enumerate(pr.materials, 1):
                     prior = delivered.get(m)
                     if m in dups:
                         pub, src = hashes.get(m), "the published table"
@@ -401,8 +450,23 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
                         pub, src = prior[1], f"HF PR #{prior[0]}"
                     else:
                         pub, src = None, "the published table"
-                    reports.append(verify_table(m, d / "overlay", opts, version,
-                                                published=pub, source=src))
+                    shas = (recorded.get(f"{m}.hm", {}).get("sha256"),
+                            recorded.get(f"{m}.stats.json", {}).get("sha256"))
+                    entry = reusable(prev, m, shas, tool, opts.settings(), pub)
+                    if entry is not None and prev is not None:
+                        head = str(prev.get("head"))
+                        reports.append(TableReport.from_json(m, entry, head))
+                        seed_used = entry.get("seed")
+                        print(f"[{i}/{n}] {m} reused from {head[:7]}", flush=True)
+                    else:
+                        def show(line: str, i: int = i) -> None:
+                            print(f"[{i}/{n}] {line}", flush=True)
+
+                        reports.append(verify_table(m, d / "overlay", opts, version,
+                                                    published=pub, source=src, progress=show))
+                        seed_used = opts.resolved_seed()
+                    table_meta[m] = {"hm_sha256": shas[0], "stats_sha256": shas[1],
+                                     "seed": seed_used, "source_payload": pub}
         except MissingPublished as exc:
             raise UsageError(f"{exc.material} is published but not in {tables}; "
                              "sync the corpus first") from exc
@@ -416,7 +480,8 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         md = render_markdown(reports, heading=f"Verification of PR #{pr.num}", seed=seed,
                              tool=tool, pr_checks=[v1], subtables_from=subtables_from)
         js = report_json(reports, seed=seed, tool=tool, head=pr.head, pr=pr.num, pr_checks=[v1],
-                         settings=opts.settings(), subtables_from=subtables_from)
+                         settings=opts.settings(), subtables_from=subtables_from,
+                         table_meta=table_meta)
         (d / "report.md").write_text(md)
         (d / "report.json").write_text(json.dumps(js, indent=2))
         print(md)

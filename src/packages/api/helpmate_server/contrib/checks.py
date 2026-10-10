@@ -20,6 +20,7 @@ class Check:
     title: str
     status: str  # "pass" | "fail" | "warn" | "skip"
     detail: str = ""
+    reused_from: str | None = None   # head of the earlier verification this result was taken from
 
 
 @dataclass
@@ -31,6 +32,13 @@ class TableReport:
     @property
     def passed(self) -> bool:
         return all(c.status != "fail" for c in self.checks)
+
+    @classmethod
+    def from_json(cls, material: str, entry: dict, reused_from: str) -> "TableReport":
+        """Rebuild a report from a report.json table entry, marking every check as reused."""
+        checks = [Check(c["id"], c["title"], c["status"], c.get("detail", ""), reused_from)
+                  for c in entry.get("checks", [])]
+        return cls(material, checks, entry.get("payload_sha256"))
 
 
 def _stem(path: Path) -> str:
