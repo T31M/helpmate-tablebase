@@ -131,11 +131,47 @@ the maintainer can link the two accounts and credit you. Run
 `huggingface-cli whoami` if you are unsure which account your token belongs
 to — it is easy to be logged in as an old one.
 
+### Duplicates and claims
+
+Two deliveries of the same material with identical content are an independent
+reproduction. That makes the table more trustworthy, so it is a joint result,
+not a conflict:
+
+1. **Equal credit.** Everyone whose delivery passed and matched is a
+   *producer* of that table, listed in order of delivery (dataset PR number).
+   Nobody is "author" and nobody is "confirmer"; every producer counts the table
+   fully.
+2. **Which file is published.** The content is identical, only the sidecar and
+   the generator version differ. The published file is the claim holder's
+   delivery; if no producer holds a valid claim, the earliest delivery. A file
+   that is already published is never replaced; a claim holder who delivers
+   later becomes a producer.
+3. **A claim does not block an identical delivery.** Someone else's delivery of
+   a claimed material is accepted when it equals the claim holder's delivery or
+   the published table; it adds a producer.
+4. **A claim still protects new material.** Someone else's delivery of a claimed
+   material that is neither published nor delivered by the claim holder is
+   *held*: it passes verify, `accept` skips it ("held for claim #N") and the PR
+   stays open until the claim holder delivers, the claim ends, or the
+   maintainer releases the material after asking the claim holder.
+5. **Different content is not a duplicate.** If two deliveries differ, V8 fails
+   for the later one and nothing is accepted for that material until it is
+   resolved.
+6. **A valid claim** is an open claim issue that covers the material, directly
+   or by pattern, and is the earliest open claim covering it.
+
+To reproduce a table on purpose, open a claim whose first line is `confirm:`
+(then the list of materials). A confirming claim never holds or conflicts with
+anything. A pattern claim such as `KQvk???` leaves out every material that an
+earlier claim already covers; the status comment lists them as "excluded:
+claimed earlier by others". Explicit overlaps are still flagged, with one
+notice that names both authors.
+
 ## What gets checked before a merge
 
 Being blunt about the state of this: **a donated table is currently reviewed,
-not proven.** `helpmate-tables verify` runs seven checks, cheapest first. You
-run V2 to V7 with `--material`; the maintainer runs V1 to V7 on your pull
+not proven.** `helpmate-tables verify` runs seven checks, cheapest first, plus V8 for duplicates. You
+run V2 to V7 with `--material`; the maintainer runs V1 to V7 (and V8) on your pull
 request with `--pr`. If V4 or V5 fails, V6 and V7 are skipped.
 
 - **V1 PR hygiene.** Only `<M>.hm` plus `<M>.stats.json` pairs with safe file
@@ -163,6 +199,12 @@ request with `--pr`. If V4 or V5 fails, V6 and V7 are skipped.
   plies deep (`--oracle-samples`, `--oracle-plies`). The limit is runtime:
   python-chess needs minutes per six-piece position at 5 plies. The report
   records the settings used.
+
+- **V8 identical to the published table.** Only for a material that is already
+  published or delivered by an earlier PR in the same run: the payload hash
+  (SHA-256 of the four plane hashes) must equal the other copy. Such a duplicate
+  is checked with V2 to V4 and V8; V5 to V7 are skipped as "independent
+  reproduction".
 
 **What is not checked is full correctness.** Proving a donated table right
 means regenerating it, which costs exactly what the donation saved. The
@@ -214,8 +256,25 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
 - `verify --pr` lists the PR files and sizes and asks before downloading
   (`--yes` skips the question, `--plan-only` stops after the list, `--no-post`
   keeps the report off HF and GitHub). Downloads are staged in `~/tb-staging`,
-  bound to the PR head, and a rerun resumes size-exactly. It exits with status 2
+  per file (`files/.files.json`), and a rerun downloads only the files that changed
+  or are incomplete. It exits with status 2
   if `--tables` lacks a sub-table the PR needs.
+- Delta verify: a table whose file and settings (`samples`, `oracle_samples`,
+  `oracle_plies`) are unchanged since the last report reuses its result
+  ("reused from <head>"); a killed run resumes from `report.partial.json`;
+  `--full` re-checks everything. Progress lines read
+  `[i/n] <material> <check> ... <status> (<time>)`. V1 labels each material new,
+  duplicate of published, duplicate of HF PR #N, or held for claim #N;
+  `--no-post` still reads the claims.
+- `accept` publishes the claim holder's file, else the earliest, never replaces a
+  published one, and adds identical deliveries as producers. It skips held
+  deliveries (the PR stays open with a comment); `accept --release M` publishes
+  someone else's delivery of claimed material after you asked the claim holder.
+  Differing content stops it before anything is merged. A reproduction of your
+  own table credits "maintainer" plus the reproducer. `accept --no-pages` leaves
+  out the site pages.
+- `helpmate-tables pages --tables ~/tb (--missing | --material M...) [--jobs N]`
+  mines the missing site pages in parallel jobs, resumable, and ships a docs PR.
 - `accept` refuses a PR that changed since its passing verification, and needs
   a clean checkout on its first run. Steps: merge the HF PR, regenerate and
   push the manifest, move the files into `--tables`, open a docs PR
