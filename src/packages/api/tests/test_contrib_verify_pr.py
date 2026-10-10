@@ -27,25 +27,26 @@ def _pr(files, description="Claim: #39", deleted=()):
 
 
 def test_v1_hygiene():
-    ok = check_pr_hygiene(_pr(["KRRvkqq.hm", "KRRvkqq.stats.json"]), {})
+    ok, _ = check_pr_hygiene(_pr(["KRRvkqq.hm", "KRRvkqq.stats.json"]), {})
     assert ok.status == "pass"
-    assert check_pr_hygiene(_pr(["KRRvkqq.hm"]), {}).status == "fail"            # no sidecar
+    assert check_pr_hygiene(_pr(["KRRvkqq.hm"]), {})[0].status == "fail"            # no sidecar
     assert check_pr_hygiene(_pr(["KRRvkqq.hm", "KRRvkqq.stats.json", "manifest.json"]),
-                            {}).status == "fail"
-    assert check_pr_hygiene(_pr(["KRRvkqq.hm", "KRRvkqq.stats.json"]),
-                            {"KRRvkqq.hm": {"sha256": "ab", "size": 1}}).status == "fail"
-    assert check_pr_hygiene(_pr(["KRRvkqq.hm", "KRRvkqq.stats.json"], ""), {}).status == "warn"
+                            {})[0].status == "fail"
+    published, dups = check_pr_hygiene(_pr(["KRRvkqq.hm", "KRRvkqq.stats.json"]),
+                                       {"KRRvkqq.hm": {"sha256": "ab", "size": 1}})
+    assert published.status == "pass" and dups == {"KRRvkqq"}      # a duplicate, not a failure
+    assert check_pr_hygiene(_pr(["KRRvkqq.hm", "KRRvkqq.stats.json"], ""), {})[0].status == "warn"
 
 
 def test_v1_fails_deletions_subdirectories_and_prs_without_tables():
     pair = ["KRRvkqq.hm", "KRRvkqq.stats.json"]
-    c = check_pr_hygiene(_pr(pair, deleted=["KQvk.hm"]), {})
+    c, _ = check_pr_hygiene(_pr(pair, deleted=["KQvk.hm"]), {})
     assert c.status == "fail" and "PR deletes KQvk.hm" in c.detail
-    c = check_pr_hygiene(_pr(pair + ["sub/KRRvkqr.hm", "sub/KRRvkqr.stats.json"]), {})
+    c, _ = check_pr_hygiene(_pr(pair + ["sub/KRRvkqr.hm", "sub/KRRvkqr.stats.json"]), {})
     assert c.status == "fail" and "sub/KRRvkqr.hm" in c.detail
-    c = check_pr_hygiene(_pr([]), {})
+    c, _ = check_pr_hygiene(_pr([]), {})
     assert c.status == "fail" and "no tables in this PR" in c.detail
-    c = check_pr_hygiene(_pr([], deleted=["README.md"]), {})
+    c, _ = check_pr_hygiene(_pr([], deleted=["README.md"]), {})
     assert c.status == "fail" and "PR deletes README.md" in c.detail
 
 

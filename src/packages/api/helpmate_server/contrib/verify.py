@@ -10,8 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .checks import (
-    Check, TableReport, check_block_integrity, check_deepest, check_header, check_sidecar,
+    Check, MissingPublished, TableReport, check_block_integrity, check_deepest, check_header,
+    check_identical, check_sidecar,
 )
+from .claims import ClaimIndex, load_index
 from .consistency import check_consistency
 from .links import parse_links
 from .materials import Material, canonical
@@ -40,8 +42,35 @@ class VerifyOptions:
                 "date": datetime.now(timezone.utc).date().isoformat()}
 
 
+class PublishedHashes:
+    """Payload hashes of published tables, from the local corpus copy, cached per manifest sha."""
+
+    def __init__(self, tables: Path, manifest_files: dict):
+        self.tables, self.files = Path(tables), manifest_files
+        self.path = self.tables / ".payload-sha256.json"
+        try:
+            self.cache: dict = json.loads(self.path.read_text())
+        except (OSError, ValueError):
+            self.cache = {}
+
+    def get(self, material: str) -> str:
+        from .tablefile import payload_sha256
+        sha = self.files.get(f"{material}.hm", {}).get("sha256")
+        hit = self.cache.get(material)
+        if hit and hit.get("hm_sha256") == sha:
+            return hit["payload"]
+        hm = self.tables / f"{material}.hm"
+        if not hm.exists():
+            raise MissingPublished(material)
+        payload = payload_sha256(hm)
+        self.cache[material] = {"hm_sha256": sha, "payload": payload}
+        self.path.write_text(json.dumps(self.cache, indent=1, sort_keys=True))
+        return payload
+
+
 def verify_table(material: str, tables: Path, opts: VerifyOptions,
-                 installed_version: str) -> TableReport:
+                 installed_version: str, *, published: str | None = None,
+                 source: str = "the published table") -> TableReport:
     rep = TableReport(material)
     path = tables / f"{material}.hm"
     if not path.exists():
@@ -55,6 +84,14 @@ def verify_table(material: str, tables: Path, opts: VerifyOptions,
     v4, payload = check_sidecar(path)
     rep.checks.append(v4)
     rep.payload_sha256 = payload
+    if published is not None:
+        rep.checks.append(check_identical(rep.payload_sha256, published, source))
+        why = (f"independent reproduction: identical to {source}" if rep.passed
+               else "an earlier check failed")
+        for cid, title in (("V5", "deepest positions probe as recorded"),
+                           ("V6", "local consistency"), ("V7", "independent solver")):
+            rep.checks.append(Check(cid, title, "skip", why))
+        return rep
     rep.checks.append(check_deepest(path, tables))
     if read_header(path).marker:
         rep.checks.append(Check("V6", "local consistency", "skip", "marker table"))
@@ -81,7 +118,8 @@ def verify_table(material: str, tables: Path, opts: VerifyOptions,
     return rep
 
 
-def check_pr_hygiene(pr, manifest_files: dict) -> Check:
+def check_pr_hygiene(pr, manifest_files: dict) -> tuple[Check, set[str]]:
+    """The V1 check, and the materials of the PR that are already published."""
     title = "only canonical table + sidecar pairs, nothing already published"
     problems: list[str] = []
     hms = {f[:-3] for f in pr.files if f.endswith(".hm")}
@@ -100,16 +138,38 @@ def check_pr_hygiene(pr, manifest_files: dict) -> Check:
         problems.append("no tables in this PR")
     for f in pr.deleted:
         problems.append(f"PR deletes {f}")
+    dups = {f[:-3] for f in pr.files if f.endswith(".hm") and f in manifest_files}
     for f in pr.files:
-        if f in manifest_files:
+        if f in manifest_files and f.split(".")[0] not in dups:
             problems.append(f"{f} is already published "
                             f"(sha256 {manifest_files[f]['sha256'][:12]}…)")
     if problems:
-        return Check("V1", title, "fail", "; ".join(problems))
+        return Check("V1", title, "fail", "; ".join(problems)), dups
+    detail = f"{len(hms)} table(s)"
+    if dups:
+        detail += f"; duplicates of published tables: {', '.join(sorted(dups))}"
     if parse_links(pr.description)[0] is None:
-        return Check("V1", title, "warn", f"{len(hms)} table(s); no `Claim:` line in the "
-                     "description (push with --claim N next time)")
-    return Check("V1", title, "pass", f"{len(hms)} table(s)")
+        return Check("V1", title, "warn", f"{detail}; no `Claim:` line in the "
+                     "description (push with --claim N next time)"), dups
+    return Check("V1", title, "pass", detail), dups
+
+
+def classify(pr, manifest_files: dict, index: ClaimIndex | None, earlier: dict[str, int],
+             login: str | None) -> dict[str, str]:
+    """One label per material of the PR: published, delivered by an earlier PR of this run,
+    held for someone else's claim, or new."""
+    out = {}
+    for m in pr.materials:
+        claim = index.claim_for(m) if index is not None else None
+        if f"{m}.hm" in manifest_files:
+            out[m] = "duplicate of published"
+        elif m in earlier:
+            out[m] = f"duplicate of HF PR #{earlier[m]}"
+        elif claim is not None and (login is None or claim.author.lower() != login.lower()):
+            out[m] = f"held for claim #{claim.issue}"
+        else:
+            out[m] = "new"
+    return out
 
 
 def _build_overlay(tables: Path, files_dir: Path, overlay: Path,
@@ -262,14 +322,32 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         return 2
     manifest_files = hub.fetch_manifest().get("files", {})
     gh = None if a.no_post else (gh_factory or GitHub)(a.github_repo)
+    gh_read = gh if gh is not None else (gh_factory(a.github_repo) if gh_factory else None)
+    index, claims_note = None, ""
+    if gh_read is not None:
+        try:
+            index = load_index(gh_read)
+        except Exception:  # noqa: BLE001 - claims are advisory; verification goes on without them
+            claims_note = "; claims unavailable"
+    hashes = PublishedHashes(tables, manifest_files)
+    delivered: dict[str, tuple[int, str | None]] = {}   # material -> (PR, payload if it passed)
     rc = 0
     open_prs = hub.open_pull_requests()
     open_heads = {p.num: p.head for p in open_prs}
     for pr in sorted(prs, key=_batch_order):
+        pr_login = parse_links(pr.description)[1]
         d = staging / f"pr-{pr.num}"
         files_dir = d / "files"
         d.mkdir(parents=True, exist_ok=True)
-        v1 = check_pr_hygiene(pr, manifest_files)
+        v1, dups = check_pr_hygiene(pr, manifest_files)
+        earlier: dict[str, int] = {}
+        for other in sorted(prs, key=lambda x: -x.num):
+            if other.num < pr.num:
+                earlier.update({m: other.num for m in other.materials})
+        labels = classify(pr, manifest_files, index, earlier, pr_login)
+        notes = [f"{m}: {label}" for m, label in labels.items() if label != "new"]
+        if notes or claims_note:
+            v1.detail += ("; " + ", ".join(notes) if notes else "") + claims_note
         reports: list = []
         subtables_from: list[int] = []
         try:
@@ -277,10 +355,25 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
                 _stage(hub, pr, files_dir)
                 subtables_from = _build_overlay(tables, files_dir, d / "overlay",
                                                 _verified_files(staging, pr.num, open_heads))
-                reports = [verify_table(m, d / "overlay", opts, version) for m in pr.materials]
+                for m in pr.materials:
+                    prior = delivered.get(m)
+                    if m in dups:
+                        pub, src = hashes.get(m), "the published table"
+                    elif prior and prior[1] and prior[0] < pr.num:
+                        pub, src = prior[1], f"HF PR #{prior[0]}"
+                    else:
+                        pub, src = None, "the published table"
+                    reports.append(verify_table(m, d / "overlay", opts, version,
+                                                published=pub, source=src))
+        except MissingPublished as exc:
+            raise UsageError(f"{exc.material} is published but not in {tables}; "
+                             "sync the corpus first") from exc
         except MissingSubtable as exc:
             # Our corpus is incomplete, not the PR's fault: post nothing.
             raise UsageError(_who_has(exc, open_prs, staging)) from exc
+        for rep in reports:
+            if rep.passed and rep.payload_sha256:
+                delivered.setdefault(rep.material, (pr.num, rep.payload_sha256))
         seed = opts.resolved_seed()
         md = render_markdown(reports, heading=f"Verification of PR #{pr.num}", seed=seed,
                              tool=tool, pr_checks=[v1], subtables_from=subtables_from)

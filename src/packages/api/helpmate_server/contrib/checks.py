@@ -231,3 +231,18 @@ def check_deepest(path: Path, tables: Path) -> Check:
         return Check("V5", title, "fail", "; ".join(bad[:10]))
     return Check("V5", title, "pass",
                  f"{len(sc.get('deepest', []))} deepest + {len(uniq)} deepest-unique positions")
+
+
+class MissingPublished(Exception):
+    def __init__(self, material: str):
+        super().__init__(material)
+        self.material = material
+
+
+def check_identical(payload: str | None, published: str, source: str = "the published table") -> Check:
+    title = "identical to the published table"
+    if payload is None:
+        return Check("V8", title, "fail", "payload unknown (V4 did not decode)")
+    if payload != published:
+        return Check("V8", title, "fail", f"content differs from {source}")
+    return Check("V8", title, "pass", f"identical to {source} (payload {payload[:12]}…)")
