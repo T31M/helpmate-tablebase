@@ -58,5 +58,6 @@ def report_json(reports: list[TableReport], *, seed: int, tool: str, head: str |
                 "stats_sha256": meta.get(r.material, {}).get("stats_sha256"),
                 "payload_sha256": r.payload_sha256,
                 "seed": meta.get(r.material, {}).get("seed", seed),
-                "source_payload": meta.get(r.material, {}).get("source_payload")}
+                "source_payload": meta.get(r.material, {}).get("source_payload"),
+                "verified_head": meta.get(r.material, {}).get("verified_head", head)}
                 for r in reports}}

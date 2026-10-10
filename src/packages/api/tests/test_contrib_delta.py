@@ -105,3 +105,74 @@ def test_full_reuses_nothing(tmp_path, compressed_tables, capsys):
     assert "reused" not in capsys.readouterr().out
     rep = json.loads((st / "pr-2" / "report.json").read_text())
     assert all("reused_from" not in c for t in rep["tables"].values() for c in t["checks"])
+
+
+def test_reuse_needs_known_shas():
+    prev = {**PREV, "tables": {"KQvk": {"passed": True, "checks": [], "payload_sha256": "p"}}}
+    assert reusable(prev, "KQvk", (None, None), TOOL, SETTINGS) is None  # type: ignore[arg-type]
+
+
+def test_chain_of_revisions_names_the_head_that_ran_the_checks(tmp_path, compressed_tables, capsys):
+    hub, pair, tables = _setup(tmp_path, compressed_tables)
+    st = tmp_path / "st"
+    _run(hub, tables, st)
+    _revise(hub, pair)
+    _run(hub, tables, st)
+    hub.add_pr(2, {**pair, "KRvk.stats.json": json.dumps(json.loads(pair["KRvk.stats.json"]),
+                                                          indent=5).encode()},
+               description="Claim: #39", head="h3")
+    capsys.readouterr()
+    assert _run(hub, tables, st) == 0
+    assert "KQvk reused from h1" in capsys.readouterr().out
+    rep = json.loads((st / "pr-2" / "report.json").read_text())
+    assert rep["head"] == "h3" and rep["tables"]["KQvk"]["verified_head"] == "h1"
+    assert all(c["reused_from"] == "h1" for c in rep["tables"]["KQvk"]["checks"])
+    assert rep["tables"]["KRvk"]["verified_head"] == "h3"
+
+
+def test_interrupted_run_resumes_from_the_partial_report(tmp_path, compressed_tables, capsys,
+                                                         monkeypatch):
+    from helpmate_server.contrib import verify as V
+    hub, _, tables = _setup(tmp_path, compressed_tables)
+    st = tmp_path / "st"
+    real, calls, dead = V.verify_table, [], []
+
+    def dying(m, *args, **kw):
+        calls.append(m)
+        if m == "KRvk" and not dead:
+            dead.append(1)
+            raise KeyboardInterrupt
+        return real(m, *args, **kw)
+
+    monkeypatch.setattr(V, "verify_table", dying)
+    try:
+        _run(hub, tables, st)
+    except KeyboardInterrupt:
+        pass
+    assert calls == ["KQvk", "KRvk"]
+    assert (st / "pr-2" / "report.partial.json").exists()
+    assert not (st / "pr-2" / "report.json").exists()
+    calls.clear()
+    capsys.readouterr()
+    assert _run(hub, tables, st) == 0
+    assert calls == ["KRvk"] and "KQvk reused from h1" in capsys.readouterr().out
+    assert not (st / "pr-2" / "report.partial.json").exists()
+
+
+def test_usage_error_keeps_the_report(tmp_path, compressed_tables, monkeypatch):
+    from helpmate_server.contrib import verify as V
+    from helpmate_server.contrib.consistency import MissingSubtable
+    hub, _, tables = _setup(tmp_path, compressed_tables)
+    st = tmp_path / "st"
+    _run(hub, tables, st)
+    before = (st / "pr-2" / "report.json").read_text()
+
+    def boom(*a, **k):
+        raise MissingSubtable("no table for Kvk nor its color flip")
+
+    monkeypatch.setattr(V, "verify_table", boom)
+    try:
+        _run(hub, tables, st, "--full")
+    except Exception:  # noqa: BLE001 - UsageError surfaces as exit or exception
+        pass
+    assert (st / "pr-2" / "report.json").read_text() == before

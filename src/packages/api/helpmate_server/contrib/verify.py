@@ -83,7 +83,7 @@ def reusable(prev: dict | None, material: str, shas: tuple[str, str], tool: str,
     if any(prev.get(k) != settings.get(k) for k in REUSE_SETTINGS):
         return None
     entry = prev.get("tables", {}).get(material)
-    if not entry or not entry.get("passed"):
+    if not entry or not entry.get("passed") or None in shas:
         return None
     if (entry.get("hm_sha256"), entry.get("stats_sha256")) != shas:
         return None
@@ -425,16 +425,15 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         reports: list = []
         table_meta: dict[str, dict] = {}
         subtables_from: list[int] = []
-        prev = None
-        old = d / "report.json"
-        if old.exists():
-            try:
-                prev = json.loads(old.read_text())
-            except ValueError:
-                prev = None
-            old.replace(d / "report.prev.json")
-        if getattr(a, "full", False) or not isinstance(prev, dict):
-            prev = None
+        sources: list[dict] = []
+        if not getattr(a, "full", False):
+            for name in ("report.json", "report.partial.json"):
+                try:
+                    src_rep = json.loads((d / name).read_text())
+                except (OSError, ValueError):
+                    continue
+                if isinstance(src_rep, dict) and src_rep.get("head"):
+                    sources.append(src_rep)
         n = len(pr.materials)
         try:
             if not any(_unsafe(f) for f in pr.files):
@@ -452,9 +451,14 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
                         pub, src = None, "the published table"
                     shas = (recorded.get(f"{m}.hm", {}).get("sha256"),
                             recorded.get(f"{m}.stats.json", {}).get("sha256"))
-                    entry = reusable(prev, m, shas, tool, opts.settings(), pub)
-                    if entry is not None and prev is not None:
-                        head = str(prev.get("head"))
+                    entry, verified = None, ""
+                    for src_rep in sources:
+                        entry = reusable(src_rep, m, shas, tool, opts.settings(), pub)
+                        if entry is not None:
+                            verified = str(entry.get("verified_head") or src_rep["head"])
+                            break
+                    if entry is not None:
+                        head = verified
                         reports.append(TableReport.from_json(m, entry, head))
                         seed_used = entry.get("seed")
                         print(f"[{i}/{n}] {m} reused from {head[:7]}", flush=True)
@@ -465,8 +469,13 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
                         reports.append(verify_table(m, d / "overlay", opts, version,
                                                     published=pub, source=src, progress=show))
                         seed_used = opts.resolved_seed()
+                        head = pr.head or ""
                     table_meta[m] = {"hm_sha256": shas[0], "stats_sha256": shas[1],
-                                     "seed": seed_used, "source_payload": pub}
+                                     "seed": seed_used, "source_payload": pub,
+                                     "verified_head": head}
+                    (d / "report.partial.json").write_text(json.dumps(report_json(
+                        reports, seed=opts.resolved_seed(), tool=tool, head=pr.head, pr=pr.num,
+                        settings=opts.settings(), table_meta=table_meta), indent=2))
         except MissingPublished as exc:
             raise UsageError(f"{exc.material} is published but not in {tables}; "
                              "sync the corpus first") from exc
@@ -483,7 +492,10 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
                          settings=opts.settings(), subtables_from=subtables_from,
                          table_meta=table_meta)
         (d / "report.md").write_text(md)
+        if (d / "report.json").exists():
+            (d / "report.json").replace(d / "report.prev.json")
         (d / "report.json").write_text(json.dumps(js, indent=2))
+        (d / "report.partial.json").unlink(missing_ok=True)
         print(md)
         if js["result"] != "pass":
             rc = 1
