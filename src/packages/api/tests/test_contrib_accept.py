@@ -21,6 +21,7 @@ class FakeGit:
         if name == self.fail_at:
             raise RuntimeError(f"{name} failed")
 
+    def writes(self): return [c for c in self.calls if c[0] != "main_file"]   # reads of origin/main aside
     def clean(self): return True
     def current(self): return "main"
     def dirty_paths(self): return []
@@ -838,7 +839,7 @@ def test_any_other_conflict_stops_before_copying(tmp_path, capsys, files):
     assert _run(checkout, staging, hub, gh, tables, git) == 2
     err = capsys.readouterr().err
     assert all(f in err for f in files) and "#2" in err
-    assert hub.copies == [] and hub.closed == [] and hub.commits == [] and git.calls == []
+    assert hub.copies == [] and hub.closed == [] and hub.commits == [] and git.writes() == []
 
 
 def test_head_changed_before_the_copy_is_refused(tmp_path, capsys):

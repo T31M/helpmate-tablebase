@@ -337,8 +337,13 @@ def _identity_claim(pr, index, reg: Registry):
     return None
 
 
-def _notes(credited: list[str], held: list[str], decisions: dict[str, Decision]) -> list[str]:
+def _notes(credited: list[str], held: list[str], decisions: dict[str, Decision],
+           own: list[str] = ()) -> list[str]:
+    """`own`: materials this PR's delivery is already in the dataset and credited for (an
+    earlier run of a PR that stayed open for held material)."""
     out = []
+    if own:
+        out.append(f"{', '.join(own)}: already in the dataset from this PR.")
     if credited:
         out.append(f"{', '.join(credited)}: identical to the published table — credited as co-producer.")
     for m in held:
@@ -358,6 +363,28 @@ def _partial_comment(ref: str, head: str, already: bool, published: list[str], n
     return "\n\n".join([first, *notes, "Thank you!"])
 
 
+def _own_deliveries(regs: list[Registry], pulls: dict[int, PullRequest]) -> dict[str, list[str]]:
+    """PR -> its materials that a registry already credits to this very PR (published from it,
+    or listed among the producers with its number): a rerun of a PR that stayed open for held
+    material must not credit it again for its own file. `regs`: origin/main's registry (the
+    earlier run's docs PR landed there) and the checkout's."""
+    out = {}
+    for n, pr in pulls.items():
+        out[str(n)] = [m for m in pr.materials if any(
+            (entry := reg.tables.get(m)) is not None and (entry.get("published_from") == n or any(
+                p.get("hf_pr") == n for p in entry.get("producers", [])))
+            for reg in regs)]
+    return out
+
+
+def _manifest_key(manifest: dict, materials) -> str:
+    """A hash of what the manifest publishes for `materials`: decisions taken under another
+    manifest (another run published one of them meanwhile) are taken again."""
+    files = manifest.get("files", {})
+    rows = sorted((m, (files.get(f"{m}.hm") or {}).get("sha256")) for m in set(materials))
+    return hashlib.sha256(json.dumps(rows).encode()).hexdigest()
+
+
 def _decisions(state: dict) -> dict[str, Decision] | None:
     raw = state.get("decisions")
     return None if raw is None else {m: Decision(**d) for m, d in raw.items()}
@@ -374,6 +401,9 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
     if not binary or not Path(binary).is_file():
         return _err(f"no helpmate binary {'at ' + binary if binary else 'on PATH'}: "
                     "the material pages need one; pass --binary PATH")
+    if contributor and len(prs) > 1:
+        return _err("--contributor applies to every PR of a run; accept the PR that needs it on "
+                    "its own with --contributor LOGIN")
     release = list(release or [])
     not_materials = [m for m in release if canonical(m) != m]
     if not_materials:
@@ -400,6 +430,11 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
     reg_path = checkout / "data" / "contributions.json"
     # What each PR contained, as validated: after the merge the Hub is never asked again.
     stored: dict[str, dict] = state.setdefault("pulls", {})
+
+    def fix(n: int) -> str:
+        """How to name the PR's contributor: --contributor holds for the whole run."""
+        return ("pass --contributor LOGIN" if len(prs) == 1 else
+                f"accept PR #{n} on its own with --contributor LOGIN")
 
     if "merge" not in state["done"]:
         index = load_index(gh)
@@ -436,17 +471,15 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
             claim = _identity_claim(pr, index, reg)
             why = ownership_conflict(pr, claim, reg) if claim and not contributor else None
             if why:
-                return _err(f"PR #{n}: {why} (the claims bot shows this as a conflict); "
-                            "pass --contributor LOGIN")
+                return _err(f"PR #{n}: {why} (the claims bot shows this as a conflict); {fix(n)}")
             who = resolve_contributor(reg, pr, claim, contributor)
             if who is None:
-                return _err(f"PR #{n} by HF user {pr.author}: no GitHub identity found; "
-                            "pass --contributor LOGIN")
+                return _err(f"PR #{n} by HF user {pr.author}: no GitHub identity found; {fix(n)}")
             known = reg.contributors.get(who.key)
             other = known.github if known else seen_keys.get(who.key)
             if (known or who.key in seen_keys) and (other or "").lower() != (who.github or "").lower():
                 return _err(f"PR #{n}: registry key {who.key!r} already belongs to GitHub user "
-                            f"{other!r}, not {who.github!r}; pass --contributor with the right login "
+                            f"{other!r}, not {who.github!r}; {fix(n)} with the right login "
                             "or fix data/contributions.json")
             seen_keys[who.key] = who.github
             # Anonymity is per person and permanent: an anonymous claim form by this person
@@ -461,10 +494,12 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
         save()
         # The preflight: every material is decided before anything is written to the Hub.
         decisions = _decisions(state)
-        heads = {str(n): stored[str(n)]["head"] for n in prs}
+        heads: dict[str, str | None] = {str(n): stored[str(n)]["head"] for n in prs}
+        heads["manifest"] = _manifest_key(manifest, [m for n in prs
+                                                     for m in PullRequest(n, **stored[str(n)]).materials])
         if decisions is not None and (release or state.get("decision_heads") != heads):
-            # a PR was revised (and verified again) since the decisions, or the maintainer
-            # overrides a claim now: decide again from the current reports
+            # a PR was revised (and verified again) since the decisions, another run published
+            # one of the materials, or the maintainer overrides a claim now: decide again
             decisions = None
             state.pop("decisions", None)
         if decisions is None:
@@ -486,6 +521,9 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
             conflicts = [f"{m}: {d.reason}" for m, d in sorted(decisions.items()) if d.kind == "conflict"]
             if conflicts:
                 return _err("; ".join(conflicts) + "; nothing merged")
+            on_main = Registry(reg_path, json.loads(git.main_file("data/contributions.json")))
+            state["own"] = _own_deliveries([on_main, reg],
+                                           {n: PullRequest(n, **stored[str(n)]) for n in prs})
             for m in release:
                 c = index.claim_for(m)
                 print(f"--release {m}: " + (f"overrides claim #{c.issue} by {c.author}" if c else
@@ -505,23 +543,26 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
             state["decision_heads"] = heads
             save()
         decided: dict[str, Decision] = decisions
+        owned: dict[str, list[str]] = state.get("own", {})
 
-        def plan(n: int) -> tuple[PullRequest, list[str], list[str], list[str]]:
-            """(the PR, materials published from it, held, credited as co-producer)"""
+        def plan(n: int) -> tuple[PullRequest, list[str], list[str], list[str], list[str]]:
+            """(the PR, materials published from it, held, credited as co-producer, already
+            credited to this PR by an earlier run)"""
             pr = PullRequest(n, **stored[str(n)])
+            own = owned.get(str(n), [])
             pub = [m for m in pr.materials if decided[m].publish_from == n]
             held = [m for m in pr.materials if decided[m].kind == "held"]
-            return pr, pub, held, [m for m in pr.materials if m not in pub and m not in held]
+            return pr, pub, held, [m for m in pr.materials if m not in pub + held + own], own
 
         # PRs that publish go first: no "credited as co-producer" before the published file landed
         for n in sorted(prs, key=lambda n: (not plan(n)[1], n)):
             if n in merged:
                 continue
-            pr, pub, held, credited = plan(n)
+            pr, pub, held, credited, own = plan(n)
             verified = stored[str(n)]["head"]
             p = people[n]
             credit = "an anonymous contributor" if p.get("anonymous") else p["display"]
-            notes = _notes(credited, held, decided)
+            notes = _notes(credited, held, decided, own)
 
             def record(ref: str, already: bool, n: int = n, partial: bool = True,
                        close: bool = not held) -> None:
@@ -544,7 +585,7 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                 if now != verified:  # a push between validation and this merge
                     return _err(f"PR #{n} changed after verification (verified {verified}, "
                                 f"now {now}); run verify --pr {n} again")
-                if pub and not held and not credited:  # everything is new and published from here
+                if pub and not held and not credited and not own:  # everything new, published from here
                     try:
                         hub.merge(n)
                     except HubConflict as exc:
@@ -577,7 +618,10 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
     decisions = _decisions(state) or {m: Decision("new", n, [n], None, "")
                                       for n, pr in pulls.items() for m in pr.materials}
     published = {n: [m for m in pr.materials if decisions[m].publish_from == n] for n, pr in pulls.items()}
-    recorded = {n: [m for m in pr.materials if decisions[m].kind in ("new", "reproduction")]
+    # a PR's own earlier delivery (published from it or credited) is not recorded again
+    own = state.get("own", {})
+    recorded = {n: [m for m in pr.materials if decisions[m].kind in ("new", "reproduction")
+                    and m not in own.get(str(n), [])]
                 for n, pr in pulls.items()}
     mats = [m for n in prs for m in published[n]]
     if not any(recorded.values()):  # everything held: nothing changed on main or in the credits

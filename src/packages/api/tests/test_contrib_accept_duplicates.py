@@ -252,7 +252,7 @@ def test_two_prs_without_a_claim_publish_the_earliest(tmp_path):
 
 def _nothing_written(hub, gh, git):
     return (hub.copies == [] and hub.merged == [] and hub.closed == [] and hub.comments == []
-            and hub.commits == [] and gh.posted == [] and git.calls == [])
+            and hub.commits == [] and gh.posted == [] and git.writes() == [])
 
 
 def test_content_differing_from_the_published_table_stops_before_any_write(tmp_path, capsys, published_hash):
@@ -287,7 +287,7 @@ def test_someone_elses_claim_holds_unpublished_material_and_leaves_the_pr_open(t
     assert num == 2 and "held for claim #39 by @popeye37" in comment
     assert hub.prs[2][0].status == "open"
     assert "KRRvkqq" not in _reg(checkout)["tables"] and not (tables / "KRRvkqq.hm").exists()
-    assert git.calls == [] and gh.posted == []                    # no docs PR, no claim comment
+    assert git.writes() == [] and gh.posted == []                 # no docs PR, no claim comment
     assert not list(staging.glob("accept-*.json"))
 
 
@@ -460,3 +460,86 @@ def test_release_decides_again_over_stored_decisions(tmp_path):
     assert _accept([2, 3], checkout, staging, hub, gh, tables, release=["KRRvkqq"]) == 0
     assert hub.merged == [2, 3] and hub.comments == []
     assert _reg(checkout)["tables"]["KRRvkqq"]["published_from"] == 2
+
+
+def _claim_issue(gh, num, author, body):
+    gh.issues[num] = {"number": num, "title": f"claim: {body}", "body": body, "user": {"login": author},
+                      "created_at": "2026-09-21T00:00:00Z", "labels": [], "state": "open"}
+    gh.labels[num], gh.issue_comments[num] = set(), []
+
+
+@pytest.mark.parametrize("stale_checkout", [False, True])
+def test_rerun_of_a_partially_published_pr_does_not_credit_it_for_its_own_file(tmp_path, published_hash,
+                                                                               stale_checkout):
+    checkout, staging, hub, gh, tables = _base(tmp_path)              # KRRvkqq: claim #39 by popeye37
+    _claim_issue(gh, 40, "T31M", "KQvkqq KQvkqr")                     # stays open after run 1
+    del hub.prs[2]
+    _add_pr(hub, staging, 2, ["KRRvkqq", "KQvkqq"], author="T31M")
+    assert _accept([2], checkout, staging, hub, gh, tables) == 0           # run 1: KQvkqq out, KRRvkqq held
+    assert [c["files"] for c in hub.copies] == [["KQvkqq.hm", "KQvkqq.stats.json"]]
+    assert hub.prs[2][0].status == "open"
+    posted, n_comments = len(gh.posted), len(hub.comments)
+    _add_pr(hub, staging, 3, ["KRRvkqq"], author="popeye37", gv="0.21.0")
+    git = FakeGit()
+    if stale_checkout:   # run 1's docs PR is on origin/main only; the maintainer has not pulled
+        reg_path = checkout / "data" / "contributions.json"
+        git.main_registry = reg_path.read_bytes()
+        reg = json.loads(git.main_registry)
+        del reg["tables"]["KQvkqq"]
+        reg_path.write_text(json.dumps(reg))
+    assert _accept([2, 3], checkout, staging, hub, gh, tables, git) == 0   # run 2: the holder delivers
+    assert hub.merged == [3] and len(hub.copies) == 1
+    ((num, closing),) = hub.closed
+    assert num == 2 and "KRRvkqq: identical" in closing and "co-producer" in closing
+    credit_line = next(line for line in closing.splitlines() if "co-producer" in line)
+    assert credit_line.startswith("KRRvkqq: identical")
+    assert "KQvkqq" in closing                                            # mentioned neutrally only
+    assert len(hub.comments) == n_comments
+    for issue, body in gh.posted[posted:]:
+        assert "KQvkqq" not in body, (issue, body)
+    title = next(c[1] for c in git.calls if c[0] == "commit_all").splitlines()[0]
+    assert title.startswith("Data: 1 table(s), 1 reproduction(s)"), title
+    if not stale_checkout:   # (FakeGit's reset does not bring origin/main's registry back)
+        assert _producers(checkout, "KQvkqq") == [("T31M", 2)]
+    assert _producers(checkout, "KRRvkqq") == [("T31M", 2), ("popeye37", 3)]
+
+
+def test_a_manifest_change_since_the_decisions_forces_a_new_decision(tmp_path, published_hash):
+    checkout, staging, hub, gh, tables = _base(tmp_path)              # #2 by T31M, claim #39 popeye37
+    _add_pr(hub, staging, 3, ["KRRvkqq"], author="popeye37", gv="0.21.0")
+    real = hub.merge
+
+    def fail(num):
+        raise RuntimeError("network")
+    hub.merge = fail
+    with pytest.raises(RuntimeError):
+        _accept([2, 3], checkout, staging, hub, gh, tables)
+    assert json.loads((staging / "accept-2-3.json").read_text())["decisions"]["KRRvkqq"]["publish_from"] == 3
+    hub.merge = real
+    _publish(hub, checkout, tables, publisher="T31M", hf_pr=1)         # another run published it meanwhile
+    assert _accept([2, 3], checkout, staging, hub, gh, tables) == 0
+    assert hub.merged == [] and hub.copies == []                       # the published file stays
+    assert (tables / "KRRvkqq.hm").read_bytes() == b"published"
+    assert sorted(n for n, _ in hub.closed) == [2, 3]
+    assert _reg(checkout)["tables"]["KRRvkqq"]["published_from"] == 1
+
+
+def test_contributor_with_more_than_one_pr_is_refused(tmp_path, capsys):
+    checkout, staging, hub, gh, tables = _base(tmp_path)
+    _add_pr(hub, staging, 3, ["KQvkqq"], author="popeye37")
+    git = FakeGit()
+    assert _accept([2, 3], checkout, staging, hub, gh, tables, git, contributor="T31M") == 2
+    err = capsys.readouterr().err
+    assert "--contributor" in err and "on its own" in err
+    assert _nothing_written(hub, gh, git)
+
+
+def test_multi_pr_run_suggests_accepting_the_pr_on_its_own_with_contributor(tmp_path, capsys):
+    checkout, staging, hub, gh, tables = _base(tmp_path)
+    _add_pr(hub, staging, 3, ["KQvkqq"], author="someone", description="Claim: #39\nGitHub: @someone")
+    assert _accept([2, 3], checkout, staging, hub, gh, tables) == 2
+    err = capsys.readouterr().err
+    assert "accept PR #3 on its own with --contributor LOGIN" in err
+    capsys.readouterr()
+    assert _accept([3], checkout, staging, hub, gh, tables) == 2
+    assert "pass --contributor LOGIN" in capsys.readouterr().err

@@ -290,7 +290,7 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   manifest; skipped with a message if `--tables` is incomplete), then comment on and close the finished claims. It
   is resumable: rerun the same command after a failure. Use
   `--contributor LOGIN` when neither the PR description nor the claim issue
-  names one.
+  names one; it applies to every PR of a run, so accept that PR on its own.
   The docs PR also carries the accepted materials' site pages
   (`site/data/material/<M>.json`, mined by `tools/build_problems.py`), so accept
   needs the `helpmate` binary on `PATH` (`--binary PATH` to point elsewhere).
