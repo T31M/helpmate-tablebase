@@ -61,6 +61,9 @@ def add_parsers(sub) -> None:
                          "(after asking the claim holder); prints the claim each one overrides")
     ac.add_argument("--no-pages", action="store_true",
                     help="do not build the material pages now (helpmate-tables pages does it later)")
+    ac.add_argument("--plan", action="store_true",
+                    help="show what accept would do (decisions, PR actions, credits, CHANGELOG lines) "
+                         "and write nothing; exit 1 if a material conflicts")
     pg = sub.add_parser("pages", help="(maintainer) build material pages in parallel jobs and ship them as a docs PR")
     pg.add_argument("--tables", required=True, metavar="DIR")
     pw = pg.add_mutually_exclusive_group(required=True)
@@ -167,7 +170,7 @@ def run(a: argparse.Namespace, hub_factory=None, gh_factory=None, git_factory=No
             return 0
         if a.cmd in ("accept", "status"):
             from datetime import date
-            from .accept import Git, accept, status
+            from .accept import Git, accept, plan_accept, status
             from .github import GitHub
             from .hf import Hub
             from .registry import Registry
@@ -180,7 +183,13 @@ def run(a: argparse.Namespace, hub_factory=None, gh_factory=None, git_factory=No
                 print(status(hub, gh, Registry.load(checkout / "data" / "contributions.json"),
                              Path(a.staging).expanduser(), checkout))
                 return 0
-            return accept(a.pr, hub=hub, gh=gh, git=Git(checkout), checkout=checkout,
+            git = (git_factory or Git)(checkout)
+            if a.plan:
+                return plan_accept(a.pr, hub=hub, gh=gh, git=git, checkout=checkout,
+                                   tables=Path(a.tables).expanduser(), staging=Path(a.staging).expanduser(),
+                                   contributor=a.contributor, today=date.today().isoformat(),
+                                   binary=_absolute_binary(a.binary), release=a.release)
+            return accept(a.pr, hub=hub, gh=gh, git=git, checkout=checkout,
                           tables=Path(a.tables).expanduser(), staging=Path(a.staging).expanduser(),
                           contributor=a.contributor, today=date.today().isoformat(),
                           binary=_absolute_binary(a.binary), release=a.release,

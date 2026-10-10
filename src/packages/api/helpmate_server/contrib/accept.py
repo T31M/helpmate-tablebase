@@ -913,6 +913,103 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
     state_path.unlink()
     return 0
 
+
+_ACTIONS: dict[str, str] = {"merge": "merge", "copy_close": "partial copy + close",
+                            "copy_open": "partial copy, stays open", "comment": "comment only, stays open",
+                            "close": "close with thank-you"}
+
+
+def _material_line(n: int, m: str, d: Decision, own: list[str]) -> str:
+    if d.kind == "conflict":
+        return f"CONFLICT: {d.reason}"
+    if m in own:
+        return "already in the dataset from this PR (an earlier run)"
+    if d.kind == "held":
+        return d.reason
+    if d.kind == "reproduction":
+        return "reproduction of published table -> producer"
+    if d.publish_from == n:
+        return f"publish from #{n}" + (" (released by the maintainer)"
+                                       if d.reason.endswith("released by the maintainer") else "")
+    return f"co-producer (file published from #{d.publish_from})"
+
+
+def plan_accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, staging: Path,
+                contributor: str | None, today: str, binary: str | None,
+                release: list[str] | None = None) -> int:
+    """accept --plan: print what `accept` would do with `prs` and write nothing anywhere.
+    Runs accept's own preparation (`_prepare`, with a no-op save) and crediting (`_credit`, on
+    an in-memory copy of origin/main's registry). An interrupted run's state file is read,
+    never written. rc 0: no conflict; 1: a material conflicts; 2: what accept refuses."""
+    release = list(release or [])
+    rc = _check_args(prs, contributor, binary, release)
+    if rc is not None:
+        return rc
+    state_path = _state_path(staging, prs)
+    state = json.loads(state_path.read_text()) if state_path.exists() else {"done": []}
+    out = [f"accept plan for HF PR(s) {', '.join(f'#{n}' for n in prs)} (nothing is written)"]
+    if "merge" in state["done"]:
+        rest = [s for s in STEPS if s not in state["done"]]
+        out.append(f"an interrupted run ({state_path.name}) has finished the merge step; "
+                   f"accept resumes with: {', '.join(rest)}")
+        stored = state["pulls"]
+        people = {int(k): v for k, v in state["people"].items()}
+        decisions = _merged_decisions(state, {n: PullRequest(n, **stored[str(n)]) for n in prs})
+        conflicts: list[str] = []
+    else:
+        prep = _prepare(prs, state, lambda: None, hub=hub, gh=gh, git=git, checkout=checkout,
+                        tables=tables, staging=staging, contributor=contributor, release=release)
+        if isinstance(prep, int):
+            return prep
+        stored = state["pulls"]
+        people, decisions, conflicts = prep.people, prep.decisions, prep.conflicts
+    pulls = {n: PullRequest(n, **stored[str(n)]) for n in prs}
+    owned: dict[str, list[str]] = {} if conflicts else state.get("own", {})
+    done = set(state.get("merged", [])) | {int(k) for k in state.get("copied", {})}
+    for n in sorted(prs):
+        pr, p, own = pulls[n], people[n], owned.get(str(n), [])
+        who = p["display"] + (f" (@{p['github']})" if p["github"] else "") + (
+            ", anonymous" if p.get("anonymous") else "")
+        out += ["", f"HF PR #{n} by HF user {pr.author}: contributor {who}"
+                + (f", claim #{p['claim']}" if p["claim"] else "")]
+        out += [f"  {m}: {_material_line(n, m, decisions[m], own)}" for m in pr.materials]
+        what = ("nothing: the conflict stops the run before any write" if conflicts else
+                "done by the interrupted run" if n in done else _ACTIONS[_pr_plan(pr, decisions, own)[3]])
+        out.append(f"  -> {what}")
+    if conflicts:
+        out += ["", "CONFLICT: nothing would be merged:", *(f"  {c}" for c in conflicts)]
+        print("\n".join(out))
+        return 1
+    published, recorded = _outcome(decisions, pulls, owned)
+    if not any(recorded.values()):
+        out += ["", "nothing changes on main or in the credits (every material is held or "
+                    "credited already)"]
+        print("\n".join(out))
+        return 0
+    # the registry accept credits: origin/main's (its docs step starts from a fresh origin/main)
+    reg = Registry(checkout / "data" / "contributions.json",
+                   json.loads(git.main_file("data/contributions.json")))
+    before = {m: {(q["contributor"], q["hf_pr"]) for q in reg.tables.get(m, {}).get("producers", [])}
+              for ms in recorded.values() for m in ms}
+
+    def sidecar(n: int, m: str) -> Path:   # still staged, unless an interrupted run moved it
+        staged = staging / f"pr-{n}" / "files" / f"{m}.stats.json"
+        return staged if staged.exists() else tables / f"{m}.stats.json"
+
+    lines = _credit(reg, prs=prs, pulls=pulls, people=people, published=published, recorded=recorded,
+                    staging=staging, tables=tables, today=today, sidecar=sidecar)
+    out += ["", "registry producers to add:"]
+    for m in sorted(before):
+        added = [q for q in reg.tables[m]["producers"] if (q["contributor"], q["hf_pr"]) not in before[m]]
+        if added:
+            out.append(f"  {m}: " + ", ".join(
+                f"{q['contributor']} " + (f"(HF PR #{q['hf_pr']})" if q["hf_pr"] else "(published by the maintainer)")
+                for q in added))
+    out += ["", "CHANGELOG lines:", *(f"  {line}" for line in lines or ["(none)"])]
+    print("\n".join(out))
+    return 0
+
+
 def status(hub, gh, registry, staging: Path, checkout: Path) -> str:
     index = load_index(gh)
     rows = ["| HF PR | author | materials | claim | verification | |", "|---|---|---|---|---|---|"]
