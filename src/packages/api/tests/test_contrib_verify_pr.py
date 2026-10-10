@@ -176,7 +176,7 @@ def test_truncated_staged_file_is_redownloaded(tmp_path, compressed_tables):
     assert json.loads((staging / "pr-2" / "report.json").read_text())["result"] == "pass"
 
 
-def test_new_head_with_same_sizes_is_redownloaded(tmp_path, compressed_tables):
+def test_new_head_with_identical_files_keeps_them_and_rebinds_the_head(tmp_path, compressed_tables):
     hub = _hub_with_kqvk_pr(compressed_tables)
     tables, staging = _tables_without_kqvk(tmp_path, compressed_tables), tmp_path / "st"
     _run_pr(hub, tables, staging)
@@ -185,9 +185,9 @@ def test_new_head_with_same_sizes_is_redownloaded(tmp_path, compressed_tables):
     pr.head = "h2"
     hub.prs[2] = (pr, files)
     _run_pr(hub, tables, staging)
-    assert len(hub.downloads) > n
+    assert len(hub.downloads) == n          # same content: nothing is fetched again
     assert json.loads((staging / "pr-2" / "report.json").read_text())["head"] == "h2"
-    assert (staging / "pr-2" / "files" / ".head").read_text() == "h2"
+    assert json.loads((staging / "pr-2" / "files" / ".files.json").read_text())["head"] == "h2"
 
 
 def test_unsafe_file_name_downloads_nothing_and_fails(tmp_path, compressed_tables):

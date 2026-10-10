@@ -209,8 +209,8 @@ def _verified_files(staging: Path, exclude: int, open_heads: dict[int, str | Non
         d = staging / f"pr-{num}"
         if num == exclude or head is None:
             continue
-        rep, marker = _passed_report(d), d / "files" / ".head"
-        if rep is not None and rep.get("head") == head and marker.exists() and marker.read_text() == head:
+        rep = _passed_report(d)
+        if rep is not None and rep.get("head") == head and _is_staged_for(d / "files", head):
             out[num] = d / "files"
     return out
 
@@ -256,29 +256,71 @@ def _unsafe(name: str) -> bool:
     return "/" in name or "\\" in name or name.startswith(".")
 
 
-def _staged_ok(have: Path, head: str | None, name: str, size: int) -> bool:
-    marker = have / ".head"
-    if head is not None and (not marker.exists() or marker.read_text() != head):
-        return False
-    return (have / name).exists() and (have / name).stat().st_size == size
+def _files_record(files_dir: Path) -> dict:
+    try:
+        rec = json.loads((files_dir / ".files.json").read_text())
+        if isinstance(rec, dict) and isinstance(rec.get("files"), dict):
+            return rec
+    except (OSError, ValueError):
+        pass
+    return {"head": None, "files": {}}
 
 
-def _stage(hub, pr, files_dir: Path) -> None:
-    """Download what is missing or the wrong size, bound to the PR's head."""
-    marker = files_dir / ".head"
-    if pr.head is not None and files_dir.exists() and (
-            not marker.exists() or marker.read_text() != pr.head):
-        shutil.rmtree(files_dir)  # staged from another revision
+def _is_staged_for(files_dir: Path, head: str | None) -> bool:
+    return head is not None and _files_record(files_dir).get("head") == head
+
+
+def _staged_ok(files_dir: Path, name: str, want: tuple[int, str]) -> bool:
+    p = files_dir / name
+    rec = _files_record(files_dir)["files"].get(name)
+    return p.exists() and p.stat().st_size == want[0] and rec is not None and rec.get("sha256") == want[1]
+
+
+def _sha256_file(p: Path) -> str:
+    import hashlib
+
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 24), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _stage(hub, pr, files_dir: Path) -> list[str]:
+    """Download what is missing or changed at the PR's head; keep unchanged files.
+    Returns the names actually downloaded."""
     files_dir.mkdir(parents=True, exist_ok=True)
-    if pr.head is not None:
-        marker.write_text(pr.head)  # before downloading: an interrupted run resumes
     revision = pr.head or f"refs/pr/{pr.num}"
-    sizes = hub.file_sizes(pr.files, revision)
-    for f in pr.files:
-        p = files_dir / f
-        if not (p.exists() and p.stat().st_size == sizes[f]):
-            p.unlink(missing_ok=True)
-            hub.download(f, revision, files_dir)
+    tree = hub._tree(revision)
+    want = {f: tree[f] for f in pr.files}
+    rec = _files_record(files_dir)
+    legacy = files_dir / ".head"
+    if legacy.exists() and not (files_dir / ".files.json").exists():
+        rec = {"head": None, "files": {
+            f.name: {"sha256": _sha256_file(f), "size": f.stat().st_size}
+            for f in files_dir.iterdir() if f.is_file() and not f.name.startswith(".")}}
+    legacy.unlink(missing_ok=True)
+    for f in files_dir.iterdir():
+        if f.is_file() and not f.name.startswith(".") and f.name not in want:
+            f.unlink()
+            rec["files"].pop(f.name, None)
+    rec["head"] = pr.head
+
+    def save() -> None:
+        (files_dir / ".files.json").write_text(json.dumps(rec, indent=1, sort_keys=True))
+
+    save()  # before downloading: an interrupted run resumes
+    fetched = []
+    for name, (size, sha) in sorted(want.items()):
+        p = files_dir / name
+        if p.exists() and p.stat().st_size == size and rec["files"].get(name, {}).get("sha256") == sha:
+            continue
+        p.unlink(missing_ok=True)
+        hub.download(name, revision, files_dir)
+        rec["files"][name] = {"sha256": sha, "size": size}
+        save()
+        fetched.append(name)
+    return fetched
 
 
 def _gib(n: int) -> str:
@@ -301,9 +343,10 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         if pr.status != "open":
             print(f"error: PR #{num} is {pr.status}", file=sys.stderr)
             return 2
-        sizes = hub.file_sizes([f for f in pr.files if not _unsafe(f)], pr.head or f"refs/pr/{num}")
+        tree = hub._tree(pr.head or f"refs/pr/{num}")
+        sizes = {f: tree[f][0] for f in pr.files if not _unsafe(f)}
         have = staging / f"pr-{num}" / "files"
-        todo = {f: s for f, s in sizes.items() if not _staged_ok(have, pr.head, f, s)}
+        todo = {f: tree[f][0] for f in sizes if not _staged_ok(have, f, tree[f])}
         if any(_unsafe(f) for f in pr.files):
             print(f"  unsafe file names in PR #{num}: nothing will be downloaded")
         total += sum(todo.values())

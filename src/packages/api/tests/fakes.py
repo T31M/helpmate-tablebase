@@ -63,6 +63,11 @@ class FakeHub:
             return int(revision.rsplit("/", 1)[1])
         return next(n for n, (p, _) in self.prs.items() if p.head == revision)
 
+    def _tree(self, revision):
+        import hashlib
+        tree = self._pr_tree(self._num(revision))
+        return {k: (len(v), hashlib.sha256(v).hexdigest()) for k, v in tree.items()}
+
     def file_sizes(self, files, revision):
         tree = self._pr_tree(self._num(revision))
         return {f: len(tree[f]) for f in files if f in tree}
