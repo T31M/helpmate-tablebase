@@ -302,7 +302,8 @@ def test_material_already_in_the_manifest_needs_a_report_with_a_payload_hash(tmp
     assert hub.merged == [] and "no payload hash" in capsys.readouterr().err
 
 
-def test_same_material_in_two_prs_of_a_batch_is_refused(tmp_path, capsys):
+def test_same_material_in_two_prs_without_payload_hashes_is_refused(tmp_path, capsys):
+    """Two deliveries can only be compared by their payload hash; reports from before it are refused."""
     checkout, staging, hub, gh, tables = _two_prs(tmp_path)
     files = dict(hub.prs[2][1])
     hub.healed = True
@@ -310,7 +311,8 @@ def test_same_material_in_two_prs_of_a_batch_is_refused(tmp_path, capsys):
     for k, v in files.items():
         (staging / "pr-3" / "files" / k).write_bytes(v)
     assert _run2(checkout, staging, hub, gh, tables, FakeGit()) == 2
-    assert hub.merged == [] and "KRRvkqq" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert hub.merged == [] and "KRRvkqq" in err and "payload" in err
 
 
 def test_unknown_contributor_stops_before_merging(tmp_path, capsys):

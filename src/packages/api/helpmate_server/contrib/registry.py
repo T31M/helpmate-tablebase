@@ -73,7 +73,8 @@ class Registry:
             return
         producers.append({"contributor": contributor, "hf_pr": hf_pr, "date": date,
                           "generator_version": generator_version})
-        producers.sort(key=lambda p: p["hf_pr"])
+        # delivery order; the maintainer's own table (hf_pr None) came first
+        producers.sort(key=lambda p: (p["hf_pr"] is not None, p["hf_pr"] or 0))
 
     def producers_of(self, material: str) -> list[str]:
         """Contributor keys of every producer of `material`, in delivery order."""

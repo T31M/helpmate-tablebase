@@ -35,6 +35,7 @@ DOCS_PATHS = ("CHANGELOG.md", "data/contributions.json", "README.md", "docs/CONT
               "site/data/corpus.json", "site/data/stats.json", ".all-contributorsrc", "site/data/material",
               "site/data/index.json", "site/data/themes.json")
 _NO_CHECKS = "no checks reported"
+MAINTAINER = "maintainer"   # producer key of the published tables that are not contributions
 _NO_GLOBAL = {"GIT_CONFIG_GLOBAL": "/dev/null"}   # the global config rewrites HTTPS to SSH
 _GH_CREDENTIALS = "credential.helper=!gh auth git-credential"
 
@@ -458,6 +459,12 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
         save()
         # The preflight: every material is decided before anything is written to the Hub.
         decisions = _decisions(state)
+        heads = {str(n): stored[str(n)]["head"] for n in prs}
+        if decisions is not None and (release or state.get("decision_heads") != heads):
+            # a PR was revised (and verified again) since the decisions, or the maintainer
+            # overrides a claim now: decide again from the current reports
+            decisions = None
+            state.pop("decisions", None)
         if decisions is None:
             from .checks import MissingPublished
             from .verify import PublishedHashes
@@ -493,6 +500,7 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                             f"run verify --pr {n} again")
         if "decisions" not in state:
             state["decisions"] = {m: asdict(d) for m, d in decisions.items()}
+            state["decision_heads"] = heads
             save()
         decided: dict[str, Decision] = decisions
 
@@ -627,10 +635,17 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                 for m in recorded[n]:
                     if m in published[n]:
                         continue
-                    if m not in reg.tables:
-                        print(f"warning: {m} is published but not in data/contributions.json (not a "
-                              f"contribution); PR #{n}'s reproduction is not recorded", file=sys.stderr)
-                        continue
+                    if m not in reg.tables:  # one of the maintainer's own tables: credit both
+                        try:
+                            gv = json.loads((tables / f"{m}.stats.json").read_text()).get(
+                                "generator_version", "")
+                        except (OSError, ValueError):
+                            gv = ""
+                        reg.tables[m] = {"contributor": MAINTAINER, "hf_pr": None, "claim": None,
+                                         "merged": None, "generator_version": gv, "verification": None,
+                                         "producers": [{"contributor": MAINTAINER, "hf_pr": None,
+                                                        "date": None, "generator_version": gv}],
+                                         "published_from": None}
                     sc_path = staging / f"pr-{n}" / "files" / f"{m}.stats.json"
                     try:
                         gv = json.loads(sc_path.read_text()).get("generator_version", "")
@@ -788,6 +803,6 @@ def status(hub, gh, registry, staging: Path, checkout: Path) -> str:
                               cwd=checkout, capture_output=True, text=True, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         last = ""
-    newer = sum(1 for t in registry.tables.values() if last and t["merged"] > last)
+    newer = sum(1 for t in registry.tables.values() if last and (t.get("merged") or "") > last)
     rows += ["", f"{newer} contributed table(s) merged since the last DEEPEST refresh ({last or '?'})."]
     return "\n".join(rows)

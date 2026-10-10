@@ -408,3 +408,53 @@ def test_cli_passes_release_materials_to_accept(tmp_path, monkeypatch):
                             "--binary", BINARY, "--release", "KRRvkqq", "KQvkqq"],
                            hub_factory=lambda r: hub, gh_factory=lambda r: gh) == 0
     assert seen["release"] == ["KRRvkqq", "KQvkqq"] and seen["prs"] == [2]
+
+
+def test_reproduction_of_a_maintainer_table_credits_the_maintainer_and_the_reproducer(tmp_path, published_hash):
+    checkout, staging, hub, gh, tables = _base(tmp_path)
+    _publish(hub, checkout, tables)
+    reg = _reg(checkout)
+    del reg["tables"]["KRRvkqq"]                     # published, but not a contribution
+    (checkout / "data" / "contributions.json").write_text(json.dumps(reg))
+    assert _accept([2], checkout, staging, hub, gh, tables) == 0
+    entry = _reg(checkout)["tables"]["KRRvkqq"]
+    assert entry["producers"] == [
+        {"contributor": "maintainer", "hf_pr": None, "date": None, "generator_version": "0.19.0"},
+        {"contributor": "T31M", "hf_pr": 2, "date": "2026-10-10", "generator_version": "0.20.0"}]
+    assert (entry["published_from"], entry["contributor"], entry["hf_pr"], entry["merged"],
+            entry["generator_version"]) == (None, "maintainer", None, None, "0.19.0")
+    assert "maintainer" not in _reg(checkout)["contributors"]
+    assert "KRRvkqq (independently reproduced by maintainer and T31M)." in (checkout / "CHANGELOG.md").read_text()
+    assert "co-producer" in hub.closed[0][1] and hub.copies == []
+
+
+def test_a_pr_revised_after_the_decisions_is_decided_again(tmp_path):
+    checkout, staging, hub, gh, tables = _base(tmp_path)              # #2 by T31M, claim #39 popeye37
+    _add_pr(hub, staging, 3, ["KRRvkqq"], author="popeye37", gv="0.21.0")
+    real = hub.pr_head
+    hub.pr_head = lambda n: "h3b" if n == 3 else real(n)            # pushed after verify
+    assert _accept([2, 3], checkout, staging, hub, gh, tables) == 2
+    assert "decisions" in json.loads((staging / "accept-2-3.json").read_text())
+    hub.pr_head = real
+    hub.prs[3][0].head = "h3b"                                       # verified again: other content
+    _report(staging, 3, "h3b", {"KRRvkqq": OTHER})
+    git = FakeGit()
+    assert _accept([2, 3], checkout, staging, hub, gh, tables, git) == 2
+    assert _nothing_written(hub, gh, git)
+
+
+def test_release_decides_again_over_stored_decisions(tmp_path):
+    checkout, staging, hub, gh, tables = _base(tmp_path)              # KRRvkqq held for #39
+    _add_pr(hub, staging, 3, ["KQvkqq"], author="popeye37", description="GitHub: @popeye37")
+    real = hub.merge
+
+    def fail(num):
+        raise RuntimeError("network")
+    hub.merge = fail
+    with pytest.raises(RuntimeError):
+        _accept([2, 3], checkout, staging, hub, gh, tables)
+    assert json.loads((staging / "accept-2-3.json").read_text())["decisions"]["KRRvkqq"]["kind"] == "held"
+    hub.merge = real
+    assert _accept([2, 3], checkout, staging, hub, gh, tables, release=["KRRvkqq"]) == 0
+    assert hub.merged == [2, 3] and hub.comments == []
+    assert _reg(checkout)["tables"]["KRRvkqq"]["published_from"] == 2

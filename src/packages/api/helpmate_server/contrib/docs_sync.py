@@ -89,7 +89,8 @@ def render_contributors(reg, statuses: dict) -> str:
         mats = [m for m in reg.tables_of(key) if statuses.get(m) and statuses[m].state == "done"]
         if not mats:
             continue
-        prs = sorted({reg.tables[m]["hf_pr"] for m in mats})
+        prs = sorted({p["hf_pr"] for m in mats for p in reg.tables[m].get("producers", [])
+                      if p["contributor"] == key and p["hf_pr"] is not None})
         name = "anonymous" if c.anonymous else (
             f"[**{c.display}**]({HF_USER}{c.hf})" if c.hf else f"**{c.display}**")
         links = ", ".join(f"[PR #{p}]({PR_URL}/{p})" for p in prs)

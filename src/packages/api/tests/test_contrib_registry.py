@@ -113,3 +113,11 @@ def test_migration_does_not_touch_the_loaded_data(tmp_path):
     data = {"tables": {"KQvk": {"contributor": "a", "hf_pr": 1, "merged": "d", "generator_version": "v"}}}
     Registry(tmp_path / "x.json", data)
     assert "producers" not in data["tables"]["KQvk"]
+
+
+def test_a_producer_without_a_pr_sorts_first(tmp_path):
+    reg = _reg(tmp_path)
+    reg.tables["KQvk"] = {"contributor": "T31M", "hf_pr": 4, "producers": []}
+    reg.add_producer("KQvk", contributor="T31M", hf_pr=4, date="d", generator_version="v")
+    reg.add_producer("KQvk", contributor="maintainer", hf_pr=None, date=None, generator_version="v")
+    assert reg.producers_of("KQvk") == ["maintainer", "T31M"]
