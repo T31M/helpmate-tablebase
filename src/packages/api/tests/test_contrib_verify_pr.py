@@ -433,3 +433,13 @@ def test_verify_pr_not_interactive_without_yes_is_a_usage_error(tmp_path, monkey
                          hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub())
     assert rc == 2 and hub.downloads == []
     assert "run with --yes when not interactive" in capsys.readouterr().err
+
+
+def test_verify_pr_without_stdin_is_the_same_usage_error(tmp_path, monkeypatch, capsys):
+    hub = FakeHub({"manifest.json": b'{"schema":1,"files":{}}'})
+    hub.add_pr(2, {"KQvk.hm": b"table-1", "KQvk.stats.json": b"{}"}, description="Claim: #39", head="h2")
+    monkeypatch.setattr("sys.stdin", None)                     # pythonw, some service managers
+    rc = tables_cli.main(["verify", "--tables", str(tmp_path), "--pr", "2", "--staging", str(tmp_path / "st")],
+                         hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub())
+    assert rc == 2 and hub.downloads == []
+    assert "run with --yes when not interactive" in capsys.readouterr().err

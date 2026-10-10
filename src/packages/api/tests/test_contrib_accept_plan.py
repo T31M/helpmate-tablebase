@@ -30,7 +30,8 @@ def _snapshot(*dirs):
 
 @pytest.fixture
 def published_hash(monkeypatch):
-    monkeypatch.setattr("helpmate_server.contrib.verify.PublishedHashes.get", lambda self, m: PAY)
+    """Only the table read is faked: the real PublishedHashes.get runs, cache file and all."""
+    monkeypatch.setattr("helpmate_server.contrib.tablefile.payload_sha256", lambda path: PAY)
 
 
 def _holder_later(tmp_path):
@@ -58,6 +59,12 @@ def _partial(tmp_path):
     return checkout, staging, hub, gh, tables
 
 
+def _partial_published(tmp_path):
+    checkout, staging, hub, gh, tables = _partial(tmp_path)
+    _publish(hub, checkout, tables)                                   # KRRvkqq: a reproduction
+    return checkout, staging, hub, gh, tables
+
+
 def _conflict(tmp_path):
     checkout, staging, hub, gh, tables = _base(tmp_path)
     _add_pr(hub, staging, 3, ["KRRvkqq"], author="popeye37", payload=OTHER)
@@ -66,6 +73,7 @@ def _conflict(tmp_path):
 
 SCENARIOS = {"holder_later": (_holder_later, [2, 3], 0), "held": (_held, [2], 0),
              "reproduction": (_reproduction, [2], 0), "partial": (_partial, [2], 0),
+             "partial_published": (_partial_published, [2], 0),
              "conflict": (_conflict, [2, 3], 1)}
 
 
@@ -80,6 +88,7 @@ def test_plan_writes_nothing_anywhere(tmp_path, published_hash, name):
     assert hub.downloads == []
     assert not list(staging.glob("accept-*.json"))
     assert _snapshot(checkout, staging, tables) == before
+    assert not (tables / ".payload-sha256.json").exists()
 
 
 def test_plan_of_two_deliveries_names_the_published_file_and_the_co_producer(tmp_path, capsys):

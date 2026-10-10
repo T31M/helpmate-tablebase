@@ -426,11 +426,13 @@ class _Prepared:
 
 
 def _prepare(prs: list[int], state: dict, save, *, hub, gh, git, checkout: Path, tables: Path,
-             staging: Path, contributor: str | None, release: list[str]) -> _Prepared | int:
+             staging: Path, contributor: str | None, release: list[str],
+             persist: bool = True) -> _Prepared | int:
     """Everything accept checks and decides before its first write: the PRs are open, verified
     at their head and staged; every contributor is known; every material is decided. Reads the
     Hub, GitHub and origin/main only; changes nothing but the in-memory `state` (written only
-    through `save`, a no-op for accept --plan). Returns the rc of a usage error instead."""
+    through `save`, a no-op for accept --plan, and, with `persist`, the payload-hash cache in
+    `tables`). Returns the rc of a usage error instead."""
     reg_path = checkout / "data" / "contributions.json"
     # What each PR contained, as validated: after the merge the Hub is never asked again.
     stored: dict[str, dict] = state.setdefault("pulls", {})
@@ -516,7 +518,7 @@ def _prepare(prs: list[int], state: dict, save, *, hub, gh, git, checkout: Path,
                 reports[n] = {}
         try:
             decisions = decide([PullRequest(n, **stored[str(n)]) for n in prs], reports, manifest,
-                               PublishedHashes(tables, manifest.get("files", {})), index,
+                               PublishedHashes(tables, manifest.get("files", {}), persist), index,
                                {n: people[n]["github"] for n in prs}, set(release))
         except MissingPublished as exc:
             return _err(f"{exc.material} is published but {exc.material}.hm is missing from "
@@ -958,7 +960,8 @@ def plan_accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, s
         conflicts: list[str] = []
     else:
         prep = _prepare(prs, state, lambda: None, hub=hub, gh=gh, git=git, checkout=checkout,
-                        tables=tables, staging=staging, contributor=contributor, release=release)
+                        tables=tables, staging=staging, contributor=contributor, release=release,
+                        persist=False)
         if isinstance(prep, int):
             return prep
         stored = state["pulls"]

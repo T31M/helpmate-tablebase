@@ -63,7 +63,8 @@ def add_parsers(sub) -> None:
                     help="do not build the material pages now (helpmate-tables pages does it later)")
     ac.add_argument("--plan", action="store_true",
                     help="show what accept would do (decisions, PR actions, credits, CHANGELOG lines) "
-                         "and write nothing; exit 1 if a material conflicts")
+                         "and write nothing; exit 1 if a material conflicts. Needs what accept needs: "
+                         "a clean checkout and the helpmate binary (--binary)")
     pg = sub.add_parser("pages", help="(maintainer) build material pages in parallel jobs and ship them as a docs PR")
     pg.add_argument("--tables", required=True, metavar="DIR")
     pw = pg.add_mutually_exclusive_group(required=True)

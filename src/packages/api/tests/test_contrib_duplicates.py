@@ -274,3 +274,11 @@ def test_rerun_does_not_reuse_a_same_run_duplicate_verified_without_v5(tmp_path,
     c3 = {c["id"]: c for c in json.loads(path.read_text())["tables"]["KQvk"]["checks"]}
     assert "reused_from" in c2["V6"]                           # PR #2 unchanged: reused
     assert c3["V5"]["status"] == "pass" and "reused_from" not in c3["V5"]
+
+
+def test_published_hashes_without_persist_write_no_cache(tmp_path, compressed_tables):
+    shutil.copy(compressed_tables / "KQvk.hm", tmp_path)
+    ph = PublishedHashes(tmp_path, {"KQvk.hm": {"sha256": "s1", "size": 1}}, persist=False)
+    assert ph.get("KQvk") == payload_sha256(tmp_path / "KQvk.hm")
+    assert ph.get("KQvk") == ph.cache["KQvk"]["payload"]          # kept in memory
+    assert not (tmp_path / ".payload-sha256.json").exists()

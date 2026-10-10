@@ -47,8 +47,9 @@ class VerifyOptions:
 class PublishedHashes:
     """Payload hashes of published tables, from the local corpus copy, cached per manifest sha."""
 
-    def __init__(self, tables: Path, manifest_files: dict):
-        self.tables, self.files = Path(tables), manifest_files
+    def __init__(self, tables: Path, manifest_files: dict, persist: bool = True):
+        """`persist=False`: keep new hashes in memory only (accept --plan writes nothing)."""
+        self.tables, self.files, self.persist = Path(tables), manifest_files, persist
         self.path = self.tables / ".payload-sha256.json"
         try:
             self.cache: dict = json.loads(self.path.read_text())
@@ -66,7 +67,8 @@ class PublishedHashes:
             raise MissingPublished(material)
         payload = payload_sha256(hm)
         self.cache[material] = {"hm_sha256": sha, "payload": payload}
-        self.path.write_text(json.dumps(self.cache, indent=1, sort_keys=True))
+        if self.persist:
+            self.path.write_text(json.dumps(self.cache, indent=1, sort_keys=True))
         return payload
 
 
@@ -417,7 +419,7 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
     if a.plan_only:
         return 0
     if total and not a.yes:
-        if not sys.stdin.isatty():
+        if not (sys.stdin and sys.stdin.isatty()):
             raise UsageError(f"{_gib(total)} to download and nobody to ask: run with --yes when "
                              "not interactive")
         if input(f"download {_gib(total)}? [y/N] ").strip().lower() != "y":
