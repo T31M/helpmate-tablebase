@@ -139,6 +139,7 @@ def test_verify_pr_rerun_skips_downloaded_files(tmp_path, compressed_tables):
 def test_verify_pr_without_confirmation_stops(tmp_path, compressed_tables, monkeypatch):
     hub = _hub_with_kqvk_pr(compressed_tables)
     monkeypatch.setattr("builtins.input", lambda prompt: "n")
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     rc = tables_cli.main(["verify", "--tables", str(_tables_without_kqvk(tmp_path, compressed_tables)),
                           "--pr", "2", "--staging", str(tmp_path / "st")],
                          hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub())
@@ -372,3 +373,63 @@ def test_batch_order_puts_promotion_and_capture_sub_tables_first():
         return PullRequest(num, "", "", "open", "", [f"{m}.hm" for m in mats])
     prs = [pr(3, "KRRvkqp"), pr(4, "KRRvkq"), pr(5, "KRRvkqn"), pr(6, "KRRvkpp"), pr(7, "x.hm")]
     assert [p.num for p in sorted(prs, key=_batch_order)] == [7, 4, 5, 3, 6]
+
+
+def _legacy_staged(tmp_path, *, same_size=True):
+    """PR 2 (KQvk) staged by a helpmate-tables from before .files.json: only a .head marker."""
+    hub = FakeHub({"manifest.json": b'{"schema":1,"files":{}}'})
+    hub.add_pr(2, {"KQvk.hm": b"table-1", "KQvk.stats.json": b"{}"}, description="Claim: #39", head="h2")
+    d = tmp_path / "st" / "pr-2" / "files"
+    d.mkdir(parents=True)
+    (d / ".head").write_text("h1")
+    (d / "KQvk.hm").write_bytes(b"table-1" if same_size else b"table-1-longer")
+    (d / "KQvk.stats.json").write_bytes(b"{}")
+    return hub
+
+
+def _tight_disk(monkeypatch, free):
+    import collections
+    usage = collections.namedtuple("usage", "total used free")
+    monkeypatch.setattr("helpmate_server.contrib.verify.shutil.disk_usage", lambda p: usage(free, 0, free))
+
+
+def test_plan_counts_legacy_staged_files_of_the_right_size_as_downloaded(tmp_path, monkeypatch, capsys):
+    hub = _legacy_staged(tmp_path)
+    _tight_disk(monkeypatch, 5)              # less than the PR's 9 bytes: only passes if nothing is due
+    rc = tables_cli.main(["verify", "--tables", str(tmp_path), "--pr", "2", "--staging", str(tmp_path / "st"),
+                          "--plan-only"], hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub())
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert out.count("(already downloaded, will be checked)") == 2
+    assert hub.downloads == [] and (tmp_path / "st" / "pr-2" / "files" / ".head").exists()   # plan only
+
+
+def test_plan_counts_a_legacy_staged_file_of_another_size_as_missing(tmp_path, monkeypatch, capsys):
+    hub = _legacy_staged(tmp_path, same_size=False)
+    _tight_disk(monkeypatch, 7 * 100)        # 7 bytes (KQvk.hm) are due: fits
+    rc = tables_cli.main(["verify", "--tables", str(tmp_path), "--pr", "2", "--staging", str(tmp_path / "st"),
+                          "--plan-only"], hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub())
+    out = capsys.readouterr().out
+    assert rc == 0
+    hm = next(line for line in out.splitlines() if "KQvk.hm" in line)
+    assert "already downloaded" not in hm
+    assert "(already downloaded, will be checked)" in next(line for line in out.splitlines()
+                                                           if "KQvk.stats.json" in line)
+    _tight_disk(monkeypatch, 6)              # 7 bytes are due: does not fit any more
+    assert tables_cli.main(["verify", "--tables", str(tmp_path), "--pr", "2", "--staging",
+                            str(tmp_path / "st"), "--plan-only"],
+                           hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub()) == 2
+
+
+def test_verify_pr_not_interactive_without_yes_is_a_usage_error(tmp_path, monkeypatch, capsys):
+    hub = FakeHub({"manifest.json": b'{"schema":1,"files":{}}'})
+    hub.add_pr(2, {"KQvk.hm": b"table-1", "KQvk.stats.json": b"{}"}, description="Claim: #39", head="h2")
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    def no_prompt(prompt):
+        raise OSError("reading from stdin while output is captured")
+    monkeypatch.setattr("builtins.input", no_prompt)
+    rc = tables_cli.main(["verify", "--tables", str(tmp_path), "--pr", "2", "--staging", str(tmp_path / "st")],
+                         hub_factory=lambda r: hub, gh_factory=lambda r: FakeGitHub())
+    assert rc == 2 and hub.downloads == []
+    assert "run with --yes when not interactive" in capsys.readouterr().err

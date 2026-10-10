@@ -396,13 +396,18 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         tree = hub._tree(pr.head or f"refs/pr/{num}")
         sizes = {f: tree[f][0] for f in pr.files if not _unsafe(f)}
         have = staging / f"pr-{num}" / "files"
-        todo = {f: tree[f][0] for f in sizes if not _staged_ok(have, f, tree[f])}
+        # staged before .files.json: a file of the right size is probably kept (_stage checks its sha)
+        legacy = (have / ".head").exists() and not (have / ".files.json").exists()
+        unsure = {f for f in sizes if legacy and (have / f).is_file() and (have / f).stat().st_size == sizes[f]}
+        todo = {f: tree[f][0] for f in sizes if f not in unsure and not _staged_ok(have, f, tree[f])}
         if any(_unsafe(f) for f in pr.files):
             print(f"  unsafe file names in PR #{num}: nothing will be downloaded")
         total += sum(todo.values())
         print(f"PR #{num} by {pr.author}: {', '.join(pr.materials) or '(no tables)'}")
         for f, s in sorted(sizes.items()):
-            print(f"  {f:28} {_gib(s):>12}{'' if f in todo else '  (already downloaded)'}")
+            note = ("" if f in todo else "  (already downloaded, will be checked)" if f in unsure
+                    else "  (already downloaded)")
+            print(f"  {f:28} {_gib(s):>12}{note}")
         prs.append(pr)
     free = shutil.disk_usage(staging).free
     print(f"to download: {_gib(total)}; free in {staging}: {_gib(free)}")
@@ -411,8 +416,12 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         return 2
     if a.plan_only:
         return 0
-    if total and not a.yes and input(f"download {_gib(total)}? [y/N] ").strip().lower() != "y":
-        return 2
+    if total and not a.yes:
+        if not sys.stdin.isatty():
+            raise UsageError(f"{_gib(total)} to download and nobody to ask: run with --yes when "
+                             "not interactive")
+        if input(f"download {_gib(total)}? [y/N] ").strip().lower() != "y":
+            return 2
     manifest_files = hub.fetch_manifest().get("files", {})
     gh = None if a.no_post else (gh_factory or GitHub)(a.github_repo)
     index, claims_note = None, ""
