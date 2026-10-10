@@ -65,7 +65,7 @@ def _fold(checkout: Path, job_dirs: list[tuple[Path, list[str]]]) -> list[str]:
 def run_pages(materials: list[str], *, checkout: Path, tables: Path, binary: str, jobs: int,
               staging: Path, git, today: str, allow_failures: bool = False,
               runner=subprocess.Popen) -> int:
-    from .accept import DOCS_PATHS
+    from .accept import DOCS_PATHS, under
     from .site_data import write_site_data
 
     checkout, staging = Path(checkout), Path(staging)
@@ -82,6 +82,24 @@ def run_pages(materials: list[str], *, checkout: Path, tables: Path, binary: str
     def save() -> None:
         state_path.write_text(json.dumps(state, indent=1))
 
+    def guard() -> str | None:
+        """Why the checkout may not be touched, or None. The reset discards edits under
+        DOCS_PATHS and the commit takes every change, so nothing else may be dirty; before
+        the first reset nothing at all (later, leftovers under DOCS_PATHS are this run's)."""
+        if state.get("committed"):
+            return None
+        outside = [d for d in git.dirty_paths() if not under(d, DOCS_PATHS)]
+        if outside:
+            return f"{checkout} has uncommitted changes outside what pages writes: {', '.join(outside)}"
+        if not state.get("started") and not git.clean():
+            return f"{checkout} has uncommitted changes; commit or stash them first"
+        return None
+
+    if "pr" not in state:
+        why = guard()
+        if why:
+            print(f"error: {why}", file=sys.stderr)
+            return 2
     if "original" not in state:
         state["original"] = git.current()
     save()
@@ -115,6 +133,12 @@ def run_pages(materials: list[str], *, checkout: Path, tables: Path, binary: str
         failed = sorted(failed)
         # a clean slate from origin/main, then the pages of every job (repeatable until committed)
         if not state.get("committed"):
+            why = guard()   # the build took a while: check again right before the reset
+            if why:
+                print(f"error: {why}", file=sys.stderr)
+                return 2
+            state["started"] = True   # from here on, leftovers under DOCS_PATHS are ours
+            save()
             git.reset_to_origin_main(branch, DOCS_PATHS)
             built = _fold(checkout, job_dirs)
         else:

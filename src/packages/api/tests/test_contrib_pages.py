@@ -28,8 +28,11 @@ def test_split_jobs_round_robin_without_empty_jobs():
 
 
 class FakeGit:
-    def __init__(self, merge_fails=0):
-        self.calls, self.merge_fails = [], merge_fails
+    def __init__(self, merge_fails=0, dirty=()):
+        self.calls, self.merge_fails, self.dirty = [], merge_fails, list(dirty)
+
+    def clean(self): return not self.dirty
+    def dirty_paths(self): return list(self.dirty)
 
     def _do(self, name, *a):
         self.calls.append((name, *a))
@@ -197,3 +200,37 @@ def test_real_build_problems_merge_functions_match_the_fold(tmp_path):
     spec.loader.exec_module(bp)
     assert bp.merge_index([], [{"material": "A", "pieces": 3}], {"A"})[0]["material"] == "A"
     assert bp.merge_themes({}, {"t": [{"material": "A"}]}, {"A"}) == {"t": {"count": 1, "problems": [{"material": "A"}]}}
+
+
+def test_refuses_a_checkout_with_changes_outside_the_docs_paths(tmp_path, capsys):
+    git, runner = FakeGit(dirty=["src/packages/api/x.py"]), Runner()
+    rc, _, _ = _go(tmp_path, runner, git)
+    assert rc == 2 and git.calls == [] and runner.calls == []
+    assert "src/packages/api/x.py" in capsys.readouterr().err
+
+
+def test_first_run_refuses_uncommitted_docs_files_too(tmp_path, capsys):
+    git, runner = FakeGit(dirty=["site/data/index.json"]), Runner()
+    rc, _, _ = _go(tmp_path, runner, git)
+    assert rc == 2 and git.calls == [] and runner.calls == []
+    assert "commit or stash" in capsys.readouterr().err
+
+
+def test_resumed_run_accepts_its_own_leftovers_in_the_docs_paths(tmp_path):
+    rc, _, _ = _go(tmp_path, Runner(fail={"B"}), FakeGit())      # stops after the fold
+    assert rc == 1
+    git = FakeGit(dirty=["site/data/material/A.json", "site/data/index.json"])
+    rc, _, _ = _go(tmp_path, Runner(), git)
+    assert rc == 0 and "commit_all" in git.names()
+
+
+def test_changes_outside_the_docs_paths_made_during_the_build_stop_before_the_reset(tmp_path):
+    git = FakeGit()
+
+    class Dirtying(Runner):
+        def __call__(self, cmd, cwd):
+            git.dirty = ["notes.txt"]
+            return super().__call__(cmd, cwd)
+
+    rc, _, _ = _go(tmp_path, Dirtying(), git)
+    assert rc == 2 and "reset" not in git.names() and "commit_all" not in git.names()
