@@ -338,7 +338,7 @@ def _identity_claim(pr, index, reg: Registry):
 
 
 def _notes(credited: list[str], held: list[str], decisions: dict[str, Decision],
-           own: list[str] = ()) -> list[str]:
+           own: list[str] | None = None) -> list[str]:
     """`own`: materials this PR's delivery is already in the dataset and credited for (an
     earlier run of a PR that stayed open for held material)."""
     out = []
