@@ -255,6 +255,7 @@ tier. The setup instructions below are theirs too (#42).
 ```bash
 helpmate-tables status                                  # what is waiting
 helpmate-tables verify --tables ~/tb --pr 2 3 4         # asks before downloading; posts reports
+helpmate-tables accept 2 3 4 --tables ~/tb --plan       # what accept would do; writes nothing
 helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credits, docs PR
 ```
 
@@ -263,7 +264,11 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   keeps the report off HF and GitHub). Downloads are staged in `~/tb-staging`,
   per file (`files/.files.json`), and a rerun downloads only the files that changed
   or are incomplete. It exits with status 2
-  if `--tables` lacks a sub-table the PR needs.
+  if `--tables` lacks a sub-table the PR needs. Without a terminal (`nohup`,
+  `systemd-run`, a cron job) it cannot ask: pass `--yes`, or it stops with a usage
+  error. Files staged by an older helpmate-tables (only `files/.head`) are listed as
+  "already downloaded, will be checked" when their size matches; their checksums are
+  compared before verifying and a mismatching file is downloaded again.
 - Delta verify: a table whose file and settings (`samples`, `oracle_samples`,
   `oracle_plies`) are unchanged since the last report reuses its result
   ("reused from <head>"); a killed run resumes from `report.partial.json`;
@@ -271,6 +276,16 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   `[i/n] <material> <check> ... <status> (<time>)`. V1 labels each material new,
   duplicate of published, duplicate of HF PR #N, or held for claim #N;
   `--no-post` still reads the claims.
+- `accept N... --plan` runs everything accept checks before its first write (open
+  PRs, report heads, staged files, contributors, claims, decisions) and prints, per
+  PR, the contributor, one line per material (`publish from #N`, `reproduction of
+  published table -> producer`, `co-producer (file published from #M)`, `held for
+  claim #K by @holder` or `CONFLICT: ...`) and what happens to the PR (merge,
+  partial copy + close, partial copy and stays open, comment only, close with
+  thank-you), then the producers and CHANGELOG lines it would add. It writes
+  nothing: no Hub or GitHub write, no checkout change, no state file. Exit 1 means
+  a conflict, 2 an error accept would stop with. Run it before every real accept
+  of a batch, with the same `--release` and `--contributor` arguments.
 - `accept` publishes the claim holder's file, else the earliest, never replaces a
   published one, and adds identical deliveries as producers. It skips held
   deliveries (the PR stays open with a comment); `accept --release M` publishes

@@ -66,6 +66,15 @@ bumps may change behavior).
   - `accept --no-pages` skips the site pages; `helpmate-tables pages --tables DIR
     (--missing | --material M...) [--jobs N]` builds them in parallel jobs,
     resumable, and ships a docs PR.
+  - `accept N [N ...] --plan` shows what accept would do and writes nothing: per
+    PR its contributor, one line per material (publish, reproduction, co-producer,
+    held, or CONFLICT), what happens to the PR, then the producers and CHANGELOG
+    lines it would add. Exits 1 on a conflict; works with `--release` and
+    `--contributor`.
+  - `verify --pr`: the download plan counts files staged by an older
+    helpmate-tables (only a `.head` marker) as downloaded when their size matches
+    ("already downloaded, will be checked"); without a terminal and without
+    `--yes` it stops with a usage error instead of a traceback.
 
 ### Data
 - KBvkbbb, KBvkbbn, KBvkbbp, KBvkbnn, KBvkbnp, KBvkbpp, KBvknnn, KBvknnp, KBvknpp, KBvkppp, KBvkqbp, KBvkqnp, KBvkqpp, KBvkqqp, KBvkqrp, KBvkrbn, KBvkrbp, KBvkrnn, KBvkrnp, KBvkrpp, KBvkrrb, KBvkrrn, KBvkrrp contributed by T31M (dataset PR #18, claim #52).

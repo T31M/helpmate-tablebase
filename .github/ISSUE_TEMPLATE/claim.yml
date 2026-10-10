@@ -10,11 +10,18 @@ body:
         See [docs/CONTRIBUTING-TABLES.md](../blob/main/docs/CONTRIBUTING-TABLES.md) and
         [the materials list](https://osick.github.io/helpmate-tablebase/#/materials) for what is still open.
         A bot will comment with the status of every material you claim.
+
+        - A wildcard claim (`KQvk???`) leaves out the materials someone else claimed earlier.
+        - To reproduce a table on purpose (one already published or claimed), start the
+          Materials with `confirm:`: such a claim never blocks anyone and your delivery is never held.
+        - Identical deliveries of a material are credited to everyone who delivered them.
   - type: textarea
     id: materials
     attributes:
       label: Materials
-      description: One name or pattern per line, e.g. `KRBvkqq` or `KQvk???` (`?` = any piece of that colour).
+      description: >-
+        One name or pattern per line, e.g. `KRBvkqq` or `KQvk???` (`?` = any piece of that colour).
+        Start with `confirm:` for a deliberate reproduction.
     validations:
       required: true
   - type: input
