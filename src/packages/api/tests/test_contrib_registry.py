@@ -71,3 +71,45 @@ def test_seeded_registry_credits_t31m_with_fifteen_tables():
     assert sorted(seeded) == sorted(f"KRBvk{b}" for b in
                                     "qq qr qb qn rr rb rn bb bn nn qp rp bp np pp".split())
     assert all(reg.tables[m]["claim"] == 41 for m in seeded)
+
+
+def test_registry_migrates_and_adds_producers(tmp_path):
+    p = tmp_path / "c.json"
+    p.write_text('{"schema":1,"contributors":{},"tables":{"KQvkqqq":{"contributor":"popeye37","hf_pr":19,'
+                 '"merged":"2026-10-10","generator_version":"0.20.0"}}}')
+    reg = Registry.load(p)
+    assert reg.producers_of("KQvkqqq") == ["popeye37"]
+    assert reg.tables["KQvkqqq"]["published_from"] == 19
+    reg.add_producer("KQvkqqq", contributor="T31M", hf_pr=22, date="2026-10-11", generator_version="0.20.0")
+    reg.add_producer("KQvkqqq", contributor="T31M", hf_pr=22, date="2026-10-11", generator_version="0.20.0")
+    assert reg.producers_of("KQvkqqq") == ["popeye37", "T31M"]
+    assert reg.tables_of("T31M") == ["KQvkqqq"] and reg.reproduced_of("popeye37") == ["KQvkqqq"]
+
+
+def test_producers_stay_in_delivery_order_and_survive_save(tmp_path):
+    reg = _reg(tmp_path)
+    reg.record_table("KRRvkqq", contributor="T31M", hf_pr=5, claim=None, merged="2026-10-10",
+                     generator_version="0.20.0", verification=None)
+    reg.add_producer("KRRvkqq", contributor="popeye37", hf_pr=3, date="2026-10-10", generator_version="0.19.0")
+    assert reg.producers_of("KRRvkqq") == ["popeye37", "T31M"]          # sorted by HF PR number
+    assert reg.tables["KRRvkqq"]["published_from"] == 5 and reg.tables["KRRvkqq"]["contributor"] == "T31M"
+    reg.save()
+    again = Registry.load(reg.path)
+    assert again.tables["KRRvkqq"]["producers"] == reg.tables["KRRvkqq"]["producers"]
+    assert again.tables_of("popeye37") == ["KRRvkqq"] and again.reproduced_of("T31M") == ["KRRvkqq"]
+
+
+def test_record_table_again_keeps_the_producers(tmp_path):
+    reg = _reg(tmp_path)
+    reg.record_table("KRRvkqq", contributor="T31M", hf_pr=5, claim=None, merged="2026-10-10",
+                     generator_version="0.20.0", verification=None)
+    reg.add_producer("KRRvkqq", contributor="popeye37", hf_pr=6, date="2026-10-10", generator_version="0.20.0")
+    reg.record_table("KRRvkqq", contributor="T31M", hf_pr=5, claim=None, merged="2026-10-10",
+                     generator_version="0.20.0", verification=None)
+    assert reg.producers_of("KRRvkqq") == ["T31M", "popeye37"]
+
+
+def test_migration_does_not_touch_the_loaded_data(tmp_path):
+    data = {"tables": {"KQvk": {"contributor": "a", "hf_pr": 1, "merged": "d", "generator_version": "v"}}}
+    Registry(tmp_path / "x.json", data)
+    assert "producers" not in data["tables"]["KQvk"]

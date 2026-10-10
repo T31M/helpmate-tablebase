@@ -13,9 +13,9 @@ import shutil
 import subprocess
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from . import SITE_MATERIALS_URL
 from .claims import load_index, material_status, ownership_conflict
@@ -23,6 +23,7 @@ from .docs_sync import CorpusFacts, SyncError, close_finished_claims, sync
 from .hf import MergeConflict as HubConflict
 from .hf import PullRequest
 from .links import parse_links
+from .materials import canonical
 from .registry import Contributor, Registry, resolve_contributor
 from .site_data import write_site_data
 
@@ -239,22 +240,141 @@ def _copy_comment(ref: str, head: str, already: bool) -> str:
             "byte for byte. Thank you!")
 
 
-def _missing_staged(hub, pr, files_dir: Path) -> list[str]:
-    """Table files of the PR that are not staged locally at the size the PR has."""
-    names = [f for f in pr.files if f.endswith((".hm", ".stats.json"))]
-    sizes = hub.file_sizes(names, pr.head)
+def _missing_staged(hub, names: list[str], files_dir: Path, head: str | None) -> list[str]:
+    """Those of `names` (table files of the PR at `head`) that are not staged locally at
+    the size the PR has."""
+    if not names:
+        return []
+    sizes = hub.file_sizes(names, head)
     return [f for f in names
             if not (files_dir / f).exists() or (files_dir / f).stat().st_size != sizes.get(f)]
 
 
+@dataclass
+class Decision:
+    """What accept does with one material of the run (spec section 3)."""
+    kind: Literal["new", "reproduction", "held", "conflict"]
+    publish_from: int | None      # the PR whose file is published, None if nothing is
+    producers: list[int]          # the PRs credited as producers, in delivery order
+    held_for: int | None          # the claim a held material waits for
+    reason: str
+
+
+def _nums(ns: list[int]) -> str:
+    out = [f"#{n}" for n in ns]
+    return out[0] if len(out) == 1 else ", ".join(out[:-1]) + " and " + out[-1]
+
+
+def _payload(reports: dict, n: int, m: str) -> str | None:
+    return ((reports.get(n) or {}).get("tables") or {}).get(m, {}).get("payload_sha256")
+
+
+def decide(prs, reports: dict, manifest: dict, hashes, index, logins: dict, release) -> dict[str, Decision]:
+    """One decision per material delivered by `prs` (taken in ascending PR number = delivery
+    order). `reports`: PR -> its verification report; `manifest`: the published manifest;
+    `hashes.get(m)`: the published table's payload hash; `index`: the open claims;
+    `logins`: PR -> its contributor's GitHub login (or None); `release`: materials whose
+    claim the maintainer overrides. Pure apart from `hashes.get`."""
+    published = manifest.get("files", {})
+    deliveries: dict[str, list[int]] = {}
+    for pr in sorted(prs, key=lambda p: p.num):
+        for m in pr.materials:
+            deliveries.setdefault(m, []).append(pr.num)
+    out = {}
+    for m, ns in deliveries.items():
+        pays = {n: _payload(reports, n, m) for n in ns}
+        is_published = f"{m}.hm" in published
+        if is_published or len(ns) > 1:
+            missing = [n for n in ns if not pays[n]]
+            if missing:
+                out[m] = Decision("conflict", None, [], None,
+                                  f"the report of HF PR {_nums(missing)} has no payload hash to compare "
+                                  "(verified by an older helpmate-tables); run verify --pr N again")
+                continue
+        if is_published:
+            ref = hashes.get(m)
+            differ = [n for n in ns if pays[n] != ref]
+            out[m] = (Decision("conflict", None, [], None,
+                               f"content differs from the published table in HF PR {_nums(differ)}")
+                      if differ else
+                      Decision("reproduction", None, list(ns), None, "identical to the published table"))
+            continue
+        if len(set(pays.values())) > 1:
+            out[m] = Decision("conflict", None, [], None, f"content differs between HF PRs {_nums(ns)}")
+            continue
+        claim = index.claim_for(m) if index is not None else None
+        holder = claim.author.lower() if claim else None
+        by_holder = [n for n in ns if holder and (logins.get(n) or "").lower() == holder]
+        if claim is not None and not by_holder and m not in release:
+            out[m] = Decision("held", None, [], claim.issue,
+                              f"held for claim #{claim.issue} by @{claim.author}")
+            continue
+        src = by_holder[0] if by_holder else ns[0]
+        why = ("the claim holder's delivery" if by_holder else
+               "released by the maintainer" if claim is not None else "the earliest delivery")
+        out[m] = Decision("new", src, list(ns), None, f"published from HF PR #{src}: {why}")
+    return out
+
+
+def _identity_claim(pr, index, reg: Registry):
+    """The claim that speaks for the PR's identity: the one it names; else the one by its own
+    GitHub login (description or registry) that covers its materials; with no login at all,
+    the first claim on its material unless that claim's form names another HF user.
+    Someone else's claim never speaks for a PR whose login is known."""
+    num, login = parse_links(pr.description)
+    if num is not None:
+        return next((c for c in index.claims if c.issue == num), None)
+    if login is None:
+        known = reg.by_hf(pr.author)
+        login = known.github if known else None
+    if login is not None:
+        return next((c for c in index.claims if c.author.lower() == login.lower()
+                     and set(c.materials) & set(pr.materials)), None)
+    first = index.claim_for(pr.materials[0]) if pr.materials else None
+    if first is not None and (first.hf is None or first.hf.lower() == pr.author.lower()):
+        return first
+    return None
+
+
+def _notes(credited: list[str], held: list[str], decisions: dict[str, Decision]) -> list[str]:
+    out = []
+    if credited:
+        out.append(f"{', '.join(credited)}: identical to the published table — credited as co-producer.")
+    for m in held:
+        out.append(f"{m}: {decisions[m].reason}; it will be published when the claim holder delivers "
+                   "or releases it.")
+    if held:
+        out.append("This PR stays open for the held material.")
+    return out
+
+
+def _partial_comment(ref: str, head: str, already: bool, published: list[str], notes: list[str]) -> str:
+    mats = ", ".join(published)
+    first = (f"{mats}: already on main as of {ref} (copied from this PR's verified head {head}, byte "
+             "for byte)." if already else
+             f"{mats}: merged as {ref}, copied server-side from this PR's verified head {head}, byte "
+             "for byte.")
+    return "\n\n".join([first, *notes, "Thank you!"])
+
+
+def _decisions(state: dict) -> dict[str, Decision] | None:
+    raw = state.get("decisions")
+    return None if raw is None else {m: Decision(**d) for m, d in raw.items()}
+
+
 def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, staging: Path,
            contributor: str | None, today: str, binary: str | None,
-           build_pages=subprocess.run) -> int:
+           build_pages=subprocess.run, release: list[str] | None = None) -> int:
     """`binary`: the helpmate binary the material pages are mined with; `build_pages`
-    runs tools/build_problems.py (subprocess.run's signature)."""
+    runs tools/build_problems.py (subprocess.run's signature); `release`: materials
+    published even though someone else's claim holds them (accept --release)."""
     if not binary or not Path(binary).is_file():
         return _err(f"no helpmate binary {'at ' + binary if binary else 'on PATH'}: "
                     "the material pages need one; pass --binary PATH")
+    release = list(release or [])
+    not_materials = [m for m in release if canonical(m) != m]
+    if not_materials:
+        return _err(f"--release takes material names, not {', '.join(not_materials)}")
     state_path = staging / f"accept-{'-'.join(map(str, sorted(prs)))}.json"
     state = json.loads(state_path.read_text()) if state_path.exists() else {"done": []}
 
@@ -288,11 +408,11 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
             CorpusFacts.from_manifest(manifest, tables)
         except SyncError as exc:
             return _err(str(exc))
-        published = manifest.get("files", {})
         people: dict[int, dict[str, Any]] = {int(k): v for k, v in state.get("people", {}).items()}
         seen_keys: dict[str, str | None] = {}
         merged = state.setdefault("merged", [])
-        # PR -> {"ref": copy commit URL or main's sha, "already": no commit was needed} (merge_by_copy)
+        # PR -> {"ref": copy commit URL or main's sha, "already": no commit was needed} (merge_by_copy);
+        # a copy of only the published files adds "partial": True and "close": False if the PR stays open
         copied: dict[str, dict | str] = state.setdefault("copied", {})
         for n in prs:
             if n in merged or str(n) in copied:  # merged by an earlier, interrupted run; validated then
@@ -310,16 +430,7 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
             if rep.get("head") != pr.head:
                 return _err(f"PR #{n} changed after verification (verified {rep.get('head')}, "
                             f"now {pr.head}); run verify --pr {n} again")
-            already = [m for m in pr.materials if f"{m}.hm" in published]
-            if already:
-                return _err(f"PR #{n}: {', '.join(already)} already in the dataset")
-            missing = _missing_staged(hub, pr, staging / f"pr-{n}" / "files")
-            if missing:
-                return _err(f"PR #{n}: staged files missing or of the wrong size: {', '.join(missing)}; "
-                            f"run verify --pr {n} again")
-            claim_no = parse_links(pr.description)[0]
-            claim = next((c for c in index.claims if c.issue == claim_no), None) \
-                or (index.claim_for(pr.materials[0]) if pr.materials else None)
+            claim = _identity_claim(pr, index, reg)
             why = ownership_conflict(pr, claim, reg) if claim and not contributor else None
             if why:
                 return _err(f"PR #{n}: {why} (the claims bot shows this as a conflict); "
@@ -343,79 +454,204 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                          "display": who.display, "anonymous": who.anonymous or asks_anonymity,
                          "claim": claim.issue if claim else None}
             stored[str(n)] = {k: v for k, v in asdict(pr).items() if k != "num"}
-        owner: dict[str, int] = {}
-        for n in prs:
-            for m in PullRequest(n, **stored[str(n)]).materials:
-                if m in owner:
-                    return _err(f"{m} is in both PR #{owner[m]} and PR #{n}; accept one of them")
-                owner[m] = n
         state["people"] = {str(k): v for k, v in people.items()}
         save()
+        # The preflight: every material is decided before anything is written to the Hub.
+        decisions = _decisions(state)
+        if decisions is None:
+            from .checks import MissingPublished
+            from .verify import PublishedHashes
+            reports = {}
+            for n in prs:
+                try:
+                    reports[n] = json.loads((staging / f"pr-{n}" / "report.json").read_text())
+                except (OSError, ValueError):
+                    reports[n] = {}
+            try:
+                decisions = decide([PullRequest(n, **stored[str(n)]) for n in prs], reports, manifest,
+                                   PublishedHashes(tables, manifest.get("files", {})), index,
+                                   {n: people[n]["github"] for n in prs}, set(release))
+            except MissingPublished as exc:
+                return _err(f"{exc.material} is published but {exc.material}.hm is missing from "
+                            f"{tables}; point --tables at a complete corpus")
+            conflicts = [f"{m}: {d.reason}" for m, d in sorted(decisions.items()) if d.kind == "conflict"]
+            if conflicts:
+                return _err("; ".join(conflicts) + "; nothing merged")
+            for m in release:
+                c = index.claim_for(m)
+                print(f"--release {m}: " + (f"overrides claim #{c.issue} by {c.author}" if c else
+                                            "not claimed by anyone, nothing to override"), file=sys.stderr)
         for n in prs:
+            if n in merged or str(n) in copied:
+                continue
+            pr = PullRequest(n, **stored[str(n)])
+            names = [f for m in pr.materials if decisions[m].publish_from == n
+                     for f in (f"{m}.hm", f"{m}.stats.json") if f in pr.files]
+            missing = _missing_staged(hub, names, staging / f"pr-{n}" / "files", pr.head)
+            if missing:
+                return _err(f"PR #{n}: staged files missing or of the wrong size: {', '.join(missing)}; "
+                            f"run verify --pr {n} again")
+        if "decisions" not in state:
+            state["decisions"] = {m: asdict(d) for m, d in decisions.items()}
+            save()
+        decided: dict[str, Decision] = decisions
+
+        def plan(n: int) -> tuple[PullRequest, list[str], list[str], list[str]]:
+            """(the PR, materials published from it, held, credited as co-producer)"""
+            pr = PullRequest(n, **stored[str(n)])
+            pub = [m for m in pr.materials if decided[m].publish_from == n]
+            held = [m for m in pr.materials if decided[m].kind == "held"]
+            return pr, pub, held, [m for m in pr.materials if m not in pub and m not in held]
+
+        # PRs that publish go first: no "credited as co-producer" before the published file landed
+        for n in sorted(prs, key=lambda n: (not plan(n)[1], n)):
             if n in merged:
                 continue
+            pr, pub, held, credited = plan(n)
             verified = stored[str(n)]["head"]
-            if str(n) in copied:  # copied by an interrupted run: only the close may be missing
-                if hub.pr_status(n) == "open":
-                    c = copied[str(n)]
-                    if isinstance(c, str):  # state written before {ref, already}: a commit URL
-                        c = {"ref": c, "already": False}
-                    hub.close_pr(n, _copy_comment(c["ref"], verified, c["already"]))
+            p = people[n]
+            credit = "an anonymous contributor" if p.get("anonymous") else p["display"]
+            notes = _notes(credited, held, decided)
+
+            def record(ref: str, already: bool, n: int = n, partial: bool = True,
+                       close: bool = not held) -> None:
+                copied[str(n)] = ({"ref": ref, "already": already, "partial": True, "close": close}
+                                  if partial else {"ref": ref, "already": already})
+                save()
+
+            if str(n) in copied:  # copied by an interrupted run: only the close or comment may be missing
+                prior = copied[str(n)]
+                if isinstance(prior, str):  # state written before {ref, already}: a commit URL
+                    prior = {"ref": prior, "already": False}
+                text = (_partial_comment(prior["ref"], verified, prior["already"], pub, notes)
+                        if prior.get("partial") else _copy_comment(prior["ref"], verified, prior["already"]))
+                if not prior.get("close", True):
+                    hub.comment(n, text)
+                elif hub.pr_status(n) == "open":
+                    hub.close_pr(n, text)
             else:
                 now = hub.pr_head(n)
                 if now != verified:  # a push between validation and this merge
                     return _err(f"PR #{n} changed after verification (verified {verified}, "
                                 f"now {now}); run verify --pr {n} again")
-                try:
-                    hub.merge(n)
-                except HubConflict as exc:
-                    if not exc.files or not set(exc.files) <= {".gitattributes"}:
-                        return _err(f"PR #{n} conflicts with main in {', '.join(exc.files)}; "
-                                    "resolve that on the Hub, then rerun accept")
-                    pr = PullRequest(n, **stored[str(n)])
-                    p = people[n]
-                    credit = "an anonymous contributor" if p.get("anonymous") else p["display"]
-
-                    def record(ref: str, already: bool, n: int = n) -> None:
-                        copied[str(n)] = {"ref": ref, "already": already}
-                        save()
-                    hub.merge_by_copy(n, verified, pr.files,
-                                      message=f"Add {', '.join(pr.materials)} from dataset PR #{n} by {credit}",
-                                      comment=lambda ref, already, head=verified:
-                                          _copy_comment(ref, head, already),
-                                      on_commit=record)
+                if pub and not held and not credited:  # everything is new and published from here
+                    try:
+                        hub.merge(n)
+                    except HubConflict as exc:
+                        if not exc.files or not set(exc.files) <= {".gitattributes"}:
+                            return _err(f"PR #{n} conflicts with main in {', '.join(exc.files)}; "
+                                        "resolve that on the Hub, then rerun accept")
+                        hub.merge_by_copy(n, verified, pr.files,
+                                          message=f"Add {', '.join(pr.materials)} from dataset PR #{n} by {credit}",
+                                          comment=lambda ref, already, head=verified:
+                                              _copy_comment(ref, head, already),
+                                          on_commit=lambda ref, already, n=n: record(ref, already, n, False))
+                elif pub:
+                    copy_files = [f for m in pub for f in (f"{m}.hm", f"{m}.stats.json") if f in pr.files]
+                    hub.merge_by_copy(n, verified, copy_files,
+                                      message=f"Add {', '.join(pub)} from dataset PR #{n} by {credit}",
+                                      comment=lambda ref, already, head=verified, pub=pub, notes=notes:
+                                          _partial_comment(ref, head, already, pub, notes),
+                                      close=not held, on_commit=record)
+                elif held:
+                    hub.comment(n, "\n\n".join([*notes, "Thank you!"]))
+                else:
+                    hub.close_pr(n, "\n\n".join([*notes, "Thank you!"]))
             merged.append(n)
             save()
         mark("merge")
 
     people = {int(k): v for k, v in state["people"].items()}
     pulls = {n: PullRequest(n, **stored[str(n)]) for n in prs}
+    # A state from before decisions finished its merge step under the old rules: all new.
+    decisions = _decisions(state) or {m: Decision("new", n, [n], None, "")
+                                      for n, pr in pulls.items() for m in pr.materials}
+    published = {n: [m for m in pr.materials if decisions[m].publish_from == n] for n, pr in pulls.items()}
+    recorded = {n: [m for m in pr.materials if decisions[m].kind in ("new", "reproduction")]
+                for n, pr in pulls.items()}
+    mats = [m for n in prs for m in published[n]]
+    if not any(recorded.values()):  # everything held: nothing changed on main or in the credits
+        state_path.unlink()
+        return 0
 
     if "manifest" not in state["done"]:
-        old = hub.fetch_manifest()
-        man = manifest_from_hub(hub, old.get("generator_version", "unknown"))
-        hub.commit({"manifest.json": json.dumps(man, indent=2, sort_keys=True).encode()},
-                   f"Manifest after merging PR(s) {', '.join(f'#{n}' for n in prs)}")
+        if mats:  # reproductions alone change no file on main
+            old = hub.fetch_manifest()
+            man = manifest_from_hub(hub, old.get("generator_version", "unknown"))
+            hub.commit({"manifest.json": json.dumps(man, indent=2, sort_keys=True).encode()},
+                       f"Manifest after merging PR(s) {', '.join(f'#{n}' for n in prs)}")
         mark("manifest")
 
     if "local" not in state["done"]:
-        for n, pr in pulls.items():
-            for f in pr.files:
-                src = staging / f"pr-{n}" / "files" / f
-                if f.endswith((".hm", ".stats.json")) and src.exists():
-                    shutil.move(str(src), tables / f)
+        for n in prs:  # only the published files; the other deliveries stay in staging
+            for m in published[n]:
+                for f in (f"{m}.hm", f"{m}.stats.json"):
+                    src = staging / f"pr-{n}" / "files" / f
+                    if src.exists():
+                        shutil.move(str(src), tables / f)
         mark("local")
 
     if "docs" not in state["done"]:
         branch = "data/accept-" + "-".join(map(str, sorted(prs)))
-        lines = []
-        for n, pr in pulls.items():
-            p = people[n]
-            credited = "an anonymous contributor" if p.get("anonymous") else p["display"]
-            lines.append(f"- {', '.join(pr.materials)} contributed by {credited} "
-                         f"(dataset PR #{n}" + (f", claim #{p['claim']}" if p["claim"] else "") + ").")
-        mats = [m for pr in pulls.values() for m in pr.materials]
-        title = f"Data: {len(mats)} table(s) from dataset PR(s) {', '.join(f'#{n}' for n in prs)}"
+        reproduced = sorted({m for ms in recorded.values() for m in ms if len(decisions[m].producers) > 1
+                             or decisions[m].kind == "reproduction"})
+        title = (f"Data: {len(mats)} table(s)" + (f", {len(reproduced)} reproduction(s)" if reproduced else "")
+                 + f" from dataset PR(s) {', '.join(f'#{n}' for n in prs)}")
+
+        def name_of(reg: Registry, key: str) -> str:
+            c = reg.contributors.get(key)
+            return key if c is None else "an anonymous contributor" if c.anonymous else c.display
+
+        def update_registry(reg: Registry) -> list[str]:
+            """Credit this run's deliveries; returns the docs lines for what changed."""
+            before = {m: reg.producers_of(m) for ms in recorded.values() for m in ms}
+            for n, pr in pulls.items():
+                p = people[n]
+                if not recorded[n]:
+                    continue
+                if p["key"] not in reg.contributors:
+                    reg.add_contributor(Contributor(p["key"], p["github"], p["hf"], p["display"],
+                                                    anonymous=p.get("anonymous", False)))
+                elif p.get("anonymous"):  # never set back to False automatically
+                    reg.contributors[p["key"]].anonymous = True
+                rep = json.loads((staging / f"pr-{n}" / "report.json").read_text())
+                for m in published[n]:
+                    sc = json.loads((tables / f"{m}.stats.json").read_text())
+                    reg.record_table(m, contributor=p["key"], hf_pr=n, claim=p["claim"],
+                                     merged=today, generator_version=sc.get("generator_version", ""),
+                                     verification={"tool": rep.get("tool"), "head": rep.get("head"),
+                                                   "date": rep.get("date"),
+                                                   "samples": rep.get("samples"),
+                                                   "seed": rep.get("seed"), "result": rep["result"]})
+            for n in prs:  # after record_table: a co-delivery may come before the published one
+                for m in recorded[n]:
+                    if m in published[n]:
+                        continue
+                    if m not in reg.tables:
+                        print(f"warning: {m} is published but not in data/contributions.json (not a "
+                              f"contribution); PR #{n}'s reproduction is not recorded", file=sys.stderr)
+                        continue
+                    sc_path = staging / f"pr-{n}" / "files" / f"{m}.stats.json"
+                    try:
+                        gv = json.loads(sc_path.read_text()).get("generator_version", "")
+                    except (OSError, ValueError):
+                        gv = ""
+                    reg.add_producer(m, contributor=people[n]["key"], hf_pr=n, date=today,
+                                     generator_version=gv)
+            lines = []
+            for n in prs:
+                if published[n]:
+                    p = people[n]
+                    credited = "an anonymous contributor" if p.get("anonymous") else p["display"]
+                    lines.append(f"- {', '.join(published[n])} contributed by {credited} "
+                                 f"(dataset PR #{n}" + (f", claim #{p['claim']}" if p["claim"] else "") + ").")
+            for m in sorted(before):
+                now = reg.producers_of(m)
+                if len(now) >= 2 and now != before[m]:
+                    names = [name_of(reg, k) for k in now]
+                    lines.append(f"- {m} (independently reproduced by "
+                                 f"{', '.join(names[:-1])} and {names[-1]}).")
+            return lines
 
         def attempt() -> int | None:
             if not sub("committed"):
@@ -433,22 +669,12 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                     save()
                 git.reset_to_origin_main(branch, DOCS_PATHS)
                 reg = Registry.load(reg_path)
-                for n, pr in pulls.items():
-                    p = people[n]
-                    if p["key"] not in reg.contributors:
-                        reg.add_contributor(Contributor(p["key"], p["github"], p["hf"], p["display"],
-                                                        anonymous=p.get("anonymous", False)))
-                    elif p.get("anonymous"):  # never set back to False automatically
-                        reg.contributors[p["key"]].anonymous = True
-                    rep = json.loads((staging / f"pr-{n}" / "report.json").read_text())
-                    for m in pr.materials:
-                        sc = json.loads((tables / f"{m}.stats.json").read_text())
-                        reg.record_table(m, contributor=p["key"], hf_pr=n, claim=p["claim"],
-                                         merged=today, generator_version=sc.get("generator_version", ""),
-                                         verification={"tool": rep.get("tool"), "head": rep.get("head"),
-                                                       "date": rep.get("date"),
-                                                       "samples": rep.get("samples"),
-                                                       "seed": rep.get("seed"), "result": rep["result"]})
+                lines = update_registry(reg)
+                if not lines:  # every delivery was credited already (a rerun): nothing to commit
+                    git.back(state["original"])
+                    state["docs_empty"] = True
+                    save()
+                    return None
                 reg.save()
                 cl = checkout / "CHANGELOG.md"
                 text = cl.read_text()
@@ -458,20 +684,23 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                 sync(checkout, hub, gh, reg, tables, close_claims=False)
                 # After sync: build_problems skips a material materials.json does not list as done.
                 # A docs-PR conflict retry runs this again (minutes per six-piece table).
-                build_material_pages(mats, checkout=checkout, tables=tables, binary=binary,
-                                     runner=build_pages)
+                if mats:
+                    build_material_pages(mats, checkout=checkout, tables=tables, binary=binary,
+                                         runner=build_pages)
                 write_site_data(checkout / "site" / "data", tables)  # the page flags, now true
                 trailers = sorted({f"Co-authored-by: {p['github']} <{gh.user_id(p['github'])}+"
                                    f"{p['github']}@users.noreply.github.com>"
-                                   for p in people.values()
-                                   if p["github"] and not reg.contributors[p["key"]].anonymous})
+                                   for n, p in people.items()
+                                   if recorded.get(n) and p["github"]
+                                   and not reg.contributors[p["key"]].anonymous})
                 git.commit_all(title + "\n\n" + "\n".join(lines) + "\n\n" + "\n".join(trailers))
+                state["lines"] = lines
                 sub_done("committed")
             if "docs_pr" not in state:
                 if not sub("pushed"):
                     git.push(branch)
                     sub_done("pushed")
-                state["docs_pr"] = git.open_pr(title, "\n".join(lines), branch)
+                state["docs_pr"] = git.open_pr(title, "\n".join(state.get("lines", [])), branch)
                 save()
             git.back(state.get("original", "main"))  # before the merge deletes the data branch
             if not sub("docs_merged"):
@@ -503,6 +732,8 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
             return rc
         mark("docs")
 
+    if state.get("docs_empty"):  # a rerun that credited nothing new: card and claims are as they were
+        state["done"] += [s for s in ("card", "claims") if s not in state["done"]]
     if "card" not in state["done"]:  # only now: the public card must not credit a failed docs PR
         # main's card, not a copy from this run's docs step: a later accept run may have published a newer one
         card = git.main_file("docs/hf-dataset-card.md")
@@ -525,8 +756,8 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
     if "claims" not in state["done"]:
         for n, pr in pulls.items():
             c = people[n]["claim"]
-            if c is not None and n not in state.setdefault("commented", []):
-                gh.comment(c, f"Accepted: {', '.join(pr.materials)} ([HF PR #{n}]({pr.url})) — "
+            if c is not None and recorded[n] and n not in state.setdefault("commented", []):
+                gh.comment(c, f"Accepted: {', '.join(recorded[n])} ([HF PR #{n}]({pr.url})) — "
                               f"now in the dataset and credited on {SITE_MATERIALS_URL}. Thank you!")
                 state["commented"].append(n)
                 save()

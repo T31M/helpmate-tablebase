@@ -56,6 +56,9 @@ def add_parsers(sub) -> None:
     ac.add_argument("--github-repo", default=GITHUB_REPO)
     ac.add_argument("--binary", metavar="PATH",
                     help="helpmate binary for the material pages (default: helpmate on PATH)")
+    ac.add_argument("--release", nargs="+", default=[], metavar="MATERIAL",
+                    help="publish these materials although someone else's claim holds them "
+                         "(after asking the claim holder); prints the claim each one overrides")
     st = sub.add_parser("status", help="(maintainer) open dataset PRs, claims, verification")
     st.add_argument("--checkout", type=Path, default=Path("."))
     st.add_argument("--staging", type=Path, default=DEFAULT_STAGING)
@@ -167,7 +170,7 @@ def run(a: argparse.Namespace, hub_factory=None, gh_factory=None, git_factory=No
             return accept(a.pr, hub=hub, gh=gh, git=Git(checkout), checkout=checkout,
                           tables=Path(a.tables).expanduser(), staging=Path(a.staging).expanduser(),
                           contributor=a.contributor, today=date.today().isoformat(),
-                          binary=_absolute_binary(a.binary))
+                          binary=_absolute_binary(a.binary), release=a.release)
         if a.cmd == "stats-push":
             from .hf import Hub
             from .stats_push import StatsError, check, push
