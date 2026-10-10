@@ -365,10 +365,12 @@ def _decisions(state: dict) -> dict[str, Decision] | None:
 
 def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, staging: Path,
            contributor: str | None, today: str, binary: str | None,
-           build_pages=subprocess.run, release: list[str] | None = None) -> int:
+           build_pages=subprocess.run, release: list[str] | None = None,
+           no_pages: bool = False) -> int:
     """`binary`: the helpmate binary the material pages are mined with; `build_pages`
     runs tools/build_problems.py (subprocess.run's signature); `release`: materials
-    published even though someone else's claim holds them (accept --release)."""
+    published even though someone else's claim holds them (accept --release); `no_pages`: skip the page build
+    (helpmate-tables pages builds them later)."""
     if not binary or not Path(binary).is_file():
         return _err(f"no helpmate binary {'at ' + binary if binary else 'on PATH'}: "
                     "the material pages need one; pass --binary PATH")
@@ -699,7 +701,7 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                 sync(checkout, hub, gh, reg, tables, close_claims=False)
                 # After sync: build_problems skips a material materials.json does not list as done.
                 # A docs-PR conflict retry runs this again (minutes per six-piece table).
-                if mats:
+                if mats and not no_pages:
                     build_material_pages(mats, checkout=checkout, tables=tables, binary=binary,
                                          runner=build_pages)
                 write_site_data(checkout / "site" / "data", tables)  # the page flags, now true

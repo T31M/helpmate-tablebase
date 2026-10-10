@@ -1143,3 +1143,12 @@ def test_card_step_fails_when_the_published_statistics_do_not_match(tmp_path, mo
     assert "card" not in state["done"]            # a rerun resumes at the card step
     monkeypatch.undo()
     assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+
+
+def test_accept_no_pages_never_calls_the_page_builder(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    pages = PageBuilder()
+    assert accept([2], hub=hub, gh=gh, git=FakeGit(), checkout=checkout, tables=tables, staging=staging,
+                  contributor=None, today="2026-10-01", binary=BINARY, build_pages=pages,
+                  no_pages=True) == 0
+    assert pages.calls == []

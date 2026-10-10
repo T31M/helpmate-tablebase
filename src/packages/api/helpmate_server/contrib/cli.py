@@ -10,7 +10,7 @@ from pathlib import Path
 
 from . import DATASET_REPO, DEFAULT_STAGING, GITHUB_REPO
 
-CONTRIB_COMMANDS = {"verify", "status", "accept", "sync", "claims", "site-status", "stats-push"}
+CONTRIB_COMMANDS = {"verify", "status", "accept", "sync", "claims", "site-status", "stats-push", "pages"}
 
 
 class UsageError(Exception):
@@ -59,6 +59,19 @@ def add_parsers(sub) -> None:
     ac.add_argument("--release", nargs="+", default=[], metavar="MATERIAL",
                     help="publish these materials although someone else's claim holds them "
                          "(after asking the claim holder); prints the claim each one overrides")
+    ac.add_argument("--no-pages", action="store_true",
+                    help="do not build the material pages now (helpmate-tables pages does it later)")
+    pg = sub.add_parser("pages", help="(maintainer) build material pages in parallel jobs and ship them as a docs PR")
+    pg.add_argument("--tables", required=True, metavar="DIR")
+    pw = pg.add_mutually_exclusive_group(required=True)
+    pw.add_argument("--missing", action="store_true", help="every done material without a page")
+    pw.add_argument("--material", action="extend", nargs="+", metavar="M")
+    pg.add_argument("--jobs", type=int, default=1, metavar="N")
+    pg.add_argument("--binary", metavar="PATH", help="helpmate binary (default: helpmate on PATH)")
+    pg.add_argument("--checkout", type=Path, default=Path("."))
+    pg.add_argument("--staging", type=Path, default=DEFAULT_STAGING)
+    pg.add_argument("--allow-failures", action="store_true",
+                    help="open the PR for the pages that were built although others failed")
     st = sub.add_parser("status", help="(maintainer) open dataset PRs, claims, verification")
     st.add_argument("--checkout", type=Path, default=Path("."))
     st.add_argument("--staging", type=Path, default=DEFAULT_STAGING)
@@ -170,7 +183,25 @@ def run(a: argparse.Namespace, hub_factory=None, gh_factory=None, git_factory=No
             return accept(a.pr, hub=hub, gh=gh, git=Git(checkout), checkout=checkout,
                           tables=Path(a.tables).expanduser(), staging=Path(a.staging).expanduser(),
                           contributor=a.contributor, today=date.today().isoformat(),
-                          binary=_absolute_binary(a.binary), release=a.release)
+                          binary=_absolute_binary(a.binary), release=a.release,
+                          no_pages=a.no_pages)
+        if a.cmd == "pages":
+            from datetime import date
+            from .accept import Git
+            from .pages import missing_pages, run_pages
+            checkout = Path(a.checkout).resolve()
+            if not (checkout / "data" / "contributions.json").exists():
+                raise UsageError(f"{checkout} is not a helpmate-tablebase checkout")
+            binary = _absolute_binary(a.binary)
+            if not binary or not Path(binary).is_file():
+                raise UsageError("no helpmate binary: pass --binary PATH")
+            if a.jobs < 1:
+                raise UsageError("--jobs must be at least 1")
+            mats = missing_pages(checkout) if a.missing else a.material
+            return run_pages(mats, checkout=checkout, tables=Path(a.tables).expanduser(), binary=binary,
+                             jobs=a.jobs, staging=Path(a.staging).expanduser(),
+                             git=(git_factory or Git)(checkout), today=date.today().isoformat(),
+                             allow_failures=a.allow_failures)
         if a.cmd == "stats-push":
             from .hf import Hub
             from .stats_push import StatsError, check, push
