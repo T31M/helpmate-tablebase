@@ -78,7 +78,10 @@ class Registry:
 
     def producers_of(self, material: str) -> list[str]:
         """Contributor keys of every producer of `material`, in delivery order."""
-        return [p["contributor"] for p in self.tables.get(material, {}).get("producers", [])]
+        entry = self.tables.get(material)
+        if entry is None:
+            return []
+        return [p["contributor"] for p in _migrated(entry)["producers"]]
 
     def tables_of(self, key: str) -> list[str]:
         """The materials `key` produced (published from their file or reproduced)."""

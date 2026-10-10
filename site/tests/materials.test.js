@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { STATES, priorityLabel, wildcardMatch, mergeStatus, filterRows, defaultOrder,
-  parseQuery, toQuery, esc, contributorCards, sixProgress, validStatus, sortMaterials }
+  parseQuery, toQuery, esc, contributorCards, sixProgress, validStatus, sortMaterials, contributorCell }
   from "../js/lib/materials.js";
 
 const row = (material, o = {}) => ({ material, pieces: 6, pawns: 0, priority: 1, done: false, ...o });
@@ -151,4 +151,34 @@ test("six-piece progress falls back on a malformed status", () => {
   assert.equal(sixProgress({ counts: {} }, corpus), fallback);
   assert.equal(sixProgress({ counts: { six: { done: 1, open: 2 } } }, corpus), fallback);
   assert.ok(!sixProgress({ counts: { six: { done: 1 } } }, corpus).includes("undefined"));
+});
+
+test("producers: merged, filtered, shown and counted", () => {
+  const status = { materials: { KQvkqqq: { state: "done", contributor: "popeye37",
+    producers: ["popeye37", "T31M"], hf_pr: 19, claim: null } } };
+  const rows = mergeStatus([{ material: "KQvkqqq", pieces: 6, pawns: 0, priority: 1 }], status);
+  assert.deepEqual(rows[0].producers, ["popeye37", "T31M"]);
+  assert.equal(filterRows(rows, { contributor: "T31M" }).length, 1);
+  assert.equal(filterRows(rows, { contributor: "popeye37" }).length, 1);
+  assert.equal(filterRows(rows, { contributor: "nobody" }).length, 0);
+  const cell = contributorCell(rows[0]);
+  assert.ok(cell.startsWith("popeye37 · T31M") && cell.includes("✓ reproduced"));
+  assert.equal(contributorCell({ contributor: "x", producers: ["x"] }), "x");
+  assert.equal(contributorCell({ contributor: "<b>", producers: undefined }), "&lt;b&gt;");
+  const html = contributorCards({ contributors: [
+    { display: "T", hf: null, github: null, anonymous: false, tables: 1, reproduced: 1, six: 0, materials: [] }] });
+  assert.ok(html.includes("1 independently reproduced"));
+  assert.ok(!contributorCards({ contributors: [
+    { display: "T", anonymous: false, tables: 1, reproduced: 0, six: 0, materials: [] }] }).includes("reproduced"));
+});
+
+test("old status.json without producers still validates and merges", () => {
+  const old = structuredClone(GOOD);
+  old.materials.KQvk = { state: "done", contributor: "T31M", hf_pr: 1, claim: null };
+  assert.equal(validStatus(old), true);
+  const withNew = structuredClone(GOOD);
+  withNew.materials.KQvk = { state: "done", contributor: "T31M", producers: ["T31M"], hf_pr: 1, claim: null };
+  assert.equal(validStatus(withNew), true);
+  const r = mergeStatus([{ material: "KQvk", pieces: 3, pawns: 0, priority: 1 }], old);
+  assert.deepEqual(r[0].producers, ["T31M"]);
 });
