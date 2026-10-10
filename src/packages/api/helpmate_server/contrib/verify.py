@@ -322,13 +322,11 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         return 2
     manifest_files = hub.fetch_manifest().get("files", {})
     gh = None if a.no_post else (gh_factory or GitHub)(a.github_repo)
-    gh_read = gh if gh is not None else (gh_factory(a.github_repo) if gh_factory else None)
     index, claims_note = None, ""
-    if gh_read is not None:
-        try:
-            index = load_index(gh_read)
-        except Exception:  # noqa: BLE001 - claims are advisory; verification goes on without them
-            claims_note = "; claims unavailable"
+    try:
+        index = load_index(gh if gh is not None else (gh_factory or GitHub)(a.github_repo))
+    except Exception:  # noqa: BLE001 - claims are advisory; verification goes on without them
+        claims_note = "; claims unavailable"
     hashes = PublishedHashes(tables, manifest_files)
     delivered: dict[str, tuple[int, str | None]] = {}   # material -> (PR, payload if it passed)
     rc = 0
@@ -340,10 +338,7 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         files_dir = d / "files"
         d.mkdir(parents=True, exist_ok=True)
         v1, dups = check_pr_hygiene(pr, manifest_files)
-        earlier: dict[str, int] = {}
-        for other in sorted(prs, key=lambda x: -x.num):
-            if other.num < pr.num:
-                earlier.update({m: other.num for m in other.materials})
+        earlier = {m: n for m, (n, _) in delivered.items() if n < pr.num}
         labels = classify(pr, manifest_files, index, earlier, pr_login)
         notes = [f"{m}: {label}" for m, label in labels.items() if label != "new"]
         if notes or claims_note:

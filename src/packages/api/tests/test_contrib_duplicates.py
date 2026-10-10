@@ -130,3 +130,83 @@ def test_second_pr_repeating_the_first_is_verified_against_it(tmp_path, compress
     assert c3["V8"]["status"] == "pass" and "HF PR #2" in c3["V8"]["detail"]
     assert all(c3[k]["status"] == "skip" and "HF PR #2" in c3[k]["detail"] for k in ("V5", "V6", "V7"))
     assert "KQvk: duplicate of HF PR #2" in r3["pr_checks"][0]["detail"]
+
+
+def test_marker_redelivered_as_identical_marker_passes_v8(table_copy):
+    from helpmate_server.contrib.tablefile import read_header
+    marker = next(p.stem for p in sorted(table_copy.glob("*.hm")) if read_header(p).marker)
+    published = PublishedHashes(table_copy, {f"{marker}.hm": {"sha256": "s", "size": 1}}).get(marker)
+    assert published.startswith("marker:")
+    rep = verify_table(marker, table_copy, VerifyOptions(seed=1), "99.0.0", published=published)
+    assert rep.passed and {c.id: c.status for c in rep.checks}["V8"] == "pass"
+    assert not verify_table(marker, table_copy, VerifyOptions(seed=1), "99.0.0",
+                            published="a" * 64).passed
+
+
+def _fresh_hub(corpus, tmp_path, prs=(2,), description="Claim: #39", broken=()):
+    """Main and --tables lack KQvk; each PR in `prs` delivers it (truncated if in `broken`)."""
+    main = {p.name: p.read_bytes() for p in corpus.iterdir() if not p.name.startswith("KQvk.")}
+    hub = FakeHub(main)
+    for n in prs:
+        hm = (corpus / "KQvk.hm").read_bytes()
+        hub.add_pr(n, {"KQvk.hm": hm[:200] if n in broken else hm,
+                       "KQvk.stats.json": (corpus / "KQvk.stats.json").read_bytes()},
+                   description=description, head=f"h{n}")
+    tables = tmp_path / "tb"
+    tables.mkdir()
+    for name in main:
+        if name != "manifest.json":
+            (tables / name).write_bytes(main[name])
+    return hub, tables
+
+
+def _report(tmp_path, n):
+    return json.loads((tmp_path / "st" / f"pr-{n}" / "report.json").read_text())
+
+
+def test_failed_earlier_pr_is_neither_source_nor_named(tmp_path, compressed_tables):
+    hub, tables = _fresh_hub(compressed_tables, tmp_path, prs=(2, 3), broken=(2,))
+    assert _verify(hub, tables, tmp_path / "st", 2, 3) == 1
+    assert _report(tmp_path, 2)["result"] == "fail"
+    r3 = _report(tmp_path, 3)
+    ids = {c["id"] for c in r3["tables"]["KQvk"]["checks"]}
+    assert r3["result"] == "pass" and "V8" not in ids
+    assert "HF PR #2" not in r3["pr_checks"][0]["detail"]
+
+
+def test_duplicate_whose_v8_fails_fails_the_run(tmp_path, compressed_tables, monkeypatch):
+    hub = _dup_hub(compressed_tables)
+    monkeypatch.setattr(PublishedHashes, "get", lambda self, m: "f" * 64)
+    assert _verify(hub, compressed_tables, tmp_path / "st", 2) == 1
+    checks = {c["id"]: c for c in _report(tmp_path, 2)["tables"]["KQvk"]["checks"]}
+    assert checks["V8"]["status"] == "fail" and "differs" in checks["V8"]["detail"]
+
+
+def _claim_issue(n, author, title):
+    return {"number": n, "title": title, "body": "", "user": {"login": author},
+            "created_at": "2026-10-01T00:00:00Z", "labels": [], "state": "open"}
+
+
+def test_no_post_still_reads_claims_and_notes_held_material(tmp_path, compressed_tables, monkeypatch):
+    hub, tables = _fresh_hub(compressed_tables, tmp_path, description="Claim: #39\nGitHub: @bob")
+    gh = FakeGitHub([_claim_issue(39, "alice", "Claim: KQvk")])
+    monkeypatch.setattr("helpmate_server.contrib.github.GitHub", lambda repo: gh)
+    argv = ["verify", "--tables", str(tables), "--staging", str(tmp_path / "st"), "--yes",
+            "--no-post", "--pr", "2", *ARGS]
+    assert tables_cli.main(argv, hub_factory=lambda r: hub) == 0     # gh_factory=None, as the real CLI
+    r = _report(tmp_path, 2)
+    assert "KQvk: held for claim #39" in r["pr_checks"][0]["detail"] and r["result"] == "pass"
+    assert gh.posted == []
+
+
+def test_claims_unavailable_is_noted(tmp_path, compressed_tables):
+    hub, tables = _fresh_hub(compressed_tables, tmp_path)
+
+    class Broken(FakeGitHub):
+        def claim_issues(self):
+            raise OSError("offline")
+
+    argv = ["verify", "--tables", str(tables), "--staging", str(tmp_path / "st"), "--yes",
+            "--no-post", "--pr", "2", *ARGS]
+    assert tables_cli.main(argv, hub_factory=lambda r: hub, gh_factory=lambda r: Broken()) == 0
+    assert "claims unavailable" in _report(tmp_path, 2)["pr_checks"][0]["detail"]
