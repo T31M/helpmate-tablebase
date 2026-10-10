@@ -52,7 +52,9 @@ def verify_table(material: str, tables: Path, opts: VerifyOptions,
         rep.checks.append(check())
         if not rep.passed:
             return rep  # later checks would only restate a structural failure
-    rep.checks.append(check_sidecar(path))
+    v4, payload = check_sidecar(path)
+    rep.checks.append(v4)
+    rep.payload_sha256 = payload
     rep.checks.append(check_deepest(path, tables))
     if read_header(path).marker:
         rep.checks.append(Check("V6", "local consistency", "skip", "marker table"))
