@@ -390,6 +390,252 @@ def _decisions(state: dict) -> dict[str, Decision] | None:
     return None if raw is None else {m: Decision(**d) for m, d in raw.items()}
 
 
+def _merged_decisions(state: dict, pulls: dict[int, PullRequest]) -> dict[str, Decision]:
+    """The decisions of a run whose merge step is done. A state from before decisions finished
+    its merge step under the old rules: all new."""
+    return _decisions(state) or {m: Decision("new", n, [n], None, "")
+                                 for n, pr in pulls.items() for m in pr.materials}
+
+
+def _check_args(prs: list[int], contributor: str | None, binary: str | None,
+                release: list[str]) -> int | None:
+    """The usage errors of accept (and accept --plan) that need nothing but the arguments."""
+    if not binary or not Path(binary).is_file():
+        return _err(f"no helpmate binary {'at ' + binary if binary else 'on PATH'}: "
+                    "the material pages need one; pass --binary PATH")
+    if contributor and len(prs) > 1:
+        return _err("--contributor applies to every PR of a run; accept the PR that needs it on "
+                    "its own with --contributor LOGIN")
+    not_materials = [m for m in release if canonical(m) != m]
+    if not_materials:
+        return _err(f"--release takes material names, not {', '.join(not_materials)}")
+    return None
+
+
+def _state_path(staging: Path, prs: list[int]) -> Path:
+    return staging / f"accept-{'-'.join(map(str, sorted(prs)))}.json"
+
+
+@dataclass
+class _Prepared:
+    """What the read-only preparation of a run found (accept's preflight, accept --plan)."""
+    people: dict[int, dict[str, Any]]
+    decisions: dict[str, Decision]
+    heads: dict[str, str | None]
+    conflicts: list[str]          # non-empty: the run stops before any write
+
+
+def _prepare(prs: list[int], state: dict, save, *, hub, gh, git, checkout: Path, tables: Path,
+             staging: Path, contributor: str | None, release: list[str]) -> _Prepared | int:
+    """Everything accept checks and decides before its first write: the PRs are open, verified
+    at their head and staged; every contributor is known; every material is decided. Reads the
+    Hub, GitHub and origin/main only; changes nothing but the in-memory `state` (written only
+    through `save`, a no-op for accept --plan). Returns the rc of a usage error instead."""
+    reg_path = checkout / "data" / "contributions.json"
+    # What each PR contained, as validated: after the merge the Hub is never asked again.
+    stored: dict[str, dict] = state.setdefault("pulls", {})
+
+    def fix(n: int) -> str:
+        """How to name the PR's contributor: --contributor holds for the whole run."""
+        return ("pass --contributor LOGIN" if len(prs) == 1 else
+                f"accept PR #{n} on its own with --contributor LOGIN")
+
+    index = load_index(gh)
+    if not git.clean():
+        return _err(f"{checkout} has uncommitted changes")
+    reg = Registry.load(reg_path)
+    manifest = hub.fetch_manifest()
+    try:  # sync needs every published sidecar locally; find out before merging
+        CorpusFacts.from_manifest(manifest, tables)
+    except SyncError as exc:
+        return _err(str(exc))
+    people: dict[int, dict[str, Any]] = {int(k): v for k, v in state.get("people", {}).items()}
+    seen_keys: dict[str, str | None] = {}
+    merged = state.setdefault("merged", [])
+    # PR -> {"ref": copy commit URL or main's sha, "already": no commit was needed} (merge_by_copy);
+    # a copy of only the published files adds "partial": True and "close": False if the PR stays open
+    copied: dict[str, dict | str] = state.setdefault("copied", {})
+    for n in prs:
+        if n in merged or str(n) in copied:  # merged by an earlier, interrupted run; validated then
+            seen_keys[people[n]["key"]] = people[n]["github"]
+            continue
+        pr = hub.pull_request(n)
+        rep_path = staging / f"pr-{n}" / "report.json"
+        if not rep_path.exists():
+            return _err(f"PR #{n} has no verification report; run verify --pr {n}")
+        rep = json.loads(rep_path.read_text())
+        if rep["result"] != "pass":
+            return _err(f"PR #{n}: the last verification failed")
+        if pr.status != "open":
+            return _err(f"PR #{n} is {pr.status}")
+        if rep.get("head") != pr.head:
+            return _err(f"PR #{n} changed after verification (verified {rep.get('head')}, "
+                        f"now {pr.head}); run verify --pr {n} again")
+        claim = _identity_claim(pr, index, reg)
+        why = ownership_conflict(pr, claim, reg) if claim and not contributor else None
+        if why:
+            return _err(f"PR #{n}: {why} (the claims bot shows this as a conflict); {fix(n)}")
+        who = resolve_contributor(reg, pr, claim, contributor)
+        if who is None:
+            return _err(f"PR #{n} by HF user {pr.author}: no GitHub identity found; {fix(n)}")
+        known = reg.contributors.get(who.key)
+        other = known.github if known else seen_keys.get(who.key)
+        if (known or who.key in seen_keys) and (other or "").lower() != (who.github or "").lower():
+            return _err(f"PR #{n}: registry key {who.key!r} already belongs to GitHub user "
+                        f"{other!r}, not {who.github!r}; {fix(n)} with the right login "
+                        "or fix data/contributions.json")
+        seen_keys[who.key] = who.github
+        # Anonymity is per person and permanent: an anonymous claim form by this person
+        # hides them from now on, even if they were registered under their name before.
+        asks_anonymity = bool(claim and claim.anonymous and who.github
+                              and claim.author.lower() == who.github.lower())
+        people[n] = {"key": who.key, "github": who.github, "hf": who.hf,
+                     "display": who.display, "anonymous": who.anonymous or asks_anonymity,
+                     "claim": claim.issue if claim else None}
+        stored[str(n)] = {k: v for k, v in asdict(pr).items() if k != "num"}
+    state["people"] = {str(k): v for k, v in people.items()}
+    save()
+    # The preflight: every material is decided before anything is written to the Hub.
+    decisions = _decisions(state)
+    heads: dict[str, str | None] = {str(n): stored[str(n)]["head"] for n in prs}
+    heads["manifest"] = _manifest_key(manifest, [m for n in prs
+                                                 for m in PullRequest(n, **stored[str(n)]).materials])
+    if decisions is not None and (release or state.get("decision_heads") != heads):
+        # a PR was revised (and verified again) since the decisions, another run published
+        # one of the materials, or the maintainer overrides a claim now: decide again
+        decisions = None
+        state.pop("decisions", None)
+    if decisions is None:
+        from .checks import MissingPublished
+        from .verify import PublishedHashes
+        reports = {}
+        for n in prs:
+            try:
+                reports[n] = json.loads((staging / f"pr-{n}" / "report.json").read_text())
+            except (OSError, ValueError):
+                reports[n] = {}
+        try:
+            decisions = decide([PullRequest(n, **stored[str(n)]) for n in prs], reports, manifest,
+                               PublishedHashes(tables, manifest.get("files", {})), index,
+                               {n: people[n]["github"] for n in prs}, set(release))
+        except MissingPublished as exc:
+            return _err(f"{exc.material} is published but {exc.material}.hm is missing from "
+                        f"{tables}; point --tables at a complete corpus")
+        conflicts = [f"{m}: {d.reason}" for m, d in sorted(decisions.items()) if d.kind == "conflict"]
+        if conflicts:
+            return _Prepared(people, decisions, heads, conflicts)
+        on_main = Registry(reg_path, json.loads(git.main_file("data/contributions.json")))
+        state["own"] = _own_deliveries([on_main, reg],
+                                       {n: PullRequest(n, **stored[str(n)]) for n in prs})
+        for m in release:
+            c = index.claim_for(m)
+            print(f"--release {m}: " + (f"overrides claim #{c.issue} by {c.author}" if c else
+                                        "not claimed by anyone, nothing to override"), file=sys.stderr)
+    for n in prs:
+        if n in merged or str(n) in copied:
+            continue
+        pr = PullRequest(n, **stored[str(n)])
+        names = [f for m in pr.materials if decisions[m].publish_from == n
+                 for f in (f"{m}.hm", f"{m}.stats.json") if f in pr.files]
+        missing = _missing_staged(hub, names, staging / f"pr-{n}" / "files", pr.head)
+        if missing:
+            return _err(f"PR #{n}: staged files missing or of the wrong size: {', '.join(missing)}; "
+                        f"run verify --pr {n} again")
+    return _Prepared(people, decisions, heads, [])
+
+
+Action = Literal["merge", "copy_close", "copy_open", "comment", "close"]
+
+
+def _pr_plan(pr: PullRequest, decided: dict[str, Decision], own: list[str]
+             ) -> tuple[list[str], list[str], list[str], Action]:
+    """(materials published from the PR, held, credited as co-producer, what happens to the PR).
+    `own`: materials already credited to this PR by an earlier run."""
+    pub = [m for m in pr.materials if decided[m].publish_from == pr.num]
+    held = [m for m in pr.materials if decided[m].kind == "held"]
+    credited = [m for m in pr.materials if m not in pub + held + own]
+    action: Action = ("merge" if pub and not held and not credited and not own  # all new, from here
+                      else "copy_open" if pub and held else "copy_close" if pub
+                      else "comment" if held else "close")
+    return pub, held, credited, action
+
+
+def _outcome(decisions: dict[str, Decision], pulls: dict[int, PullRequest], own: dict[str, list[str]]
+             ) -> tuple[dict[int, list[str]], dict[int, list[str]]]:
+    """(PR -> materials published from it, PR -> materials credited to it in this run).
+    A PR's own earlier delivery (published from it or credited) is not recorded again."""
+    published = {n: [m for m in pr.materials if decisions[m].publish_from == n] for n, pr in pulls.items()}
+    recorded = {n: [m for m in pr.materials if decisions[m].kind in ("new", "reproduction")
+                    and m not in own.get(str(n), [])]
+                for n, pr in pulls.items()}
+    return published, recorded
+
+
+def _credit(reg: Registry, *, prs: list[int], pulls: dict[int, PullRequest], people: dict,
+            published: dict[int, list[str]], recorded: dict[int, list[str]], staging: Path,
+            tables: Path, today: str, sidecar) -> list[str]:
+    """Credit this run's deliveries in `reg` (in memory); returns the CHANGELOG lines for what
+    changed. `sidecar(n, m)`: the path of the sidecar published from PR `n` for `m`."""
+    def name_of(key: str) -> str:
+        c = reg.contributors.get(key)
+        return key if c is None else "an anonymous contributor" if c.anonymous else c.display
+
+    before = {m: reg.producers_of(m) for ms in recorded.values() for m in ms}
+    for n in pulls:
+        p = people[n]
+        if not recorded[n]:
+            continue
+        if p["key"] not in reg.contributors:
+            reg.add_contributor(Contributor(p["key"], p["github"], p["hf"], p["display"],
+                                            anonymous=p.get("anonymous", False)))
+        elif p.get("anonymous"):  # never set back to False automatically
+            reg.contributors[p["key"]].anonymous = True
+        rep = json.loads((staging / f"pr-{n}" / "report.json").read_text())
+        for m in published[n]:
+            sc = json.loads(sidecar(n, m).read_text())
+            reg.record_table(m, contributor=p["key"], hf_pr=n, claim=p["claim"],
+                             merged=today, generator_version=sc.get("generator_version", ""),
+                             verification={"tool": rep.get("tool"), "head": rep.get("head"),
+                                           "date": rep.get("date"),
+                                           "samples": rep.get("samples"),
+                                           "seed": rep.get("seed"), "result": rep["result"]})
+    for n in prs:  # after record_table: a co-delivery may come before the published one
+        for m in recorded[n]:
+            if m in published[n]:
+                continue
+            if m not in reg.tables:  # one of the maintainer's own tables: credit both
+                try:
+                    gv = json.loads((tables / f"{m}.stats.json").read_text()).get("generator_version", "")
+                except (OSError, ValueError):
+                    gv = ""
+                reg.tables[m] = {"contributor": MAINTAINER, "hf_pr": None, "claim": None,
+                                 "merged": None, "generator_version": gv, "verification": None,
+                                 "producers": [{"contributor": MAINTAINER, "hf_pr": None,
+                                                "date": None, "generator_version": gv}],
+                                 "published_from": None}
+            sc_path = staging / f"pr-{n}" / "files" / f"{m}.stats.json"
+            try:
+                gv = json.loads(sc_path.read_text()).get("generator_version", "")
+            except (OSError, ValueError):
+                gv = ""
+            reg.add_producer(m, contributor=people[n]["key"], hf_pr=n, date=today,
+                             generator_version=gv)
+    lines = []
+    for n in prs:
+        if published[n]:
+            p = people[n]
+            credited = "an anonymous contributor" if p.get("anonymous") else p["display"]
+            lines.append(f"- {', '.join(published[n])} contributed by {credited} "
+                         f"(dataset PR #{n}" + (f", claim #{p['claim']}" if p["claim"] else "") + ").")
+    for m in sorted(before):
+        now = reg.producers_of(m)
+        if len(now) >= 2 and now != before[m]:
+            names = [name_of(k) for k in now]
+            lines.append(f"- {m} (independently reproduced by "
+                         f"{', '.join(names[:-1])} and {names[-1]}).")
+    return lines
+
+
 def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, staging: Path,
            contributor: str | None, today: str, binary: str | None,
            build_pages=subprocess.run, release: list[str] | None = None,
@@ -398,17 +644,12 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
     runs tools/build_problems.py (subprocess.run's signature); `release`: materials
     published even though someone else's claim holds them (accept --release); `no_pages`: skip the page build
     (helpmate-tables pages builds them later)."""
-    if not binary or not Path(binary).is_file():
-        return _err(f"no helpmate binary {'at ' + binary if binary else 'on PATH'}: "
-                    "the material pages need one; pass --binary PATH")
-    if contributor and len(prs) > 1:
-        return _err("--contributor applies to every PR of a run; accept the PR that needs it on "
-                    "its own with --contributor LOGIN")
     release = list(release or [])
-    not_materials = [m for m in release if canonical(m) != m]
-    if not_materials:
-        return _err(f"--release takes material names, not {', '.join(not_materials)}")
-    state_path = staging / f"accept-{'-'.join(map(str, sorted(prs)))}.json"
+    rc = _check_args(prs, contributor, binary, release)
+    if rc is not None:
+        return rc
+    assert binary is not None  # _check_args
+    state_path = _state_path(staging, prs)
     state = json.loads(state_path.read_text()) if state_path.exists() else {"done": []}
 
     def save() -> None:
@@ -428,137 +669,38 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
         save()
 
     reg_path = checkout / "data" / "contributions.json"
-    # What each PR contained, as validated: after the merge the Hub is never asked again.
     stored: dict[str, dict] = state.setdefault("pulls", {})
 
-    def fix(n: int) -> str:
-        """How to name the PR's contributor: --contributor holds for the whole run."""
-        return ("pass --contributor LOGIN" if len(prs) == 1 else
-                f"accept PR #{n} on its own with --contributor LOGIN")
-
     if "merge" not in state["done"]:
-        index = load_index(gh)
-        if not git.clean():
-            return _err(f"{checkout} has uncommitted changes")
-        reg = Registry.load(reg_path)
-        manifest = hub.fetch_manifest()
-        try:  # sync needs every published sidecar locally; find out before merging
-            CorpusFacts.from_manifest(manifest, tables)
-        except SyncError as exc:
-            return _err(str(exc))
-        people: dict[int, dict[str, Any]] = {int(k): v for k, v in state.get("people", {}).items()}
-        seen_keys: dict[str, str | None] = {}
-        merged = state.setdefault("merged", [])
-        # PR -> {"ref": copy commit URL or main's sha, "already": no commit was needed} (merge_by_copy);
-        # a copy of only the published files adds "partial": True and "close": False if the PR stays open
-        copied: dict[str, dict | str] = state.setdefault("copied", {})
-        for n in prs:
-            if n in merged or str(n) in copied:  # merged by an earlier, interrupted run; validated then
-                seen_keys[people[n]["key"]] = people[n]["github"]
-                continue
-            pr = hub.pull_request(n)
-            rep_path = staging / f"pr-{n}" / "report.json"
-            if not rep_path.exists():
-                return _err(f"PR #{n} has no verification report; run verify --pr {n}")
-            rep = json.loads(rep_path.read_text())
-            if rep["result"] != "pass":
-                return _err(f"PR #{n}: the last verification failed")
-            if pr.status != "open":
-                return _err(f"PR #{n} is {pr.status}")
-            if rep.get("head") != pr.head:
-                return _err(f"PR #{n} changed after verification (verified {rep.get('head')}, "
-                            f"now {pr.head}); run verify --pr {n} again")
-            claim = _identity_claim(pr, index, reg)
-            why = ownership_conflict(pr, claim, reg) if claim and not contributor else None
-            if why:
-                return _err(f"PR #{n}: {why} (the claims bot shows this as a conflict); {fix(n)}")
-            who = resolve_contributor(reg, pr, claim, contributor)
-            if who is None:
-                return _err(f"PR #{n} by HF user {pr.author}: no GitHub identity found; {fix(n)}")
-            known = reg.contributors.get(who.key)
-            other = known.github if known else seen_keys.get(who.key)
-            if (known or who.key in seen_keys) and (other or "").lower() != (who.github or "").lower():
-                return _err(f"PR #{n}: registry key {who.key!r} already belongs to GitHub user "
-                            f"{other!r}, not {who.github!r}; {fix(n)} with the right login "
-                            "or fix data/contributions.json")
-            seen_keys[who.key] = who.github
-            # Anonymity is per person and permanent: an anonymous claim form by this person
-            # hides them from now on, even if they were registered under their name before.
-            asks_anonymity = bool(claim and claim.anonymous and who.github
-                                  and claim.author.lower() == who.github.lower())
-            people[n] = {"key": who.key, "github": who.github, "hf": who.hf,
-                         "display": who.display, "anonymous": who.anonymous or asks_anonymity,
-                         "claim": claim.issue if claim else None}
-            stored[str(n)] = {k: v for k, v in asdict(pr).items() if k != "num"}
-        state["people"] = {str(k): v for k, v in people.items()}
-        save()
-        # The preflight: every material is decided before anything is written to the Hub.
-        decisions = _decisions(state)
-        heads: dict[str, str | None] = {str(n): stored[str(n)]["head"] for n in prs}
-        heads["manifest"] = _manifest_key(manifest, [m for n in prs
-                                                     for m in PullRequest(n, **stored[str(n)]).materials])
-        if decisions is not None and (release or state.get("decision_heads") != heads):
-            # a PR was revised (and verified again) since the decisions, another run published
-            # one of the materials, or the maintainer overrides a claim now: decide again
-            decisions = None
-            state.pop("decisions", None)
-        if decisions is None:
-            from .checks import MissingPublished
-            from .verify import PublishedHashes
-            reports = {}
-            for n in prs:
-                try:
-                    reports[n] = json.loads((staging / f"pr-{n}" / "report.json").read_text())
-                except (OSError, ValueError):
-                    reports[n] = {}
-            try:
-                decisions = decide([PullRequest(n, **stored[str(n)]) for n in prs], reports, manifest,
-                                   PublishedHashes(tables, manifest.get("files", {})), index,
-                                   {n: people[n]["github"] for n in prs}, set(release))
-            except MissingPublished as exc:
-                return _err(f"{exc.material} is published but {exc.material}.hm is missing from "
-                            f"{tables}; point --tables at a complete corpus")
-            conflicts = [f"{m}: {d.reason}" for m, d in sorted(decisions.items()) if d.kind == "conflict"]
-            if conflicts:
-                return _err("; ".join(conflicts) + "; nothing merged")
-            on_main = Registry(reg_path, json.loads(git.main_file("data/contributions.json")))
-            state["own"] = _own_deliveries([on_main, reg],
-                                           {n: PullRequest(n, **stored[str(n)]) for n in prs})
-            for m in release:
-                c = index.claim_for(m)
-                print(f"--release {m}: " + (f"overrides claim #{c.issue} by {c.author}" if c else
-                                            "not claimed by anyone, nothing to override"), file=sys.stderr)
-        for n in prs:
-            if n in merged or str(n) in copied:
-                continue
-            pr = PullRequest(n, **stored[str(n)])
-            names = [f for m in pr.materials if decisions[m].publish_from == n
-                     for f in (f"{m}.hm", f"{m}.stats.json") if f in pr.files]
-            missing = _missing_staged(hub, names, staging / f"pr-{n}" / "files", pr.head)
-            if missing:
-                return _err(f"PR #{n}: staged files missing or of the wrong size: {', '.join(missing)}; "
-                            f"run verify --pr {n} again")
+        prep = _prepare(prs, state, save, hub=hub, gh=gh, git=git, checkout=checkout, tables=tables,
+                        staging=staging, contributor=contributor, release=release)
+        if isinstance(prep, int):
+            return prep
+        if prep.conflicts:
+            return _err("; ".join(prep.conflicts) + "; nothing merged")
+        people = prep.people
+        merged = state["merged"]
+        copied: dict[str, dict | str] = state["copied"]
         if "decisions" not in state:
-            state["decisions"] = {m: asdict(d) for m, d in decisions.items()}
-            state["decision_heads"] = heads
+            state["decisions"] = {m: asdict(d) for m, d in prep.decisions.items()}
+            state["decision_heads"] = prep.heads
             save()
-        decided: dict[str, Decision] = decisions
+        decided: dict[str, Decision] = prep.decisions
         owned: dict[str, list[str]] = state.get("own", {})
 
-        def plan(n: int) -> tuple[PullRequest, list[str], list[str], list[str], list[str]]:
-            """(the PR, materials published from it, held, credited as co-producer, already
-            credited to this PR by an earlier run)"""
+        def plan(n: int) -> tuple[PullRequest, list[str], list[str], list[str], list[str], Action]:
+            """(the PR, published from it, held, credited as co-producer, already credited to
+            this PR by an earlier run, what happens to the PR)"""
             pr = PullRequest(n, **stored[str(n)])
             own = owned.get(str(n), [])
-            pub = [m for m in pr.materials if decided[m].publish_from == n]
-            held = [m for m in pr.materials if decided[m].kind == "held"]
-            return pr, pub, held, [m for m in pr.materials if m not in pub + held + own], own
+            pub, held, credited, action = _pr_plan(pr, decided, own)
+            return pr, pub, held, credited, own, action
 
         # PRs that publish go first: no "credited as co-producer" before the published file landed
         for n in sorted(prs, key=lambda n: (not plan(n)[1], n)):
             if n in merged:
                 continue
-            pr, pub, held, credited, own = plan(n)
+            pr, pub, held, credited, own, action = plan(n)
             verified = stored[str(n)]["head"]
             p = people[n]
             credit = "an anonymous contributor" if p.get("anonymous") else p["display"]
@@ -585,7 +727,7 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                 if now != verified:  # a push between validation and this merge
                     return _err(f"PR #{n} changed after verification (verified {verified}, "
                                 f"now {now}); run verify --pr {n} again")
-                if pub and not held and not credited and not own:  # everything new, published from here
+                if action == "merge":
                     try:
                         hub.merge(n)
                     except HubConflict as exc:
@@ -597,14 +739,14 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                                           comment=lambda ref, already, head=verified:
                                               _copy_comment(ref, head, already),
                                           on_commit=lambda ref, already, n=n: record(ref, already, n, False))
-                elif pub:
+                elif action in ("copy_close", "copy_open"):
                     copy_files = [f for m in pub for f in (f"{m}.hm", f"{m}.stats.json") if f in pr.files]
                     hub.merge_by_copy(n, verified, copy_files,
                                       message=f"Add {', '.join(pub)} from dataset PR #{n} by {credit}",
                                       comment=lambda ref, already, head=verified, pub=pub, notes=notes:
                                           _partial_comment(ref, head, already, pub, notes),
-                                      close=not held, on_commit=record)
-                elif held:
+                                      close=action == "copy_close", on_commit=record)
+                elif action == "comment":
                     hub.comment(n, "\n\n".join([*notes, "Thank you!"]))
                 else:
                     hub.close_pr(n, "\n\n".join([*notes, "Thank you!"]))
@@ -614,15 +756,8 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
 
     people = {int(k): v for k, v in state["people"].items()}
     pulls = {n: PullRequest(n, **stored[str(n)]) for n in prs}
-    # A state from before decisions finished its merge step under the old rules: all new.
-    decisions = _decisions(state) or {m: Decision("new", n, [n], None, "")
-                                      for n, pr in pulls.items() for m in pr.materials}
-    published = {n: [m for m in pr.materials if decisions[m].publish_from == n] for n, pr in pulls.items()}
-    # a PR's own earlier delivery (published from it or credited) is not recorded again
-    own = state.get("own", {})
-    recorded = {n: [m for m in pr.materials if decisions[m].kind in ("new", "reproduction")
-                    and m not in own.get(str(n), [])]
-                for n, pr in pulls.items()}
+    decisions = _merged_decisions(state, pulls)
+    published, recorded = _outcome(decisions, pulls, state.get("own", {}))
     mats = [m for n in prs for m in published[n]]
     if not any(recorded.values()):  # everything held: nothing changed on main or in the credits
         state_path.unlink()
@@ -652,67 +787,11 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
         title = (f"Data: {len(mats)} table(s)" + (f", {len(reproduced)} reproduction(s)" if reproduced else "")
                  + f" from dataset PR(s) {', '.join(f'#{n}' for n in prs)}")
 
-        def name_of(reg: Registry, key: str) -> str:
-            c = reg.contributors.get(key)
-            return key if c is None else "an anonymous contributor" if c.anonymous else c.display
-
         def update_registry(reg: Registry) -> list[str]:
             """Credit this run's deliveries; returns the docs lines for what changed."""
-            before = {m: reg.producers_of(m) for ms in recorded.values() for m in ms}
-            for n, pr in pulls.items():
-                p = people[n]
-                if not recorded[n]:
-                    continue
-                if p["key"] not in reg.contributors:
-                    reg.add_contributor(Contributor(p["key"], p["github"], p["hf"], p["display"],
-                                                    anonymous=p.get("anonymous", False)))
-                elif p.get("anonymous"):  # never set back to False automatically
-                    reg.contributors[p["key"]].anonymous = True
-                rep = json.loads((staging / f"pr-{n}" / "report.json").read_text())
-                for m in published[n]:
-                    sc = json.loads((tables / f"{m}.stats.json").read_text())
-                    reg.record_table(m, contributor=p["key"], hf_pr=n, claim=p["claim"],
-                                     merged=today, generator_version=sc.get("generator_version", ""),
-                                     verification={"tool": rep.get("tool"), "head": rep.get("head"),
-                                                   "date": rep.get("date"),
-                                                   "samples": rep.get("samples"),
-                                                   "seed": rep.get("seed"), "result": rep["result"]})
-            for n in prs:  # after record_table: a co-delivery may come before the published one
-                for m in recorded[n]:
-                    if m in published[n]:
-                        continue
-                    if m not in reg.tables:  # one of the maintainer's own tables: credit both
-                        try:
-                            gv = json.loads((tables / f"{m}.stats.json").read_text()).get(
-                                "generator_version", "")
-                        except (OSError, ValueError):
-                            gv = ""
-                        reg.tables[m] = {"contributor": MAINTAINER, "hf_pr": None, "claim": None,
-                                         "merged": None, "generator_version": gv, "verification": None,
-                                         "producers": [{"contributor": MAINTAINER, "hf_pr": None,
-                                                        "date": None, "generator_version": gv}],
-                                         "published_from": None}
-                    sc_path = staging / f"pr-{n}" / "files" / f"{m}.stats.json"
-                    try:
-                        gv = json.loads(sc_path.read_text()).get("generator_version", "")
-                    except (OSError, ValueError):
-                        gv = ""
-                    reg.add_producer(m, contributor=people[n]["key"], hf_pr=n, date=today,
-                                     generator_version=gv)
-            lines = []
-            for n in prs:
-                if published[n]:
-                    p = people[n]
-                    credited = "an anonymous contributor" if p.get("anonymous") else p["display"]
-                    lines.append(f"- {', '.join(published[n])} contributed by {credited} "
-                                 f"(dataset PR #{n}" + (f", claim #{p['claim']}" if p["claim"] else "") + ").")
-            for m in sorted(before):
-                now = reg.producers_of(m)
-                if len(now) >= 2 and now != before[m]:
-                    names = [name_of(reg, k) for k in now]
-                    lines.append(f"- {m} (independently reproduced by "
-                                 f"{', '.join(names[:-1])} and {names[-1]}).")
-            return lines
+            return _credit(reg, prs=prs, pulls=pulls, people=people, published=published,
+                           recorded=recorded, staging=staging, tables=tables, today=today,
+                           sidecar=lambda n, m: tables / f"{m}.stats.json")
 
         def attempt() -> int | None:
             if not sub("committed"):
