@@ -375,3 +375,48 @@ def test_an_http_error_on_one_issue_does_not_stop_the_others(tmp_path, capsys):
     assert run_claims(hub, gh, reg, date(2026, 9, 30)) == 1
     assert [n for n, _ in gh.posted] == [40]
     assert "#39" in capsys.readouterr().err
+
+
+def test_claim_holder_who_is_a_later_producer_is_not_a_conflict(tmp_path):
+    # rule 2: the holder delivered after T31M's file was published; T31M's file stays,
+    # popeye37 became a producer. Their explicit claim is not "already done".
+    hub = FakeHub({"manifest.json": _DONE_KRRVKQQ})
+    gh = FakeGitHub([_gh_issue(39, "popeye37", "KRRvkqq KRRvkqr")])
+    reg = Registry(tmp_path / "c.json", {
+        "contributors": {"p": {"github": "popeye37", "hf": "popeye37", "display": "Popeye"},
+                         "t": {"github": "T31M", "hf": "T31M", "display": "Tim"}},
+        "tables": {"KRRvkqq": {"contributor": "t", "hf_pr": 21, "published_from": 21, "producers": [
+            {"contributor": "t", "hf_pr": 21}, {"contributor": "p", "hf_pr": 70}]}}})
+    run_claims(hub, gh, reg, date(2026, 9, 30))
+    assert "claim-conflict" not in gh.labels[39]
+    assert "already done" not in _status(gh, 39)
+
+
+def test_explicit_claim_on_a_material_produced_only_by_others_is_a_conflict(tmp_path):
+    hub = FakeHub({"manifest.json": _DONE_KRRVKQQ})
+    gh = FakeGitHub([_gh_issue(39, "popeye37", "KRRvkqq KRRvkqr")])
+    reg = Registry(tmp_path / "c.json", {
+        "contributors": {"t": {"github": "T31M", "hf": "T31M", "display": "Tim"}},
+        "tables": {"KRRvkqq": {"contributor": "t", "hf_pr": 21, "published_from": 21, "producers": [
+            {"contributor": "maintainer", "hf_pr": None}, {"contributor": "t", "hf_pr": 21}]}}})
+    run_claims(hub, gh, reg, date(2026, 9, 30))
+    assert "claim-conflict" in gh.labels[39] and "KRRvkqq is already done" in _status(gh, 39)
+
+
+def test_no_overlap_notice_between_two_claims_of_the_same_author(tmp_path):
+    gh = FakeGitHub([_gh_issue(30, "popeye37", "KRRvkpp KRRvkqq"), _gh_issue(39, "popeye37", ISSUE_39)])
+    run_claims(FakeHub(), gh, Registry(tmp_path / "c.json", {"contributors": {}, "tables": {}}),
+               date(2026, 9, 30))
+    assert not any("contrib-overlap" in b for _, b in gh.posted)
+
+
+def test_overlap_notice_ignores_materials_the_earlier_claim_released():
+    from helpmate_server.contrib.claims import _overlap_notices
+    early = Claim(30, "early", "2026-09-20T00:00:00Z", ["KRRvkpp", "KRRvkqq"], ["KRRvkpp"], "")
+    late = Claim(31, "late", "2026-09-21T00:00:00Z", ["KRRvkpp"], [], "")
+    gh = FakeGitHub([])
+    _overlap_notices(late, ClaimIndex([early, late]), [], gh)
+    assert gh.posted == []
+    late2 = Claim(32, "late", "2026-09-21T00:00:00Z", ["KRRvkpp", "KRRvkqq"], [], "")
+    _overlap_notices(late2, ClaimIndex([early, late2]), [], gh)
+    assert len(gh.posted) == 1 and "KRRvkqq" in gh.posted[0][1] and "KRRvkpp" not in gh.posted[0][1]

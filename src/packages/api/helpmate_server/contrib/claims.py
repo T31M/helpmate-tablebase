@@ -257,13 +257,12 @@ def _update_claim(c: Claim, index: ClaimIndex, statuses: dict[str, Status], in_r
                 notes[m] = f" — produced by {_names_of(producers, registry)}"
             if c.confirm or m not in c.explicit:
                 continue        # only covered by a wildcard: listed as done, not a conflict
-            entry = registry.tables.get(m)
-            if entry is None:
+            if m not in registry.tables:
                 conflicts.append(f"{m} is already in the dataset")
-            else:
-                person = registry.contributors.get(entry.get("contributor"))
-                login = person.github if person else None
-                if (login or "").lower() != c.author.lower():
+            else:   # a producer (published file or a credited reproduction) holds it rightly
+                logins = {person.github.lower() for k in producers
+                          if (person := registry.contributors.get(k)) is not None and person.github}
+                if c.author.lower() not in logins:
                     conflicts.append(f"{m} is already done")
         elif s.state == "in review" and first is not None:
             pr = in_review[m]
@@ -298,14 +297,15 @@ def _update_claim(c: Claim, index: ClaimIndex, statuses: dict[str, Status], in_r
 
 def _overlap_notices(c: Claim, index: ClaimIndex, comments: list[dict], gh) -> None:
     """Once per (this claim, earlier claim) pair: tell both authors that materials overlap.
-    Never on a confirmation claim (its overlaps are deliberate); never for an earlier one."""
+    Never on a confirmation claim (its overlaps are deliberate), never for an earlier one, never
+    between two claims of the same author; materials the earlier claim released do not count."""
     if c.confirm:
         return
     done = {x["body"] for x in comments if x["user"].endswith("[bot]")}
     for e in index.claims:
-        if e.issue >= c.issue or e.confirm:
+        if e.issue >= c.issue or e.confirm or e.author.lower() == c.author.lower():
             continue
-        shared = [m for m in c.materials if m in set(e.materials)]
+        shared = [m for m in c.materials if m in set(e.materials) - set(e.released)]
         marker = f"<!-- contrib-overlap e={e.issue} -->"
         if not shared or any(marker in b for b in done):
             continue
