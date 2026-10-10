@@ -39,6 +39,19 @@ def test_reuse_needs_the_same_comparison_source():
     assert reusable(prev, "KQvk", ("a", "b"), TOOL, SETTINGS) is None           # duplicate gone
 
 
+def test_same_run_duplicate_reuses_only_an_entry_that_probed_v5():
+    skipped = {"id": "V5", "title": "t", "status": "skip",
+               "detail": "independent reproduction: identical to HF PR #2"}
+    probed = {"id": "V5", "title": "t", "status": "pass", "detail": "1 deepest"}
+    old = {**PREV, "tables": {"KQvk": {**PREV["tables"]["KQvk"], "source_payload": "p2",
+                                       "checks": [skipped]}}}
+    new = {**PREV, "tables": {"KQvk": {**PREV["tables"]["KQvk"], "source_payload": "p2",
+                                       "checks": [probed]}}}
+    assert reusable(old, "KQvk", ("a", "b"), TOOL, SETTINGS, "p2", needs_deepest=True) is None
+    assert reusable(new, "KQvk", ("a", "b"), TOOL, SETTINGS, "p2", needs_deepest=True) is not None
+    assert reusable(old, "KQvk", ("a", "b"), TOOL, SETTINGS, "p2") is not None  # published duplicate
+
+
 ARGS = ["--samples", "50", "--oracle-samples", "2", "--oracle-plies", "1", "--seed", "1"]
 
 

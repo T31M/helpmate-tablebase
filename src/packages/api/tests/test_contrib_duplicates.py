@@ -128,7 +128,8 @@ def test_second_pr_repeating_the_first_is_verified_against_it(tmp_path, compress
     c3 = {c["id"]: c for c in r3["tables"]["KQvk"]["checks"]}
     assert "V8" not in c2 and c2["V6"]["status"] == "pass"
     assert c3["V8"]["status"] == "pass" and "HF PR #2" in c3["V8"]["detail"]
-    assert all(c3[k]["status"] == "skip" and "HF PR #2" in c3[k]["detail"] for k in ("V5", "V6", "V7"))
+    assert c3["V5"]["status"] == "pass"           # its sidecar may be the one published (R19)
+    assert all(c3[k]["status"] == "skip" and "HF PR #2" in c3[k]["detail"] for k in ("V6", "V7"))
     assert "KQvk: duplicate of HF PR #2" in r3["pr_checks"][0]["detail"]
 
 
@@ -210,3 +211,66 @@ def test_claims_unavailable_is_noted(tmp_path, compressed_tables):
             "--no-post", "--pr", "2", *ARGS]
     assert tables_cli.main(argv, hub_factory=lambda r: hub, gh_factory=lambda r: Broken()) == 0
     assert "claims unavailable" in _report(tmp_path, 2)["pr_checks"][0]["detail"]
+
+
+def _wrong_deepest(hm):
+    """A shallower position listed as deepest, in the sidecar and the table's embedded metadata
+    alike (so V2 to V4 and V8 still pass and only V5 can notice)."""
+    import struct
+
+    from helpmate_server.contrib.tablefile import HEADER_LEN, read_header
+    sc_path = hm.with_name("KQvk.stats.json")
+    sc = json.loads(sc_path.read_text())
+    sc["deepest"] = sc["deepest_unique"][:1] if sc["deepest_unique"] != sc["deepest"][:1] else []
+    h = read_header(hm)
+    raw = hm.read_bytes()
+    meta = json.loads(raw[HEADER_LEN:HEADER_LEN + h.json_len])
+    meta["deepest"] = sc["deepest"]
+    blob = json.dumps(meta).encode()
+    head = bytearray(raw[:HEADER_LEN])
+    struct.pack_into("<I", head, 60, len(blob))
+    hm.write_bytes(bytes(head) + blob + raw[HEADER_LEN + h.json_len:])
+    sc_path.write_text(json.dumps(sc, indent=2))
+
+
+def test_same_run_duplicate_probes_its_own_deepest_positions(table_copy):
+    source = payload_sha256(table_copy / "KQvk.hm")
+    opts = VerifyOptions(samples=10, oracle_samples=1, oracle_plies=1, seed=1)
+    rep = verify_table("KQvk", table_copy, opts, "99.0.0", published=source, source="HF PR #2",
+                       probe_deepest=True)
+    ids = {c.id: c for c in rep.checks}
+    assert rep.passed and ids["V8"].status == "pass" and ids["V5"].status == "pass"
+    assert all(ids[k].status == "skip" and ids[k].detail == "independent reproduction: identical to HF PR #2"
+               for k in ("V6", "V7"))
+    # a wrong deepest list in this delivery's sidecar (which accept may publish) fails it
+    _wrong_deepest(table_copy / "KQvk.hm")
+    rep = verify_table("KQvk", table_copy, opts, "99.0.0", published=source, source="HF PR #2",
+                       probe_deepest=True)
+    ids = {c.id: c for c in rep.checks}
+    assert not rep.passed and ids["V8"].status == "pass" and ids["V5"].status == "fail"
+    assert ids["V6"].detail == "an earlier check failed"
+
+
+def test_rerun_does_not_reuse_a_same_run_duplicate_verified_without_v5(tmp_path, compressed_tables):
+    main = {p.name: p.read_bytes() for p in compressed_tables.iterdir() if not p.name.startswith("KQvk.")}
+    hub = FakeHub(main)
+    for n in (2, 3):
+        hub.add_pr(n, {k: (compressed_tables / k).read_bytes() for k in ("KQvk.hm", "KQvk.stats.json")},
+                   description="Claim: #39", head=f"h{n}")
+    tables = tmp_path / "tb"
+    tables.mkdir()
+    for name, b in main.items():
+        (tables / name).write_bytes(b)
+    assert _verify(hub, tables, tmp_path / "st", 2, 3) == 0
+    path = tmp_path / "st" / "pr-3" / "report.json"
+    rep = json.loads(path.read_text())   # as the old rule wrote it: V5 skipped
+    for c in rep["tables"]["KQvk"]["checks"]:
+        if c["id"] == "V5":
+            c.update(status="skip", detail="independent reproduction: identical to HF PR #2")
+    path.write_text(json.dumps(rep))
+    assert _verify(hub, tables, tmp_path / "st", 2, 3) == 0
+    c2 = {c["id"]: c for c in json.loads((tmp_path / "st" / "pr-2" / "report.json").read_text())
+          ["tables"]["KQvk"]["checks"]}
+    c3 = {c["id"]: c for c in json.loads(path.read_text())["tables"]["KQvk"]["checks"]}
+    assert "reused_from" in c2["V6"]                           # PR #2 unchanged: reused
+    assert c3["V5"]["status"] == "pass" and "reused_from" not in c3["V5"]

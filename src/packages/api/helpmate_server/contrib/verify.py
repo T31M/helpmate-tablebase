@@ -74,10 +74,13 @@ REUSE_SETTINGS = ("samples", "oracle_samples", "oracle_plies")
 
 
 def reusable(prev: dict | None, material: str, shas: tuple[str, str], tool: str,
-             settings: dict, source_payload: str | None = None) -> dict | None:
+             settings: dict, source_payload: str | None = None,
+             needs_deepest: bool = False) -> dict | None:
     """The table entry of the previous report if its result may be taken over: same tool and
     sampling, the table passed, its files are unchanged, and it was compared against the same
-    source (the published table, an earlier delivery, or none) as it would be now."""
+    source (the published table, an earlier delivery, or none) as it would be now.
+    `needs_deepest`: the entry must have run V5 (a duplicate of an earlier delivery of the same
+    run; an entry from before that rule skipped V5 as an independent reproduction)."""
     if not prev or prev.get("tool") != tool:
         return None
     if any(prev.get(k) != settings.get(k) for k in REUSE_SETTINGS):
@@ -89,13 +92,20 @@ def reusable(prev: dict | None, material: str, shas: tuple[str, str], tool: str,
         return None
     if entry.get("source_payload") != source_payload:
         return None
+    if needs_deepest:
+        v5 = next((c for c in entry.get("checks", []) if c.get("id") == "V5"), None)
+        if v5 is None or str(v5.get("detail", "")).startswith("independent reproduction"):
+            return None
     return entry
 
 
 def verify_table(material: str, tables: Path, opts: VerifyOptions,
                  installed_version: str, *, published: str | None = None,
-                 source: str = "the published table",
+                 source: str = "the published table", probe_deepest: bool = False,
                  progress: Callable[[str], None] | None = None) -> TableReport:
+    """`published`: the payload hash a duplicate must equal (V8), from `source`. A duplicate
+    skips V5 to V7, or with `probe_deepest` (a duplicate of an earlier delivery of the same run,
+    whose sidecar may be the one published) only V6 and V7."""
     rep = TableReport(material)
     path = tables / f"{material}.hm"
     t0 = time.monotonic()
@@ -122,10 +132,14 @@ def verify_table(material: str, tables: Path, opts: VerifyOptions,
     rep.payload_sha256 = payload
     if published is not None:
         note(check_identical(rep.payload_sha256, published, source))
+        skipped = [("V6", "local consistency"), ("V7", "independent solver")]
+        if probe_deepest and rep.passed:
+            note(check_deepest(path, tables))
+        else:
+            skipped.insert(0, ("V5", "deepest positions probe as recorded"))
         why = (f"independent reproduction: identical to {source}" if rep.passed
                else "an earlier check failed")
-        for cid, title in (("V5", "deepest positions probe as recorded"),
-                           ("V6", "local consistency"), ("V7", "independent solver")):
+        for cid, title in skipped:
             note(Check(cid, title, "skip", why))
         return rep
     note(check_deepest(path, tables))
@@ -443,17 +457,18 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
                 recorded = _files_record(files_dir)["files"]
                 for i, m in enumerate(pr.materials, 1):
                     prior = delivered.get(m)
+                    same_run = False   # a duplicate of an earlier delivery: V5 too (R19)
                     if m in dups:
                         pub, src = hashes.get(m), "the published table"
                     elif prior and prior[1] and prior[0] < pr.num:
-                        pub, src = prior[1], f"HF PR #{prior[0]}"
+                        pub, src, same_run = prior[1], f"HF PR #{prior[0]}", True
                     else:
                         pub, src = None, "the published table"
                     shas = (recorded.get(f"{m}.hm", {}).get("sha256"),
                             recorded.get(f"{m}.stats.json", {}).get("sha256"))
                     entry, verified = None, ""
                     for src_rep in sources:
-                        entry = reusable(src_rep, m, shas, tool, opts.settings(), pub)
+                        entry = reusable(src_rep, m, shas, tool, opts.settings(), pub, needs_deepest=same_run)
                         if entry is not None:
                             verified = str(entry.get("verified_head") or src_rep["head"])
                             break
@@ -467,7 +482,8 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
                             print(f"[{i}/{n}] {line}", flush=True)
 
                         reports.append(verify_table(m, d / "overlay", opts, version,
-                                                    published=pub, source=src, progress=show))
+                                                    published=pub, source=src,
+                                                    probe_deepest=same_run, progress=show))
                         seed_used = opts.resolved_seed()
                         head = pr.head or ""
                     table_meta[m] = {"hm_sha256": shas[0], "stats_sha256": shas[1],

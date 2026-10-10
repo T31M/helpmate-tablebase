@@ -35,10 +35,11 @@ bumps may change behavior).
   statistics miss a table of the manifest; a repo test fails a PR whose
   `stats.json` disagrees with `materials.json`.
 - Batch processing of dataset PRs in `helpmate-tables`:
-  - `verify` hashes every table's payload. A material that is already published,
-    or delivered by an earlier PR in the same run, is checked with V2 to V4 and
-    the new V8 "identical to the published table"; V5 to V7 are recorded as
-    "independent reproduction". V1 labels each material new, duplicate of
+  - `verify` hashes every table's payload. A material that is already published
+    is checked with V2 to V4 and the new V8 "identical to the published table";
+    V5 to V7 are recorded as "independent reproduction". One delivered by an
+    earlier PR in the same run gets V5 as well (its sidecar may be the one
+    published); only V6 and V7 are skipped. V1 labels each material new, duplicate of
     published, duplicate of HF PR #N, or held for claim #N. `--no-post` still
     reads the claims.
   - Staging is per file (`files/.files.json`): a revised PR downloads only the

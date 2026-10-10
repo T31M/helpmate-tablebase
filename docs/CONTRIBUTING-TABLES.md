@@ -164,8 +164,10 @@ To reproduce a table on purpose, open a claim whose first line is `confirm:`
 (then the list of materials). A confirming claim never holds or conflicts with
 anything. A pattern claim such as `KQvk???` leaves out every material that an
 earlier claim already covers; the status comment lists them as "excluded:
-claimed earlier by others". Explicit overlaps are still flagged, with one
-notice that names both authors.
+claimed earlier by others". Explicit overlaps are still flagged as a
+conflict. Every overlap with an earlier claim, explicit or by pattern, gets one
+notice that names both authors; there is none between two claims of the same
+author, and a material the earlier claim struck through does not count.
 
 ## What gets checked before a merge
 
@@ -202,9 +204,12 @@ request with `--pr`. If V4 or V5 fails, V6 and V7 are skipped.
 
 - **V8 identical to the published table.** Only for a material that is already
   published or delivered by an earlier PR in the same run: the payload hash
-  (SHA-256 of the four plane hashes) must equal the other copy. Such a duplicate
-  is checked with V2 to V4 and V8; V5 to V7 are skipped as "independent
-  reproduction".
+  (SHA-256 of the four plane hashes) must equal the other copy. A duplicate of a
+  published table is checked with V2 to V4 and V8; V5 to V7 are skipped as
+  "independent reproduction". A duplicate of an earlier PR in the same run is
+  checked with V2 to V5 and V8: its sidecar may be the one that gets published
+  (the claim holder's delivery, or a release), so its deepest positions are
+  probed; only V6 and V7 are skipped.
 
 **What is not checked is full correctness.** Proving a donated table right
 means regenerating it, which costs exactly what the donation saved. The
