@@ -41,12 +41,24 @@ def is_marker(stats: dict) -> bool:
 
 
 def contributor_of(material: str, registry: Registry | None) -> tuple[str, int | None, str | None]:
+    """Every producer's display name, comma-separated in delivery order, and the hf_pr and
+    merge date of the published file's delivery (None for the maintainer's own tables)."""
     entry = registry.tables.get(material) if registry else None
-    if not entry:
+    if not entry or registry is None:
         return "maintainer", None, None
-    c = registry.contributors.get(entry["contributor"]) if registry else None
-    name = "anonymous" if c and c.anonymous else (c.display if c else entry["contributor"])
-    return name, entry.get("hf_pr"), entry.get("merged")
+    keys = registry.producers_of(material) or [entry.get("contributor") or "maintainer"]
+    names = []
+    for k in keys:
+        c = registry.contributors.get(k)
+        names.append("anonymous" if c and c.anonymous else (c.display if c else str(k)))
+    return ", ".join(names), entry.get("hf_pr"), entry.get("merged")
+
+
+def _producer_facts(material: str, registry: Registry | None) -> tuple[int, int | None]:
+    entry = registry.tables.get(material) if registry else None
+    if not entry or registry is None:
+        return 1, None
+    return max(1, len(registry.producers_of(material))), entry.get("published_from")
 
 
 def _unique(stats: dict) -> int:
@@ -63,6 +75,7 @@ def materials_rows(ts: list[TableStats], registry: Registry | None) -> list[dict
         uns = {k: int(cells.get("unsolvable", {}).get(k, 0)) for k in STMS}
         marker = is_marker(s)
         who, pr, merged = contributor_of(t.material, registry)
+        count, from_pr = _producer_facts(t.material, registry)
         rows.append({"material": t.material, "pieces": m.pieces, "pawns": m.pawns,
                      "white": m.white, "black": m.black, "marker": marker,
                      "max_dtm": None if marker else int(s["max_dtm"]),
@@ -72,7 +85,8 @@ def materials_rows(ts: list[TableStats], registry: Registry | None) -> list[dict
                      "solvable": 0 if marker else 2 * int(s["plane_size"]) - sum(inv.values()) - sum(uns.values()),
                      "unique": 0 if marker else _unique(s), "size_bytes": t.size_bytes,
                      "generator_version": str(s.get("generator_version", "")),
-                     "contributor": who, "hf_pr": pr, "merged": merged})
+                     "contributor": who, "producers_count": count, "published_from_pr": from_pr,
+                     "hf_pr": pr, "merged": merged})
     return rows
 
 
@@ -141,6 +155,7 @@ def _schemas():
         ("unsolvable_wtm", pa.int64()), ("unsolvable_btm", pa.int64()),
         ("solvable", pa.int64()), ("unique", pa.int64()), ("size_bytes", pa.int64()),
         ("generator_version", pa.string()), ("contributor", pa.string()),
+        ("producers_count", pa.int8()), ("published_from_pr", pa.int32()),
         ("hf_pr", pa.int32()), ("merged", pa.date32())])
     histogram = pa.schema([
         ("material", pa.string()), ("pieces", pa.int8()), ("stm", pa.string()),

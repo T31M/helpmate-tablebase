@@ -21,6 +21,7 @@ class FakeGit:
         if name == self.fail_at:
             raise RuntimeError(f"{name} failed")
 
+    def writes(self): return [c for c in self.calls if c[0] != "main_file"]   # reads of origin/main aside
     def clean(self): return True
     def current(self): return "main"
     def dirty_paths(self): return []
@@ -271,19 +272,18 @@ def test_resume_after_merge_records_the_prs_tables(tmp_path):
     assert msg.startswith("Data: 1 table(s)")
 
 
-def test_pr_by_a_known_contributor_inside_someone_elses_claim_needs_contributor(tmp_path, capsys):
-    """T31M (registered) pushes KRRvkpp-style work that #39 (popeye37) still claims:
-    the claims bot calls it 'in review by someone else', so accept must not credit popeye37."""
+def test_pr_by_a_known_contributor_inside_someone_elses_claim_is_held(tmp_path):
+    """T31M (registered) delivers material that #39 (popeye37) still claims: never credited to
+    popeye37, and not published either: held for the claim (spec section 3, rule 4)."""
     checkout, staging, hub, gh, tables = _setup(tmp_path)
     (checkout / "data" / "contributions.json").write_text(json.dumps({"schema": 1, "tables": {},
         "contributors": {"T31M": {"github": "T31M", "hf": "T31M", "display": "T31M"}}}))
     hub.prs[2][0].author = "T31M"
-    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 2
-    err = capsys.readouterr().err
-    assert hub.merged == [] and "--contributor" in err and "#39" in err
-    assert _run(checkout, staging, hub, gh, tables, FakeGit(), contributor="T31M") == 0
-    reg = json.loads((checkout / "data" / "contributions.json").read_text())
-    assert reg["tables"]["KRRvkqq"]["contributor"] == "T31M"
+    for contributor in (None, "T31M"):
+        assert _run(checkout, staging, hub, gh, tables, FakeGit(), contributor=contributor) == 0
+        assert hub.merged == [] and hub.prs[2][0].status == "open"
+        assert "held for claim #39 by @popeye37" in hub.comments[-1][1]
+    assert json.loads((checkout / "data" / "contributions.json").read_text())["tables"] == {}
 
 
 def test_head_is_checked_again_right_before_the_merge(tmp_path, capsys):
@@ -294,16 +294,17 @@ def test_head_is_checked_again_right_before_the_merge(tmp_path, capsys):
     assert hub.merged == [] and "abc" in err and "pushed-meanwhile" in err
 
 
-def test_material_already_in_the_manifest_is_refused(tmp_path, capsys):
+def test_material_already_in_the_manifest_needs_a_report_with_a_payload_hash(tmp_path, capsys):
     checkout, staging, hub, gh, tables = _setup(tmp_path)
     hub.main["manifest.json"] = json.dumps({"schema": 1, "generator_version": "0.19.0", "files": {
         "KRRvkqq.hm": {"sha256": "x", "size": 1}}}).encode()
     (tables / "KRRvkqq.stats.json").write_text('{"material": "KRRvkqq", "plane_size": 1, "max_dtm": 1}')
     assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 2
-    assert hub.merged == [] and "already in the dataset" in capsys.readouterr().err
+    assert hub.merged == [] and "no payload hash" in capsys.readouterr().err
 
 
-def test_same_material_in_two_prs_of_a_batch_is_refused(tmp_path, capsys):
+def test_same_material_in_two_prs_without_payload_hashes_is_refused(tmp_path, capsys):
+    """Two deliveries can only be compared by their payload hash; reports from before it are refused."""
     checkout, staging, hub, gh, tables = _two_prs(tmp_path)
     files = dict(hub.prs[2][1])
     hub.healed = True
@@ -311,7 +312,8 @@ def test_same_material_in_two_prs_of_a_batch_is_refused(tmp_path, capsys):
     for k, v in files.items():
         (staging / "pr-3" / "files" / k).write_bytes(v)
     assert _run2(checkout, staging, hub, gh, tables, FakeGit()) == 2
-    assert hub.merged == [] and "KRRvkqq" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert hub.merged == [] and "KRRvkqq" in err and "payload" in err
 
 
 def test_unknown_contributor_stops_before_merging(tmp_path, capsys):
@@ -837,7 +839,7 @@ def test_any_other_conflict_stops_before_copying(tmp_path, capsys, files):
     assert _run(checkout, staging, hub, gh, tables, git) == 2
     err = capsys.readouterr().err
     assert all(f in err for f in files) and "#2" in err
-    assert hub.copies == [] and hub.closed == [] and hub.commits == [] and git.calls == []
+    assert hub.copies == [] and hub.closed == [] and hub.commits == [] and git.writes() == []
 
 
 def test_head_changed_before_the_copy_is_refused(tmp_path, capsys):
@@ -1142,3 +1144,12 @@ def test_card_step_fails_when_the_published_statistics_do_not_match(tmp_path, mo
     assert "card" not in state["done"]            # a rerun resumes at the card step
     monkeypatch.undo()
     assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+
+
+def test_accept_no_pages_never_calls_the_page_builder(tmp_path):
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    pages = PageBuilder()
+    assert accept([2], hub=hub, gh=gh, git=FakeGit(), checkout=checkout, tables=tables, staging=staging,
+                  contributor=None, today="2026-10-01", binary=BINARY, build_pages=pages,
+                  no_pages=True) == 0
+    assert pages.calls == []

@@ -114,7 +114,11 @@ table (the viewer above shows them):
 - `stats/materials.parquet` — one row per table: material, pieces, pawns, the pieces besides
   the kings (`white`, `black`), `marker` (provably no helpmate), `max_dtm`, `plane_size`, invalid
   and unsolvable cells per side to move, `solvable`, `unique` (positions with exactly one
-  solution), compressed size, generator version, contributor, dataset PR and merge date.
+  solution), compressed size and generator version. `contributor` names every producer of the
+  table (everyone whose delivery was identical, comma-separated in delivery order; `maintainer`
+  for tables published before contributions), `producers_count` (int8) counts them and
+  `published_from_pr` (int32) is the dataset PR whose file is published (null for tables
+  published by the maintainer); `hf_pr` and `merged` describe that published file's delivery.
 - `stats/histogram.parquet` — the full distribution: one row per material, side to move
   (`wtm`/`btm`), depth `dtm` (plies) and solution `count` (255 = 255 or more), with the number
   of positions in `cells`.

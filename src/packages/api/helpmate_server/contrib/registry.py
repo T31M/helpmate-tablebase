@@ -29,7 +29,7 @@ class Registry:
     def __init__(self, path: Path, data: dict):
         self.path = Path(path)
         self.contributors = {k: Contributor(k, **v) for k, v in data.get("contributors", {}).items()}
-        self.tables: dict[str, dict] = dict(data.get("tables", {}))
+        self.tables: dict[str, dict] = {m: _migrated(t) for m, t in data.get("tables", {}).items()}
 
     @classmethod
     def load(cls, path: Path) -> "Registry":
@@ -55,12 +55,52 @@ class Registry:
 
     def record_table(self, material: str, *, contributor: str, hf_pr: int, claim: int | None,
                      merged: str, generator_version: str, verification: dict | None) -> None:
+        """The published file's delivery (top-level fields, `published_from`), also a producer."""
+        producers = list(self.tables.get(material, {}).get("producers", []))
         self.tables[material] = {"contributor": contributor, "hf_pr": hf_pr, "claim": claim,
                                  "merged": merged, "generator_version": generator_version,
-                                 "verification": verification}
+                                 "verification": verification, "producers": producers,
+                                 "published_from": hf_pr}
+        self.add_producer(material, contributor=contributor, hf_pr=hf_pr, date=merged,
+                          generator_version=generator_version)
+
+    def add_producer(self, material: str, *, contributor: str, hf_pr: int, date: str,
+                     generator_version: str) -> None:
+        """Credit a delivery of `material` (which must be recorded) that passed and matched;
+        the same (contributor, hf_pr) is credited once. Kept in delivery order (HF PR number)."""
+        producers = self.tables[material].setdefault("producers", [])
+        if any(p["contributor"] == contributor and p["hf_pr"] == hf_pr for p in producers):
+            return
+        producers.append({"contributor": contributor, "hf_pr": hf_pr, "date": date,
+                          "generator_version": generator_version})
+        # delivery order; the maintainer's own table (hf_pr None) came first
+        producers.sort(key=lambda p: (p["hf_pr"] is not None, p["hf_pr"] or 0))
+
+    def producers_of(self, material: str) -> list[str]:
+        """Contributor keys of every producer of `material`, in delivery order."""
+        entry = self.tables.get(material)
+        if entry is None:
+            return []
+        return [p["contributor"] for p in _migrated(entry)["producers"]]
 
     def tables_of(self, key: str) -> list[str]:
-        return sorted(m for m, t in self.tables.items() if t["contributor"] == key)
+        """The materials `key` produced (published from their file or reproduced)."""
+        return sorted(m for m in self.tables if key in self.producers_of(m))
+
+    def reproduced_of(self, key: str) -> list[str]:
+        """The materials `key` produced that have more than one producer."""
+        return [m for m in self.tables_of(key) if len(self.producers_of(m)) >= 2]
+
+
+def _migrated(entry: dict) -> dict:
+    """An entry from before producers: its one contributor is the only producer and the
+    published file is theirs."""
+    t = dict(entry)
+    if "producers" not in t:
+        t["producers"] = [{"contributor": t.get("contributor"), "hf_pr": t.get("hf_pr"),
+                           "date": t.get("merged"), "generator_version": t.get("generator_version")}]
+        t.setdefault("published_from", t.get("hf_pr"))
+    return t
 
 
 def resolve_contributor(registry: Registry, pr, claim: Claim | None,

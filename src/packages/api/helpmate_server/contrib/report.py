@@ -11,7 +11,8 @@ ICON = {"pass": "✅", "fail": "❌", "warn": "⚠️", "skip": "➖"}
 
 
 def _rows(checks: Iterable[Check]) -> list[str]:
-    return [f"| {ICON[c.status]} | {c.id} | {c.title} | {c.detail.replace('|', '/')} |"
+    return [f"| {ICON[c.status]} | {c.id} | {c.title} | "
+            f"{(c.detail + (f' (reused from {c.reused_from[:7]})' if c.reused_from else '')).replace('|', '/')} |"
             for c in checks]
 
 
@@ -37,14 +38,26 @@ def render_markdown(reports: list[TableReport], *, heading: str, seed: int, tool
 
 def report_json(reports: list[TableReport], *, seed: int, tool: str, head: str | None,
                 pr: int | None, pr_checks: Iterable[Check] = (),
-                settings: dict | None = None, subtables_from: list[int] | None = None) -> dict:
+                settings: dict | None = None, subtables_from: list[int] | None = None,
+                table_meta: dict[str, dict] | None = None) -> dict:
     """`settings`: what was sampled (samples, oracle_samples, oracle_plies) and the date.
-    `subtables_from`: PRs (verified, not yet accepted) whose files served as sub-tables."""
+    `subtables_from`: PRs (verified, not yet accepted) whose files served as sub-tables.
+    `table_meta`: per material `hm_sha256`, `stats_sha256`, `seed`, `source_payload`."""
+    meta = table_meta or {}
     pr_checks = list(pr_checks)
     ok = all(r.passed for r in reports) and all(c.status != "fail" for c in pr_checks)
     return {"result": "pass" if ok else "fail", "seed": seed, "tool": tool,
             "head": head, "pr": pr, **(settings or {}),
             **({} if subtables_from is None else {"subtables_from": list(subtables_from)}),
             "pr_checks": [asdict(c) for c in pr_checks],
-            "tables": {r.material: {"passed": r.passed, "checks": [asdict(c) for c in r.checks]}
-                       for r in reports}}
+            "tables": {r.material: {
+                "passed": r.passed,
+                "checks": [{k: v for k, v in asdict(c).items() if k != "reused_from" or v}
+                           for c in r.checks],
+                "hm_sha256": meta.get(r.material, {}).get("hm_sha256"),
+                "stats_sha256": meta.get(r.material, {}).get("stats_sha256"),
+                "payload_sha256": r.payload_sha256,
+                "seed": meta.get(r.material, {}).get("seed", seed),
+                "source_payload": meta.get(r.material, {}).get("source_payload"),
+                "verified_head": meta.get(r.material, {}).get("verified_head", head)}
+                for r in reports}}

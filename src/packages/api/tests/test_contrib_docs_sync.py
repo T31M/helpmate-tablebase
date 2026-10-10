@@ -7,7 +7,7 @@ import pytest
 
 from helpmate_server.contrib.claims import ClaimIndex, material_status
 from helpmate_server.contrib.docs_sync import (
-    CorpusFacts, render_contributors, replace_spans,
+    CorpusFacts, all_contributors_rc, render_contributors, replace_spans,
 )
 from helpmate_server.contrib.registry import Registry
 
@@ -179,3 +179,34 @@ def test_sync_refuses_when_sidecars_are_missing(tmp_path, capsys):
                            github_repo="x/y", no_close=True)
     assert cli.run(a, lambda repo: hub, lambda repo: FakeGitHub()) == 2
     assert "sidecars" in capsys.readouterr().err
+
+
+def test_credit_table_counts_every_produced_table_and_reproductions(tmp_path):
+    prod = lambda c, pr: {"contributor": c, "hf_pr": pr, "date": None, "generator_version": ""}  # noqa: E731
+    reg = Registry(tmp_path / "c.json", {
+        "contributors": {"popeye37": {"github": "popeye37", "hf": "popeye37", "display": "popeye37"},
+                         "T31M": {"github": "T31M", "hf": "T31M", "display": "T31M"}},
+        "tables": {"KQvkqqq": {"contributor": "popeye37", "hf_pr": 19, "merged": "x", "published_from": 19,
+                               "producers": [prod("popeye37", 19), prod("T31M", 20)]},
+                   # reproduction of a maintainer table: null hf_pr / merged
+                   "KRBvkqq": {"contributor": "maintainer", "hf_pr": None, "merged": None,
+                               "published_from": None,
+                               "producers": [prod("maintainer", None), prod("T31M", 22)]}}})
+    st = _statuses_for(reg, {"KQvkqqq", "KRBvkqq"})
+    table = render_contributors(reg, st)
+    assert "| contributor | tables | reproduced | notes |" in table
+    rows = {line.split("|")[1].strip(): line for line in table.splitlines() if line.startswith("| [")}
+    t31m = next(v for k, v in rows.items() if "T31M" in k)
+    assert "| 2: KQvkqqq, KRBvkqq | 2 |" in t31m and "PR #20" in t31m and "PR #22" in t31m
+    assert "| 1: KQvkqqq | 1 |" in next(v for k, v in rows.items() if "popeye37" in k)
+    assert "maintainer" not in table
+    assert [p["login"] for p in all_contributors_rc(reg, _Gh())["contributors"]] == ["T31M", "popeye37"]
+
+
+class _Gh:
+    def user_id(self, login):
+        return 1
+
+
+def _statuses_for(reg, done):
+    return material_status(set(done), {}, ClaimIndex([]), reg)

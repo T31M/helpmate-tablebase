@@ -84,16 +84,18 @@ PR_URL = "https://huggingface.co/datasets/osick/helpmate-tables/discussions"
 
 
 def render_contributors(reg, statuses: dict) -> str:
-    rows = ["", "| contributor | tables | notes |", "| --- | --- | --- |"]
+    rows = ["", "| contributor | tables | reproduced | notes |", "| --- | --- | --- | --- |"]
     for key, c in sorted(reg.contributors.items(), key=lambda kv: -len(reg.tables_of(kv[0]))):
         mats = [m for m in reg.tables_of(key) if statuses.get(m) and statuses[m].state == "done"]
         if not mats:
             continue
-        prs = sorted({reg.tables[m]["hf_pr"] for m in mats})
+        prs = sorted({p["hf_pr"] for m in mats for p in reg.tables[m].get("producers", [])
+                      if p["contributor"] == key and p["hf_pr"] is not None})
         name = "anonymous" if c.anonymous else (
             f"[**{c.display}**]({HF_USER}{c.hf})" if c.hf else f"**{c.display}**")
         links = ", ".join(f"[PR #{p}]({PR_URL}/{p})" for p in prs)
-        rows.append(f"| {name} | {len(mats)}: {', '.join(mats)} | {links}: {c.note} |")
+        repro = len([m for m in mats if len(reg.producers_of(m)) > 1])
+        rows.append(f"| {name} | {len(mats)}: {', '.join(mats)} | {repro} | {links}: {c.note} |")
     return "\n".join(rows) + "\n"
 
 

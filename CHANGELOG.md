@@ -34,6 +34,47 @@ bumps may change behavior).
 - Stats check workflow (daily and after each Pages run) fails when the published
   statistics miss a table of the manifest; a repo test fails a PR whose
   `stats.json` disagrees with `materials.json`.
+- Batch processing of dataset PRs in `helpmate-tables`:
+  - `verify` hashes every table's payload. A material that is already published
+    is checked with V2 to V4 and the new V8 "identical to the published table";
+    V5 to V7 are recorded as "independent reproduction". One delivered by an
+    earlier PR in the same run gets V5 as well (its sidecar may be the one
+    published); only V6 and V7 are skipped. V1 labels each material new, duplicate of
+    published, duplicate of HF PR #N, or held for claim #N. `--no-post` still
+    reads the claims.
+  - Staging is per file (`files/.files.json`): a revised PR downloads only the
+    files that changed.
+  - Delta verify: unchanged tables reuse the earlier result ("reused from
+    <head>"), a killed run resumes from `report.partial.json`, `--full` turns the
+    reuse off. Progress lines `[i/n] <material> <check> ... <status> (<time>)`.
+  - Equal credit: identical deliveries of a material are independent
+    reproductions; every deliverer is a producer, counted fully. The published
+    file is the claim holder's, else the earliest, and is never replaced. The
+    registry keeps `producers` and `published_from` (old entries are migrated).
+    Reproductions of the maintainer's own tables credit "maintainer" plus the
+    reproducer. Shown on the site ("popeye37 · T31M ✓ reproduced"), in
+    `status.json`, the credit table ("tables | reproduced"), the Parquet
+    statistics (`contributor`, `producers_count`, `published_from_pr`) and this
+    changelog ("independently reproduced by ...").
+  - Held deliveries: someone else's delivery of claimed, unpublished material
+    is held (verify passes it, `accept` skips it, the PR stays open with a
+    comment) unless `accept --release M`. Differing content stops `accept`
+    before anything is merged.
+  - Claims bot: `confirm:` claims never hold or conflict; a wildcard claim
+    excludes materials claimed earlier; one overlap notice per pair of claims;
+    rows "produced by X and Y" and "held for claim #N".
+  - `accept --no-pages` skips the site pages; `helpmate-tables pages --tables DIR
+    (--missing | --material M...) [--jobs N]` builds them in parallel jobs,
+    resumable, and ships a docs PR.
+  - `accept N [N ...] --plan` shows what accept would do and writes nothing: per
+    PR its contributor, one line per material (publish, reproduction, co-producer,
+    held, or CONFLICT), what happens to the PR, then the producers and CHANGELOG
+    lines it would add. Exits 1 on a conflict; works with `--release` and
+    `--contributor`.
+  - `verify --pr`: the download plan counts files staged by an older
+    helpmate-tables (only a `.head` marker) as downloaded when their size matches
+    ("already downloaded, will be checked"); without a terminal and without
+    `--yes` it stops with a usage error instead of a traceback.
 
 ### Data
 - KBvkbbb, KBvkbbn, KBvkbbp, KBvkbnn, KBvkbnp, KBvkbpp, KBvknnn, KBvknnp, KBvknpp, KBvkppp, KBvkqbp, KBvkqnp, KBvkqpp, KBvkqqp, KBvkqrp, KBvkrbn, KBvkrbp, KBvkrnn, KBvkrnp, KBvkrpp, KBvkrrb, KBvkrrn, KBvkrrp contributed by T31M (dataset PR #18, claim #52).
