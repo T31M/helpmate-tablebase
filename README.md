@@ -6,7 +6,7 @@ point at one position — a table that already knows the answer for all of them.
 Complete through five pieces. MIT licensed. The tables are a free download.
 
 > [!IMPORTANT]
-> **<!-- contrib:six-open -->559<!-- /contrib --> six-piece tablebases have never been computed, and <!-- contrib:six-open-p0 -->239<!-- /contrib --> of them need
+> **<!-- contrib:six-open -->504<!-- /contrib --> six-piece tablebases have never been computed, and <!-- contrib:six-open-p0 -->200<!-- /contrib --> of them need
 > only 32 GiB of RAM and about a day of CPU each.** If you have a machine that
 > idles overnight, you can compute something nobody ever has — and get credited
 > for it.
@@ -73,10 +73,10 @@ Generation is a one-off cost. Every query afterwards is a table lookup.
 | --- | --- | --- |
 | 2–4 | 66 | **complete** |
 | 5 | 220 | **complete** |
-| 6 | <!-- contrib:six-total -->715<!-- /contrib --> | <!-- contrib:six-done -->156<!-- /contrib --> done (<!-- contrib:six-empty -->75<!-- /contrib --> proven empty), <!-- contrib:six-open -->559<!-- /contrib --> to go |
+| 6 | <!-- contrib:six-total -->715<!-- /contrib --> | <!-- contrib:six-done -->211<!-- /contrib --> done (<!-- contrib:six-empty -->75<!-- /contrib --> proven empty), <!-- contrib:six-open -->504<!-- /contrib --> to go |
 | 7+ | — | needs an out-of-core generator that does not exist |
 
-**<!-- contrib:tables -->442<!-- /contrib --> tables, <!-- contrib:gib -->470.1<!-- /contrib --> GiB** block-compressed, published as a Hugging Face
+**<!-- contrib:tables -->497<!-- /contrib --> tables, <!-- contrib:gib -->666.4<!-- /contrib --> GiB** block-compressed, published as a Hugging Face
 dataset. The deepest mate in the corpus is <!-- contrib:deepest -->h#17.5<!-- /contrib -->.
 
 Fifteen of the six-piece tables — king, rook and bishop against every
@@ -88,10 +88,10 @@ tripled the size of the corpus. Thank you.
 ### Contributors
 
 <!-- contrib:contributors-table -->
-| contributor | tables | notes |
-| --- | --- | --- |
-| [**T31M**](https://huggingface.co/T31M) | 54: KBvkbbb, KBvkbbn, KBvkbbp, KBvkbnn, KBvkbnp, KBvkbpp, KBvknnn, KBvknnp, KBvknpp, KBvkppp, KBvkqbp, KBvkqnp, KBvkqpp, KBvkqqp, KBvkqrp, KBvkrbn, KBvkrbp, KBvkrnn, KBvkrnp, KBvkrpp, KBvkrrb, KBvkrrn, KBvkrrp, KRBvkbb, KRBvkbn, KRBvkbp, KRBvknn, KRBvknp, KRBvkpp, KRBvkqb, KRBvkqn, KRBvkqp, KRBvkqq, KRBvkqr, KRBvkrb, KRBvkrn, KRBvkrp, KRBvkrr, KRNvkbb, KRNvkbn, KRNvkbp, KRNvknn, KRNvknp, KRNvkpp, KRNvkqb, KRNvkqn, KRNvkqp, KRNvkqq, KRNvkqr, KRNvkrb, KRNvkrn, KRNvkrp, KRNvkrr, KRRvkpp | [PR #1](https://huggingface.co/datasets/osick/helpmate-tables/discussions/1), [PR #16](https://huggingface.co/datasets/osick/helpmate-tables/discussions/16), [PR #17](https://huggingface.co/datasets/osick/helpmate-tables/discussions/17), [PR #18](https://huggingface.co/datasets/osick/helpmate-tables/discussions/18): king, rook and bishop against every three-man Black set, 120 GiB compressed, computed on a 192-thread, 369 GiB machine. The pawn tables need about 85 GiB of RAM each. KRBvkqp and KRBvkrp tie the deepest mate in the corpus, h#17. |
-| [**popeye37**](https://huggingface.co/popeye37) | 14: KRRvkbb, KRRvkbn, KRRvkbp, KRRvknn, KRRvknp, KRRvkqb, KRRvkqn, KRRvkqp, KRRvkqq, KRRvkqr, KRRvkrb, KRRvkrn, KRRvkrp, KRRvkrr | [PR #2](https://huggingface.co/datasets/osick/helpmate-tables/discussions/2), [PR #3](https://huggingface.co/datasets/osick/helpmate-tables/discussions/3), [PR #4](https://huggingface.co/datasets/osick/helpmate-tables/discussions/4), [PR #5](https://huggingface.co/datasets/osick/helpmate-tables/discussions/5), [PR #6](https://huggingface.co/datasets/osick/helpmate-tables/discussions/6), [PR #7](https://huggingface.co/datasets/osick/helpmate-tables/discussions/7), [PR #8](https://huggingface.co/datasets/osick/helpmate-tables/discussions/8), [PR #9](https://huggingface.co/datasets/osick/helpmate-tables/discussions/9), [PR #10](https://huggingface.co/datasets/osick/helpmate-tables/discussions/10), [PR #11](https://huggingface.co/datasets/osick/helpmate-tables/discussions/11), [PR #12](https://huggingface.co/datasets/osick/helpmate-tables/discussions/12), [PR #13](https://huggingface.co/datasets/osick/helpmate-tables/discussions/13), [PR #14](https://huggingface.co/datasets/osick/helpmate-tables/discussions/14), [PR #15](https://huggingface.co/datasets/osick/helpmate-tables/discussions/15):  |
+| contributor | tables | reproduced | notes |
+| --- | --- | --- | --- |
+| [**T31M**](https://huggingface.co/T31M) | 90: KBvkbbb, KBvkbbn, KBvkbbp, KBvkbnn, KBvkbnp, KBvkbpp, KBvknnn, KBvknnp, KBvknpp, KBvkppp, KBvkqbp, KBvkqnp, KBvkqpp, KBvkqqp, KBvkqrp, KBvkrbn, KBvkrbp, KBvkrnn, KBvkrnp, KBvkrpp, KBvkrrb, KBvkrrn, KBvkrrp, KNvkbbb, KNvkbbn, KNvkbbp, KNvkbnn, KNvkbnp, KNvkbpp, KNvknnp, KNvknpp, KNvkppp, KNvkqbb, KNvkqbn, KNvkqbp, KNvkqnn, KNvkqnp, KNvkqpp, KNvkqqb, KNvkqqn, KNvkqqp, KNvkqqr, KNvkqrb, KNvkqrn, KNvkqrp, KNvkqrr, KNvkrbb, KNvkrbn, KNvkrbp, KNvkrnn, KNvkrnp, KNvkrpp, KNvkrrb, KNvkrrn, KNvkrrp, KNvkrrr, KPvkqqq, KQvkqqq, KRBvkbb, KRBvkbn, KRBvkbp, KRBvknn, KRBvknp, KRBvkpp, KRBvkqb, KRBvkqn, KRBvkqp, KRBvkqq, KRBvkqr, KRBvkrb, KRBvkrn, KRBvkrp, KRBvkrr, KRNvkbb, KRNvkbn, KRNvkbp, KRNvknn, KRNvknp, KRNvkpp, KRNvkqb, KRNvkqn, KRNvkqp, KRNvkqq, KRNvkqr, KRNvkrb, KRNvkrn, KRNvkrp, KRNvkrr, KRRvkpp, KRvkqqq | 1 | [PR #1](https://huggingface.co/datasets/osick/helpmate-tables/discussions/1), [PR #16](https://huggingface.co/datasets/osick/helpmate-tables/discussions/16), [PR #17](https://huggingface.co/datasets/osick/helpmate-tables/discussions/17), [PR #18](https://huggingface.co/datasets/osick/helpmate-tables/discussions/18), [PR #20](https://huggingface.co/datasets/osick/helpmate-tables/discussions/20), [PR #22](https://huggingface.co/datasets/osick/helpmate-tables/discussions/22): king, rook and bishop against every three-man Black set, 120 GiB compressed, computed on a 192-thread, 369 GiB machine. The pawn tables need about 85 GiB of RAM each. KRBvkqp and KRBvkrp tie the deepest mate in the corpus, h#17. |
+| [**popeye37**](https://huggingface.co/popeye37) | 34: KQvkbbb, KQvkbbn, KQvkbnn, KQvknnn, KQvkqbb, KQvkqbn, KQvkqnn, KQvkqqb, KQvkqqn, KQvkqqq, KQvkqqr, KQvkqrb, KQvkqrn, KQvkqrr, KQvkrbb, KQvkrbn, KQvkrnn, KQvkrrb, KQvkrrn, KQvkrrr, KRRvkbb, KRRvkbn, KRRvkbp, KRRvknn, KRRvknp, KRRvkqb, KRRvkqn, KRRvkqp, KRRvkqq, KRRvkqr, KRRvkrb, KRRvkrn, KRRvkrp, KRRvkrr | 1 | [PR #2](https://huggingface.co/datasets/osick/helpmate-tables/discussions/2), [PR #3](https://huggingface.co/datasets/osick/helpmate-tables/discussions/3), [PR #4](https://huggingface.co/datasets/osick/helpmate-tables/discussions/4), [PR #5](https://huggingface.co/datasets/osick/helpmate-tables/discussions/5), [PR #6](https://huggingface.co/datasets/osick/helpmate-tables/discussions/6), [PR #7](https://huggingface.co/datasets/osick/helpmate-tables/discussions/7), [PR #8](https://huggingface.co/datasets/osick/helpmate-tables/discussions/8), [PR #9](https://huggingface.co/datasets/osick/helpmate-tables/discussions/9), [PR #10](https://huggingface.co/datasets/osick/helpmate-tables/discussions/10), [PR #11](https://huggingface.co/datasets/osick/helpmate-tables/discussions/11), [PR #12](https://huggingface.co/datasets/osick/helpmate-tables/discussions/12), [PR #13](https://huggingface.co/datasets/osick/helpmate-tables/discussions/13), [PR #14](https://huggingface.co/datasets/osick/helpmate-tables/discussions/14), [PR #15](https://huggingface.co/datasets/osick/helpmate-tables/discussions/15), [PR #19](https://huggingface.co/datasets/osick/helpmate-tables/discussions/19):  |
 <!-- /contrib -->
 
 [**The deepest sound problem in every material class →**](docs/DEEPEST.md)
@@ -122,7 +122,7 @@ each class the first time someone asks for it.
 Six hundred machine-days of work remain at six pieces, and it will not come
 from one desk.
 
-**<!-- contrib:six-open-p0 -->239<!-- /contrib --> of the missing tables need only 32 GiB of RAM** and about a day each.
+**<!-- contrib:six-open-p0 -->200<!-- /contrib --> of the missing tables need only 32 GiB of RAM** and about a day each.
 If you have a machine that idles overnight, you can compute something nobody
 ever has. Contributions land as pull requests on the dataset, and every
 merged table is credited.

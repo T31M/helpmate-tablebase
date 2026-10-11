@@ -77,6 +77,10 @@ bumps may change behavior).
     `--yes` it stops with a usage error instead of a traceback.
 
 ### Data
+- KQvkqqq (independently reproduced by popeye37 and T31M).
+- KPvkqqq, KRvkqqq contributed by T31M (dataset PR #22, claim #67).
+- KNvkbbb, KNvkbbn, KNvkbbp, KNvkbnn, KNvkbnp, KNvkbpp, KNvknnp, KNvknpp, KNvkppp, KNvkqbb, KNvkqbn, KNvkqbp, KNvkqnn, KNvkqnp, KNvkqpp, KNvkqqb, KNvkqqn, KNvkqqp, KNvkqqr, KNvkqrb, KNvkqrn, KNvkqrp, KNvkqrr, KNvkrbb, KNvkrbn, KNvkrbp, KNvkrnn, KNvkrnp, KNvkrpp, KNvkrrb, KNvkrrn, KNvkrrp, KNvkrrr contributed by T31M (dataset PR #20, claim #62).
+- KQvkbbb, KQvkbbn, KQvkbnn, KQvknnn, KQvkqbb, KQvkqbn, KQvkqnn, KQvkqqb, KQvkqqn, KQvkqqq, KQvkqqr, KQvkqrb, KQvkqrn, KQvkqrr, KQvkrbb, KQvkrbn, KQvkrnn, KQvkrrb, KQvkrrn, KQvkrrr contributed by popeye37 (dataset PR #19, claim #40).
 - KBvkbbb, KBvkbbn, KBvkbbp, KBvkbnn, KBvkbnp, KBvkbpp, KBvknnn, KBvknnp, KBvknpp, KBvkppp, KBvkqbp, KBvkqnp, KBvkqpp, KBvkqqp, KBvkqrp, KBvkrbn, KBvkrbp, KBvkrnn, KBvkrnp, KBvkrpp, KBvkrrb, KBvkrrn, KBvkrrp contributed by T31M (dataset PR #18, claim #52).
 - KRNvkbb, KRNvkbn, KRNvkbp, KRNvknn, KRNvknp, KRNvkpp, KRNvkqb, KRNvkqn, KRNvkqp, KRNvkqq, KRNvkqr, KRNvkrb, KRNvkrn, KRNvkrp, KRNvkrr contributed by T31M (dataset PR #17, claim #45).
 - KRRvkpp contributed by T31M (dataset PR #16).
