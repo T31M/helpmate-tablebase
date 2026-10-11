@@ -7,7 +7,7 @@ import pytest
 
 from helpmate_server.contrib import SITE_MATERIALS_URL
 from fakes import FakeGitHub, FakeHub
-from helpmate_server.contrib.accept import accept, add_changelog_data, manifest_from_hub
+from helpmate_server.contrib.accept import accept, add_changelog_data, manifest_from_hub, plan_accept
 
 
 class FakeGit:
@@ -218,6 +218,32 @@ def test_accept_refuses_a_pr_changed_after_verification(tmp_path, capsys):
     checkout, staging, hub, gh, tables = _setup(tmp_path, head="new", report_head="old")
     assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 2
     assert hub.merged == [] and "old" in capsys.readouterr().err
+
+
+def test_a_pr_merged_by_hand_at_its_verified_head_is_taken_as_merged(tmp_path, capsys):
+    """HF PR #20 was merged in the Hub's web page after its passing verification: accept
+    carries on from the merge (manifest, files, credits) instead of stopping."""
+    checkout, staging, hub, gh, tables = _setup(tmp_path)
+    hub.merge(2)
+    hub.merged.clear()
+    assert plan_accept([2], hub=hub, gh=gh, git=FakeGit(), checkout=checkout, tables=tables,
+                       staging=staging, contributor=None, today="2026-10-01", binary=BINARY) == 0
+    assert "already merged on the Hub by hand" in capsys.readouterr().out
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 0
+    assert hub.merged == []                                          # not merged a second time
+    assert "KRRvkqq.hm" in json.loads(hub.main["manifest.json"])["files"]
+    assert (tables / "KRRvkqq.hm").read_bytes() == b"table"
+    reg = json.loads((checkout / "data" / "contributions.json").read_text())
+    assert reg["tables"]["KRRvkqq"]["contributor"] == "popeye37"
+    assert "taken as merged" in capsys.readouterr().err
+
+
+def test_a_pr_merged_by_hand_at_another_head_is_refused(tmp_path, capsys):
+    checkout, staging, hub, gh, tables = _setup(tmp_path, head="new", report_head="old")
+    hub.merge(2)
+    assert _run(checkout, staging, hub, gh, tables, FakeGit()) == 2
+    assert "PR #2 is merged" in capsys.readouterr().err
+    assert "manifest.json" in hub.main and "KRRvkqq.hm" not in json.loads(hub.main["manifest.json"])["files"]
 
 
 def test_accept_refuses_a_failed_report(tmp_path):

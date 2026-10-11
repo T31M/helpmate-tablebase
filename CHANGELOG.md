@@ -101,6 +101,10 @@ bumps may change behavior).
   empty.
 
 ### Fixed
+- `helpmate-tables accept`: a dataset PR merged on the Hub by hand after its passing
+  verification, at the verified head, is taken as merged and the run carries on (manifest,
+  files, credits) instead of stopping with "PR #N is merged". A hand-merged PR that accept
+  would not merge whole (partial copy, held material) still stops it before any write.
 - `helpmate-tables verify --pr`: a PR without a `GitHub:` line in its description is
   attributed as `accept` does (contributor registry by HF user, else the claim that speaks
   for it), so a claim holder's own delivery is no longer labelled "held for claim #N" in V1.

@@ -448,7 +448,13 @@ def _prepare(prs: list[int], state: dict, save, *, hub, gh, git, checkout: Path,
         rep = json.loads(rep_path.read_text())
         if rep["result"] != "pass":
             return _err(f"PR #{n}: the last verification failed")
-        if pr.status != "open":
+        hand = state.setdefault("hand_merged", [])
+        if pr.status == "merged" and rep.get("head") == pr.head:
+            # merged on the Hub by hand after its passing verification: the merge accept would
+            # have made, so the run carries on from there (checked below: a plain merge only)
+            if n not in hand:
+                hand.append(n)
+        elif pr.status != "open":
             return _err(f"PR #{n} is {pr.status}")
         if rep.get("head") != pr.head:
             return _err(f"PR #{n} changed after verification (verified {rep.get('head')}, "
@@ -513,6 +519,15 @@ def _prepare(prs: list[int], state: dict, save, *, hub, gh, git, checkout: Path,
             c = index.claim_for(m)
             print(f"--release {m}: " + (f"overrides claim #{c.issue} by {c.author}" if c else
                                         "not claimed by anyone, nothing to override"), file=sys.stderr)
+    for n in state.get("hand_merged", []):
+        if n in merged or n not in prs:
+            continue
+        action = _pr_plan(PullRequest(n, **stored[str(n)]), decisions,
+                          state.get("own", {}).get(str(n), []))[3]
+        if action != "merge":
+            return _err(f"PR #{n} was merged on the Hub by hand, but accept would not merge it "
+                        f"whole ({_ACTIONS[action]}): revert the merge commit on the Hub's main, "
+                        "then rerun accept without this PR")
     for n in prs:
         if n in merged or str(n) in copied:
             continue
@@ -704,6 +719,9 @@ def accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, stagin
                     hub.comment(n, text)
                 elif hub.pr_status(n) == "open":
                     hub.close_pr(n, text)
+            elif n in state.get("hand_merged", []):
+                print(f"PR #{n}: already merged on the Hub at its verified head; taken as merged",
+                      file=sys.stderr)
             else:
                 now = hub.pr_head(n)
                 if now != verified:  # a push between validation and this merge
@@ -957,7 +975,9 @@ def plan_accept(prs: list[int], *, hub, gh, git, checkout: Path, tables: Path, s
                 + (f", claim #{p['claim']}" if p["claim"] else "")]
         out += [f"  {m}: {_material_line(n, m, decisions[m], own)}" for m in pr.materials]
         what = ("nothing: the conflict stops the run before any write" if conflicts else
-                "done by the interrupted run" if n in done else _ACTIONS[_pr_plan(pr, decisions, own)[3]])
+                "done by the interrupted run" if n in done else
+                "merge (already merged on the Hub by hand; taken as merged)"
+                if n in state.get("hand_merged", []) else _ACTIONS[_pr_plan(pr, decisions, own)[3]])
         out.append(f"  -> {what}")
     if conflicts:
         out += ["", "CONFLICT: nothing would be merged:", *(f"  {c}" for c in conflicts)]
