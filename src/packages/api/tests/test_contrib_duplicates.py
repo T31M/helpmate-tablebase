@@ -282,3 +282,35 @@ def test_published_hashes_without_persist_write_no_cache(tmp_path, compressed_ta
     assert ph.get("KQvk") == payload_sha256(tmp_path / "KQvk.hm")
     assert ph.get("KQvk") == ph.cache["KQvk"]["payload"]          # kept in memory
     assert not (tmp_path / ".payload-sha256.json").exists()
+
+
+def _registry(tmp_path):
+    from helpmate_server.contrib.registry import Registry
+    return Registry(tmp_path / "contributions.json", {"contributors": {
+        "T31M": {"github": "T31M", "hf": "T31M", "display": "T31M"},
+        "popeye37": {"github": "popeye37", "hf": "popeye37", "display": "popeye37"}}})
+
+
+def test_pr_login_is_resolved_as_accept_does(tmp_path):
+    """HF PR #19: no description, so verify called popeye37's own claim #40 someone else's
+    and labelled all his tables held. The login comes from the registry or the claim, as in accept."""
+    from helpmate_server.contrib.hf import PullRequest
+    from helpmate_server.contrib.verify import pr_login
+    index = ClaimIndex([Claim(40, "popeye37", "2026-09-21T00:00:00Z", ["KQvk"]),
+                        Claim(67, "T31M", "2026-10-07T00:00:00Z", ["KQvk", "KRvk"])])
+    reg = _registry(tmp_path)
+    own = PullRequest(19, "Add", "popeye37", "open", "", ["KQvk.hm", "KQvk.stats.json"], "h", "u", [])
+    other = PullRequest(22, "Add", "T31M", "open", "", ["KQvk.hm", "KQvk.stats.json",
+                                                        "KRvk.hm", "KRvk.stats.json"], "h", "u", [])
+    assert pr_login(own, index, reg) == "popeye37"
+    assert classify(own, {}, index, {}, pr_login(own, index, reg)) == {"KQvk": "new"}
+    assert pr_login(other, index, reg) == "T31M"
+    assert classify(other, {}, index, {}, pr_login(other, index, reg)) == {
+        "KQvk": "held for claim #40", "KRvk": "new"}
+    # unknown HF user, no description: the first claim on its material speaks for it
+    stranger = PullRequest(5, "Add", "newbie", "open", "", ["KQvk.hm", "KQvk.stats.json"], "h", "u", [])
+    assert pr_login(stranger, index, reg) == "popeye37"
+    # the description's GitHub line wins; without a registry only the description counts
+    named = PullRequest(6, "Add", "x", "open", "GitHub: @alice", ["KQvk.hm"], "h", "u", [])
+    assert pr_login(named, index, reg) == "alice"
+    assert pr_login(own, index, None) is None

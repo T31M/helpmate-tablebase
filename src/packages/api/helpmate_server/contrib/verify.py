@@ -15,11 +15,12 @@ from .checks import (
     Check, MissingPublished, TableReport, check_block_integrity, check_deepest, check_header,
     check_identical, check_sidecar,
 )
-from .claims import ClaimIndex, load_index
+from .claims import ClaimIndex, identity_claim, load_index
 from .consistency import check_consistency
 from .links import parse_links
 from .materials import Material, canonical
 from .oracle import check_oracle
+from .registry import Registry
 from .report import render_markdown, report_json
 from .tablefile import read_header
 
@@ -204,6 +205,20 @@ def check_pr_hygiene(pr, manifest_files: dict) -> tuple[Check, set[str]]:
         return Check("V1", title, "warn", f"{detail}; no `Claim:` line in the "
                      "description (push with --claim N next time)"), dups
     return Check("V1", title, "pass", detail), dups
+
+
+def pr_login(pr, index: ClaimIndex | None, registry) -> str | None:
+    """The PR's GitHub login as accept resolves it: the description's `GitHub:` line, the
+    registry entry of its HF user, else the author of the claim that speaks for it. Without the
+    registry only the description counts (someone else's claim must not speak for the PR)."""
+    login = parse_links(pr.description)[1]
+    if login or registry is None:
+        return login
+    known = registry.by_hf(pr.author)
+    if known and known.github:
+        return known.github
+    claim = identity_claim(pr, index, registry) if index is not None else None
+    return claim.author if claim else None
 
 
 def classify(pr, manifest_files: dict, index: ClaimIndex | None, earlier: dict[str, int],
@@ -431,19 +446,24 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         index = load_index(gh if gh is not None else (gh_factory or GitHub)(a.github_repo))
     except Exception:  # noqa: BLE001 - claims are advisory; verification goes on without them
         claims_note = "; claims unavailable"
+    reg_path = Path(getattr(a, "checkout", None) or ".") / "data" / "contributions.json"
+    registry = Registry.load(reg_path) if reg_path.exists() else None
+    if registry is None and index is not None:
+        claims_note += ("; contributor registry not found (run from the checkout or pass "
+                        "--checkout), so only the PR description names its author")
     hashes = PublishedHashes(tables, manifest_files)
     delivered: dict[str, tuple[int, str | None]] = {}   # material -> (PR, payload if it passed)
     rc = 0
     open_prs = hub.open_pull_requests()
     open_heads = {p.num: p.head for p in open_prs}
     for pr in sorted(prs, key=_batch_order):
-        pr_login = parse_links(pr.description)[1]
+        login = pr_login(pr, index, registry)
         d = staging / f"pr-{pr.num}"
         files_dir = d / "files"
         d.mkdir(parents=True, exist_ok=True)
         v1, dups = check_pr_hygiene(pr, manifest_files)
         earlier = {m: n for m, (n, _) in delivered.items() if n < pr.num}
-        labels = classify(pr, manifest_files, index, earlier, pr_login)
+        labels = classify(pr, manifest_files, index, earlier, login)
         notes = [f"{m}: {label}" for m, label in labels.items() if label != "new"]
         if notes or claims_note:
             v1.detail += ("; " + ", ".join(notes) if notes else "") + claims_note

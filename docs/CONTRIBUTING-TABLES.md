@@ -275,7 +275,8 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   `--full` re-checks everything. Progress lines read
   `[i/n] <material> <check> ... <status> (<time>)`. V1 labels each material new,
   duplicate of published, duplicate of HF PR #N, or held for claim #N;
-  `--no-post` still reads the claims.
+  `--no-post` still reads the claims. Run it from the checkout (or pass `--checkout`):
+  the contributor registry tells V1 who sent a PR that has no `GitHub:` line.
 - `accept N... --plan` runs everything accept checks before its first write (open
   PRs, report heads, staged files, contributors, claims, decisions) and prints, per
   PR, the contributor, one line per material (`publish from #N`, `reproduction of

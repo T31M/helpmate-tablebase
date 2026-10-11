@@ -205,6 +205,26 @@ def _day(ts: str) -> date:
     return datetime.fromisoformat(ts.replace("Z", "+00:00")).date()
 
 
+def identity_claim(pr, index: ClaimIndex, reg) -> Claim | None:
+    """The claim that speaks for the PR's identity: the one it names; else the one by its own
+    GitHub login (description or registry) that covers its materials; with no login at all,
+    the first claim on its material unless that claim's form names another HF user.
+    Someone else's claim never speaks for a PR whose login is known."""
+    num, login = parse_links(pr.description)
+    if num is not None:
+        return next((c for c in index.claims if c.issue == num), None)
+    if login is None:
+        known = reg.by_hf(pr.author)
+        login = known.github if known else None
+    if login is not None:
+        return next((c for c in index.claims if c.author.lower() == login.lower()
+                     and set(c.materials) & set(pr.materials)), None)
+    first = index.claim_for(pr.materials[0]) if pr.materials else None
+    if first is not None and (first.hf is None or first.hf.lower() == pr.author.lower()):
+        return first
+    return None
+
+
 def ownership_conflict(pr, claim: Claim, registry) -> str | None:
     """Why the PR's identity clues point at someone other than the claim's author, or None.
     The claims bot and accept both ask this, so they agree on who owns a PR."""

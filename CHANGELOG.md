@@ -101,6 +101,10 @@ bumps may change behavior).
   empty.
 
 ### Fixed
+- `helpmate-tables verify --pr`: a PR without a `GitHub:` line in its description is
+  attributed as `accept` does (contributor registry by HF user, else the claim that speaks
+  for it), so a claim holder's own delivery is no longer labelled "held for claim #N" in V1.
+  The registry is read from the checkout (`--checkout`, default the current directory).
 - Site: after a deploy a browser could pair a cached old `js/materials.js`
   (GitHub Pages sends `max-age=600`) with the new `index.html`, and the
   Materials screen crashed ("Cannot read properties of null"). The Pages

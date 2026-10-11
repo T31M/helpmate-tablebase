@@ -40,6 +40,9 @@ def add_parsers(sub) -> None:
     v.add_argument("--no-post", action="store_true", help="--pr: do not comment anywhere")
     v.add_argument("--full", action="store_true",
                    help="--pr: verify every table again, do not reuse results of unchanged ones")
+    v.add_argument("--checkout", type=Path, default=Path("."),
+                   help="--pr: the helpmate-tablebase checkout whose contributor registry names "
+                        "each PR's author (default: the current directory)")
     s = sub.add_parser("sync", help="(maintainer) regenerate the site's materials data, credits and counts")
     s.add_argument("--tables", required=True, metavar="DIR")
     s.add_argument("--checkout", type=Path, default=Path("."))

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from . import SITE_MATERIALS_URL
-from .claims import load_index, material_status, ownership_conflict
+from .claims import identity_claim, load_index, material_status, ownership_conflict
 from .docs_sync import CorpusFacts, SyncError, close_finished_claims, sync
 from .hf import MergeConflict as HubConflict
 from .hf import PullRequest
@@ -317,26 +317,6 @@ def decide(prs, reports: dict, manifest: dict, hashes, index, logins: dict, rele
     return out
 
 
-def _identity_claim(pr, index, reg: Registry):
-    """The claim that speaks for the PR's identity: the one it names; else the one by its own
-    GitHub login (description or registry) that covers its materials; with no login at all,
-    the first claim on its material unless that claim's form names another HF user.
-    Someone else's claim never speaks for a PR whose login is known."""
-    num, login = parse_links(pr.description)
-    if num is not None:
-        return next((c for c in index.claims if c.issue == num), None)
-    if login is None:
-        known = reg.by_hf(pr.author)
-        login = known.github if known else None
-    if login is not None:
-        return next((c for c in index.claims if c.author.lower() == login.lower()
-                     and set(c.materials) & set(pr.materials)), None)
-    first = index.claim_for(pr.materials[0]) if pr.materials else None
-    if first is not None and (first.hf is None or first.hf.lower() == pr.author.lower()):
-        return first
-    return None
-
-
 def _notes(credited: list[str], held: list[str], decisions: dict[str, Decision],
            own: list[str] | None = None) -> list[str]:
     """`own`: materials this PR's delivery is already in the dataset and credited for (an
@@ -473,7 +453,7 @@ def _prepare(prs: list[int], state: dict, save, *, hub, gh, git, checkout: Path,
         if rep.get("head") != pr.head:
             return _err(f"PR #{n} changed after verification (verified {rep.get('head')}, "
                         f"now {pr.head}); run verify --pr {n} again")
-        claim = _identity_claim(pr, index, reg)
+        claim = identity_claim(pr, index, reg)
         why = ownership_conflict(pr, claim, reg) if claim and not contributor else None
         if why:
             return _err(f"PR #{n}: {why} (the claims bot shows this as a conflict); {fix(n)}")
