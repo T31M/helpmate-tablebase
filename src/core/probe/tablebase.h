@@ -113,9 +113,14 @@ public:
     // `skipped_saturated` if non-null; existing callers that omit it are
     // unaffected. Pass it for theme-only queries too, or those positions are
     // dropped with no tally.
-    void mine(const Material& m, const MineFilter& f,
-              const std::function<bool(const std::string&)>& cb,
-              uint64_t* skipped_saturated = nullptr) const;
+    //
+    // `threads` > 1 scans the plane in segments on that many workers, each with
+    // its own Tablebase (own readers and block caches, so no lock is shared).
+    // `cb` still runs only on the calling thread, in cell order, and sees exactly
+    // the FENs -- and `skipped_saturated` exactly the tally -- that one thread
+    // would give it.
+    void mine(const Material& m, const MineFilter& f, const std::function<bool(const std::string&)>& cb,
+              uint64_t* skipped_saturated = nullptr, int threads = 1) const;
     // Theme names this position shows. CLI, bindings and API all route here,
     // so they cannot drift apart; the ThemeInput itself is built in exactly
     // one place, with_theme_input (private, below), shared with shows_theme.
@@ -132,6 +137,11 @@ public:
 
 private:
     struct Slice { TableReader reader; SliceIndex index; };
+    // The resolved, read-only part of one mine() query, shared by its workers.
+    struct MineScan;
+    // mine() over cells [begin, end) of the query's slice; false when `cb` stopped it.
+    bool mine_range(const MineScan& q, uint64_t begin, uint64_t end,
+                    const std::function<bool(const std::string&)>& cb, uint64_t* skipped_saturated) const;
     const Slice* load(const Material& m) const;
     ValuePair value_of(Board& b) const;
     // value_of(b).dtm without reading any count byte; the line searches use

@@ -346,3 +346,57 @@ TEST_CASE("a king capture is reported as valueless, not thrown") {
     CHECK(it->dtm == -1);
     CHECK_FALSE(it->optimal);
 }
+
+TEST_CASE("mine gives the single-threaded FENs and tally on any thread count") {
+    Tablebase tb(gen_dir());
+    struct Query {
+        const char* material;
+        MineFilter f;
+    };
+    // A plain filter, a shape filter, a solutions theme that skips saturated
+    // cells (KQvk dtm 8), a sibling-plane theme, and pawn material.
+    const std::vector<Query> queries = {
+        {"KQvk", MineFilter{.dtm = 2}},
+        {"KQvk", MineFilter{.dtm = 4, .starts = 1, .ends = 1}},
+        {"KQvk", MineFilter{.dtm = 8, .themes = {"mirror"}}},
+        {"KQvk", MineFilter{.dtm = 8, .themes = {"set-play"}}},
+        {"KPvk", MineFilter{.dtm = 5}},
+    };
+    auto run = [&](const Query& q, int threads, int cap) {
+        std::vector<std::string> out;
+        uint64_t skipped = 0;
+        tb.mine(
+            *Material::parse(q.material), q.f,
+            [&](const std::string& fen) {
+                if ((int)out.size() >= cap) return false;
+                out.push_back(fen);
+                return (int)out.size() < cap;
+            },
+            &skipped, threads);
+        return std::make_pair(out, skipped);
+    };
+    for (const auto& q : queries) {
+        auto full = run(q, 1, 1 << 30);
+        REQUIRE_FALSE(full.first.empty());
+        // A stop before the first FEN, inside the scan, and after the end.
+        for (int cap : {0, 1, 7, (int)full.first.size() / 2 + 1, 1 << 30}) {
+            auto one = run(q, 1, cap);
+            for (int threads : {2, 3, 8}) {
+                INFO(q.material << " dtm " << q.f.dtm << " threads " << threads << " cap " << cap);
+                auto many = run(q, threads, cap);
+                CHECK(many.first == one.first);
+                CHECK(many.second == one.second);
+            }
+        }
+    }
+}
+
+TEST_CASE("multi-threaded mine reports a missing table as one thread does") {
+    Tablebase tb(gen_dir());
+    MineFilter f{.dtm = 2};
+    for (int threads : {1, 4})
+        CHECK_THROWS_AS(
+            tb.mine(
+                *Material::parse("KRBvk"), f, [](const std::string&) { return true; }, nullptr, threads),
+            MissingTableError);
+}

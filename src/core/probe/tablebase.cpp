@@ -1,7 +1,11 @@
 #include "probe/tablebase.h"
 
 #include <algorithm>
+#include <atomic>
+#include <condition_variable>
+#include <exception>
 #include <set>
+#include <thread>
 #include <utility>
 
 #include "chess/san.h"
@@ -257,9 +261,21 @@ SolutionShape Tablebase::solution_shape(const std::string& fen) const {
     return shape_of(p->count, lines(fen, p->count));
 }
 
+struct Tablebase::MineScan {
+    Material m;
+    Color stm;
+    Color other_stm;
+    MineFilter f;
+    std::vector<themes::ResolvedTheme> dets;
+    themes::Needs need;
+    bool want_shape;
+    bool want_solutions;
+    bool want_plane;
+};
+
 void Tablebase::mine(const Material& m, const MineFilter& f,
-                      const std::function<bool(const std::string&)>& cb,
-                      uint64_t* skipped_saturated) const {
+                     const std::function<bool(const std::string&)>& cb, uint64_t* skipped_saturated,
+                     int threads) const {
     const Slice* s = load(m);
     if (!s) throw MissingTableError("no table for " + m.name());
     Color stm = (f.dtm % 2) ? Color::White : Color::Black;  // parity invariant: wtm dtm odd, btm dtm even
@@ -282,6 +298,135 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
     // positions too, at the cost of one decode plus one Board construction per
     // candidate -- measured at 26s over a 31.5M-candidate query.
     const bool want_solutions = want_shape || (!dets.empty() && need == themes::Needs::Solutions);
+    const bool want_plane = !dets.empty() && need >= themes::Needs::Plane;
+    const MineScan q{m,
+                     stm,
+                     stm == Color::White ? Color::Black : Color::White,
+                     f,
+                     std::move(dets),
+                     need,
+                     want_shape,
+                     want_solutions,
+                     want_plane};
+
+    const uint64_t plane_cells = s->index.size();
+    // About 16 segments per worker, so a slow segment (one dense in
+    // candidates) does not leave the other workers idle at the end, within
+    // [4096, 2^20] cells: large enough that claiming one is cheap, small
+    // enough that a --max stop does not wait long for workers to finish.
+    const uint64_t kSegment = std::clamp<uint64_t>(plane_cells / (16 * (uint64_t)std::max(threads, 1)),
+                                                   uint64_t{1} << 12, uint64_t{1} << 20);
+    const uint64_t segments = (plane_cells + kSegment - 1) / kSegment;
+    if (threads <= 1 || segments <= 1) {
+        mine_range(q, 0, plane_cells, cb, skipped_saturated);
+        return;
+    }
+
+    // Workers claim segments in order and park each result in a ring slot;
+    // this thread hands the results to `cb` in segment order, so the caller
+    // sees the single-threaded sequence. A worker never claims more than
+    // `window` segments past the last one handed out, which bounds the
+    // buffered FENs no matter how slow `cb` is.
+    struct Segment {
+        bool done = false;
+        // Each hit with the saturated skips before it in its segment, so a
+        // stop at that hit leaves the same tally one thread would.
+        std::vector<std::pair<std::string, uint64_t>> hits;
+        uint64_t skipped = 0;
+        std::exception_ptr error;
+    };
+    const uint64_t workers = std::min<uint64_t>((uint64_t)threads, segments);
+    const uint64_t window = 4 * workers;
+    std::vector<Segment> ring(window);
+    std::mutex mu;
+    std::condition_variable cv;
+    uint64_t next = 0;     // first unclaimed segment
+    uint64_t emitted = 0;  // segments handed to cb so far
+    std::atomic<bool> stop{false};
+
+    auto work = [&] {
+        // Its own Tablebase: own readers, own block caches, no shared lock.
+        Tablebase own(dir_);
+        for (;;) {
+            uint64_t k;
+            {
+                std::unique_lock lk(mu);
+                cv.wait(lk, [&] { return stop.load() || next >= segments || next < emitted + window; });
+                if (stop.load() || next >= segments) return;
+                k = next++;
+            }
+            Segment seg;
+            try {
+                const uint64_t begin = k * kSegment;
+                own.mine_range(
+                    q, begin, std::min(plane_cells, begin + kSegment),
+                    [&](const std::string& fen) {
+                        seg.hits.emplace_back(fen, seg.skipped);
+                        return !stop.load();
+                    },
+                    &seg.skipped);
+            } catch (...) { seg.error = std::current_exception(); }
+            seg.done = true;
+            {
+                std::lock_guard lk(mu);
+                ring[k % window] = std::move(seg);
+            }
+            cv.notify_all();
+        }
+    };
+    std::vector<std::thread> pool;
+    auto finish = [&] {
+        {
+            std::lock_guard lk(mu);
+            stop = true;
+        }
+        cv.notify_all();
+        for (auto& th : pool) th.join();
+    };
+    const uint64_t tally0 = skipped_saturated ? *skipped_saturated : 0;
+    uint64_t tally = 0;  // saturated skips in the segments handed out so far
+    try {
+        for (uint64_t i = 0; i < workers; ++i) pool.emplace_back(work);
+        for (uint64_t k = 0; k < segments; ++k) {
+            Segment seg;
+            {
+                std::unique_lock lk(mu);
+                cv.wait(lk, [&] { return ring[k % window].done; });
+                seg = std::move(ring[k % window]);
+                ring[k % window] = Segment{};
+                ++emitted;
+            }
+            cv.notify_all();
+            for (const auto& [fen, before] : seg.hits) {
+                if (skipped_saturated) *skipped_saturated = tally0 + tally + before;
+                if (!cb(fen)) {
+                    finish();
+                    return;
+                }
+            }
+            tally += seg.skipped;
+            if (skipped_saturated) *skipped_saturated = tally0 + tally;
+            // A worker's error surfaces where one thread would have hit it:
+            // after every FEN before the failing cell.
+            if (seg.error) std::rethrow_exception(seg.error);
+        }
+    } catch (...) {
+        finish();
+        throw;
+    }
+    finish();
+}
+
+bool Tablebase::mine_range(const MineScan& q, uint64_t begin, uint64_t end,
+                           const std::function<bool(const std::string&)>& cb,
+                           uint64_t* skipped_saturated) const {
+    const Slice* s = load(q.m);
+    if (!s) throw MissingTableError("no table for " + q.m.name());
+    const MineFilter& f = q.f;
+    const Color stm = q.stm, other_stm = q.other_stm;
+    const auto& dets = q.dets;
+    const themes::Needs need = q.need;
+    const bool want_shape = q.want_shape, want_solutions = q.want_solutions, want_plane = q.want_plane;
     std::vector<PlacedPiece> pp;
     // Read the two planes in block-sized chunks instead of one cell at a time.
     // get() on a compressed table takes the block cache's mutex and memcpys a
@@ -289,22 +434,19 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
     // was the cost, measured at 14x raw on KRvkbn before this loop was chunked.
     // read_values() pays one lock and one memcpy per block touched.
     constexpr size_t kScanChunk = 1 << 16;
-    const uint64_t plane_cells = s->index.size();
     std::vector<uint8_t> dtm_buf(kScanChunk), cnt_buf(kScanChunk);
     // Third buffer for the sibling side-to-move plane, filled only when some
     // requested theme needs it (Needs::Plane). A cell index is independent of
     // side to move -- side to move selects the plane, not the index -- so the
     // sibling value for candidate cell c is the same cell c read from the
     // other plane, one extra read_values() call over the same chunk.
-    const Color other_stm = stm == Color::White ? Color::Black : Color::White;
-    const bool want_plane = !dets.empty() && need >= themes::Needs::Plane;
     std::vector<uint8_t> other_buf(want_plane ? kScanChunk : 0);
-    uint64_t chunk_base = 0;
+    uint64_t chunk_base = begin;
     size_t chunk_n = 0;
-    for (uint64_t c = 0; c < plane_cells; ++c) {
+    for (uint64_t c = begin; c < end; ++c) {
         if (c - chunk_base >= chunk_n) {
             chunk_base = c;
-            chunk_n = (size_t)std::min<uint64_t>(kScanChunk, plane_cells - c);
+            chunk_n = (size_t)std::min<uint64_t>(kScanChunk, end - c);
             s->reader.read_values(stm, chunk_base, chunk_n, dtm_buf.data(), cnt_buf.data());
             if (want_plane) s->reader.read_values(other_stm, chunk_base, chunk_n, other_buf.data(), nullptr);
         }
@@ -378,8 +520,9 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
             if (!all_present) continue;
         }
         if (fen.empty()) fen = b.fen();  // only reached by an actual match
-        if (!cb(fen)) return;
+        if (!cb(fen)) return false;
     }
+    return true;
 }
 
 void Tablebase::with_theme_input(const std::string& fen, int max,

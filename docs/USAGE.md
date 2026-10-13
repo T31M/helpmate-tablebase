@@ -523,7 +523,7 @@ enumerate the actual positions at any (dtm, count).
 ## `mine` — scan for composition candidates
 
 ```
-helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N] [--theme NAME]... [--max N|infinity] [--themes] [--solutions] [--json|--jsonl] [--interactive] [--tables DIR]
+helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N] [--theme NAME]... [--max N|infinity] [--themes] [--solutions] [--json|--jsonl] [--interactive] [--tables DIR] [--threads N]
 ```
 
 - `--dtm D` (**required**): exact distance-to-mate, in plies, to match;
@@ -554,6 +554,12 @@ helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N] [--theme NA
   streamed as the scan finds it, a footer line with the counts (below);
 - `--interactive` (alias `--tui`): after the scan, open a shell over the
   result (below).
+- `--threads N`: scan the table on N worker threads (default 1). Each worker
+  opens its own readers and block caches, so memory grows by up to 64 MiB of
+  block cache per table a worker touches. The output -- order, `--max` cut-off
+  and skipped-position note included -- is identical for every N; only the
+  scan and the per-candidate solution search run in parallel, while the
+  annotation of hits (`--themes`, `--solutions`, `--json`) stays on one thread.
 
 `--starts`/`--ends` are exact-match filters, evaluated (cheaply) only for
 positions that already matched `--dtm`/`--count` — a position that matches

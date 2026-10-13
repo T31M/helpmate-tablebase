@@ -35,6 +35,7 @@ void usage() {
                  "  helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N]\n"
                  "                           [--theme NAME]... [--themes] [--solutions] [--json|--jsonl]\n"
                  "                           [--interactive] [--max N|infinity] [--tables DIR]\n"
+                 "                           [--threads N]\n"
                  "  helpmate themes\n"
                  "  helpmate compact <DIR> [--dry-run] [--compress] [--block-size N]\n"
                  "  helpmate --version\n"
@@ -75,7 +76,8 @@ void usage() {
                  "\n"
                  "Options:\n"
                  "  --tables DIR   table directory (default: \"tables\")\n"
-                 "  --threads N    worker threads for gen (default: 1)\n"
+                 "  --threads N    worker threads for gen and mine (default: 1); mine's\n"
+                 "                 output is identical for every N\n"
                  "  --verbose      gen: per-slice lifecycle lines on stderr (closure\n"
                  "                 summary, generating/cached/done per slice); implies\n"
                  "                 --progress. stdout stays scriptable.\n"
@@ -530,7 +532,7 @@ void note_skipped(uint64_t skipped) {
 
 int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int dtm, int count, int maxn,
              int starts, int ends, bool starts_given, bool ends_given,
-             const std::vector<std::string>& theme_names, const MineOutput& out) {
+             const std::vector<std::string>& theme_names, const MineOutput& out, int threads) {
     if (pos.empty()) {
         std::cerr << "error: mine needs a MATERIAL argument (e.g. KQvk)\n\n";
         usage();
@@ -595,7 +597,7 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
                 ++printed;
                 return printed < maxn;
             },
-            &skipped);
+            &skipped, threads);
         if (skipped) note_skipped(skipped);
         return 0;
     }
@@ -619,7 +621,7 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
                     ++n;
                     return (int)n < maxn;
                 },
-                &skipped);
+                &skipped, threads);
         set.set_skipped_saturated(skipped);
         std::cout << set.jsonl_footer(n);
         if (skipped) note_skipped(skipped);
@@ -637,7 +639,7 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
                 set.add(fen);
                 return (int)set.size() < maxn;
             },
-            &skipped);
+            &skipped, threads);
     set.set_skipped_saturated(skipped);
     if (skipped) note_skipped(skipped);
     // Every 100 hits OR every second, per the spec, and worded exactly as the
@@ -1139,7 +1141,7 @@ int main(int argc, char** argv) {
         if (cmd == "stats") return cmd_stats(pos, tables);
         if (cmd == "mine")
             return cmd_mine(pos, tables, dtm, count, maxn, starts, ends, starts_given, ends_given,
-                            theme_names, mine_out);
+                            theme_names, mine_out, threads);
         if (cmd == "themes") return cmd_themes();
         if (cmd == "compact") return cmd_compact(pos, compress, dry_run, block_size);
         std::cerr << "error: unknown command \"" << cmd << "\"\n\n";
