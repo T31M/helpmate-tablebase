@@ -67,6 +67,20 @@ ValuePair Tablebase::value_of(Board& b) const {
     return eval_board(b, lookup);
 }
 
+uint8_t Tablebase::dtm_of(Board& b) const {
+    // eval_board takes the minimum over DTMs only, so a lookup with count 0
+    // gives the same DTM as value_of; the count it returns is meaningless.
+    auto lookup = [this](Board& x) -> ValuePair {
+        Material m = Material::of(x.pieces());
+        const Slice* s = load(m);
+        if (!s) throw MissingTableError("no table for " + m.name());
+        auto cell = s->index.encode(x.pieces());
+        if (!cell) throw MissingTableError("position not encodable in table for " + m.name());
+        return {s->reader.get_dtm(x.stm(), *cell), 0};
+    };
+    return eval_board(b, lookup).dtm;
+}
+
 std::optional<Tablebase::Probe> Tablebase::probe(const std::string& fen) const {
     auto b = Board::from_fen(fen);
     if (!b) throw std::invalid_argument("bad FEN (or castling rights): " + fen);
@@ -101,13 +115,16 @@ std::optional<Tablebase::Probe> Tablebase::probe(const std::string& fen) const {
 void Tablebase::collect_lines(Board& b, std::vector<std::string>& path,
                                std::vector<std::vector<std::string>>& out, int max) const {
     if ((int)out.size() >= max) return;
-    ValuePair v = value_of(b);
-    if (v.dtm == 0) { out.push_back(path); return; }
+    uint8_t dtm = dtm_of(b);
+    if (dtm == 0) {
+        out.push_back(path);
+        return;
+    }
     for (const Move& m : b.legal_moves()) {
         if ((int)out.size() >= max) return;
         b.make(m);
-        ValuePair nv = value_of(b);
-        bool on_optimal = nv.dtm <= DTM_MAX && (int)nv.dtm == (int)v.dtm - 1;
+        uint8_t ndtm = dtm_of(b);
+        bool on_optimal = ndtm <= DTM_MAX && (int)ndtm == (int)dtm - 1;
         b.unmake(m);
         if (!on_optimal) continue;
         path.push_back(san(b, m));  // b is still pre-move here; san() restores it too
@@ -130,16 +147,16 @@ std::vector<std::vector<std::string>> Tablebase::lines(const std::string& fen, i
 void Tablebase::collect_solutions(Board& b, std::vector<Ply>& path, std::vector<Solution>& out,
                                   const Board& start, int max) const {
     if ((int)out.size() >= max) return;
-    ValuePair v = value_of(b);
-    if (v.dtm == 0) {
+    uint8_t dtm = dtm_of(b);
+    if (dtm == 0) {
         out.push_back(Solution{start, path});
         return;
     }
     for (const Move& m : b.legal_moves()) {
         if ((int)out.size() >= max) return;
         b.make(m);
-        ValuePair nv = value_of(b);
-        bool on_optimal = nv.dtm <= DTM_MAX && (int)nv.dtm == (int)v.dtm - 1;
+        uint8_t ndtm = dtm_of(b);
+        bool on_optimal = ndtm <= DTM_MAX && (int)ndtm == (int)dtm - 1;
         b.unmake(m);
         if (!on_optimal) continue;
 

@@ -637,6 +637,16 @@ ValuePair TableReader::get(Color stm, uint64_t cell) const {
     return {byte_at(o), byte_at(2 * ps_ + o)};
 }
 
+uint8_t TableReader::get_dtm(Color stm, uint64_t cell) const {
+    if (cell >= ps_)
+        throw std::out_of_range("TableReader::get_dtm: cell " + std::to_string(cell) +
+                                " out of range (plane size " + std::to_string(ps_) + ")");
+    if (all_unsolvable()) return DTM_UNSOLVABLE;
+    uint64_t o = (stm == Color::Black ? ps_ : 0) + cell;
+    if (block_size_ == 0) return (base_ + sizeof(TableHeader) + json_len_)[o];
+    return byte_at(o);
+}
+
 void TableReader::read_values(Color stm, uint64_t first_cell, size_t n, uint8_t* dtm, uint8_t* cnt) const {
     if (n == 0) return;
     // Same discipline as get()'s bounds check, and it has to happen before the

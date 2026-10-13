@@ -134,6 +134,9 @@ private:
     struct Slice { TableReader reader; SliceIndex index; };
     const Slice* load(const Material& m) const;
     ValuePair value_of(Board& b) const;
+    // value_of(b).dtm without reading any count byte; the line searches use
+    // only the DTM.
+    uint8_t dtm_of(Board& b) const;
     void collect_lines(Board& b, std::vector<std::string>& path,
                         std::vector<std::vector<std::string>>& out, int max) const;
     void collect_solutions(Board& b, std::vector<Ply>& path, std::vector<Solution>& out, const Board& start,

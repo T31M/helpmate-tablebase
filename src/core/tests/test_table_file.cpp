@@ -295,6 +295,57 @@ TEST_CASE("a compressed table whose last block is partial round-trips") {
     fs::remove_all(dir);
 }
 
+TEST_CASE("get_dtm agrees with get().dtm on raw, compressed and marker tables") {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / ("hm_get_dtm_" + std::to_string(::getpid()));
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+
+    Material mat = Material::parse("KQvk").value();
+    // Several 64 KiB blocks per plane, so the DTM and count of one cell sit in
+    // different blocks of the compressed table.
+    const uint64_t ps = 200000;
+    std::vector<uint8_t> dw(ps), db(ps), cw(ps), cb(ps);
+    std::mt19937 rng(7);
+    for (uint64_t i = 0; i < ps; ++i) {
+        uint32_t r = rng() % 100;
+        dw[i] = r < 45 ? DTM_INVALID : (r < 70 ? DTM_UNSOLVABLE : uint8_t(rng() % 30));
+        db[i] = r < 40 ? DTM_INVALID : (r < 65 ? DTM_UNSOLVABLE : uint8_t(rng() % 30));
+        cw[i] = uint8_t(rng() % 4);
+        cb[i] = uint8_t(rng() % 4);
+    }
+    std::string raw = (dir / "raw.hm").string();
+    std::string zip = (dir / "zip.hm").string();
+    std::string marker = (dir / "marker.hm").string();
+    TableWriter::write(raw, mat, ps, 30, "{}", dw.data(), db.data(), cw.data(), cb.data());
+    TableWriter::write_compressed(zip, mat, ps, 30, "{}", dw.data(), db.data(), cw.data(), cb.data());
+    TableWriter::write_unsolvable(marker, mat, ps, "{}");
+
+    // A fresh reader per table, so get_dtm runs on a cold cache and never
+    // relies on a block that get() already loaded.
+    for (const std::string& p : {raw, zip}) {
+        auto only = TableReader::open(p);
+        auto both = TableReader::open(p);
+        REQUIRE(only.has_value());
+        REQUIRE(both.has_value());
+        for (uint64_t i = 0; i < ps; ++i) {
+            for (Color stm : {Color::White, Color::Black}) {
+                REQUIRE(only->get_dtm(stm, i) == both->get(stm, i).dtm);
+            }
+        }
+        CHECK_THROWS_AS(only->get_dtm(Color::White, ps), std::out_of_range);
+        CHECK_THROWS_AS(only->get_dtm(Color::Black, ~uint64_t(0)), std::out_of_range);
+    }
+    auto m = TableReader::open(marker);
+    REQUIRE(m.has_value());
+    for (uint64_t c : {uint64_t(0), ps / 2, ps - 1}) {
+        CHECK(m->get_dtm(Color::White, c) == DTM_UNSOLVABLE);
+        CHECK(m->get_dtm(Color::Black, c) == DTM_UNSOLVABLE);
+    }
+    CHECK_THROWS_AS(m->get_dtm(Color::White, ps), std::out_of_range);
+    fs::remove_all(dir);
+}
+
 TEST_CASE("an out-of-range cell throws on a compressed table too") {
     namespace fs = std::filesystem;
     fs::path dir = fs::temp_directory_path() / "hm_blockfmt_range";

@@ -189,6 +189,9 @@ bumps may change behavior).
 - Corpus counts in README, CONTRIBUTING-TABLES, COOPERATIVE-TABLEBASE and the
   dataset card are generated (`helpmate-tables sync`).
 - `tools/verify_corpus.py` is a wrapper over the package's block check.
+- `mine --starts/--ends` and solution enumeration read only the DTM byte of
+  each position they visit, not the count byte in another block: a
+  KBvkqrn `--dtm 14 --count 2 --starts 2 --ends 2` scan is 2.2x faster.
 
 ## [0.20.0] - 2026-09-26
 

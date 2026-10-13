@@ -110,6 +110,10 @@ public:
     enum class OpenError { None, NotFound, Unreadable, UnsupportedVersion };
     static std::optional<TableReader> open(const std::string& path, OpenError* err);
     ValuePair get(Color stm, uint64_t cell) const;
+    // get(stm, cell).dtm without reading the count byte. On a compressed table
+    // the count lives 2 * plane_size bytes away, in another block, so a caller
+    // that needs only the DTM (the line search) halves its block decompressions.
+    uint8_t get_dtm(Color stm, uint64_t cell) const;
     uint64_t plane_size() const;
     uint8_t max_dtm() const;
     std::string material_name() const;
