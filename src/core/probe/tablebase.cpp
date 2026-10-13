@@ -71,14 +71,19 @@ ValuePair Tablebase::value_of(Board& b) const {
     return eval_board(b, lookup);
 }
 
-uint8_t Tablebase::dtm_of(Board& b) const {
+uint8_t Tablebase::dtm_of(Board& b, SliceMemo& memo) const {
     // eval_board takes the minimum over DTMs only, so a lookup with count 0
     // gives the same DTM as value_of; the count it returns is meaningless.
-    auto lookup = [this](Board& x) -> ValuePair {
-        Material m = Material::of(x.pieces());
-        const Slice* s = load(m);
+    auto lookup = [this, &memo](Board& x) -> ValuePair {
+        const std::vector<PlacedPiece> pieces = x.pieces();
+        const Material m = Material::of(pieces);
+        const Slice* s = nullptr;
+        auto it =
+            std::find_if(memo.slices.begin(), memo.slices.end(), [&](const auto& e) { return e.first == m; });
+        if (it != memo.slices.end()) s = it->second;
+        else memo.slices.emplace_back(m, s = load(m));  // a miss is remembered too, as load() does
         if (!s) throw MissingTableError("no table for " + m.name());
-        auto cell = s->index.encode(x.pieces());
+        auto cell = s->index.encode(pieces);
         if (!cell) throw MissingTableError("position not encodable in table for " + m.name());
         return {s->reader.get_dtm(x.stm(), *cell), 0};
     };
@@ -117,9 +122,9 @@ std::optional<Tablebase::Probe> Tablebase::probe(const std::string& fen) const {
 }
 
 void Tablebase::collect_lines(Board& b, std::vector<std::string>& path,
-                               std::vector<std::vector<std::string>>& out, int max) const {
+                              std::vector<std::vector<std::string>>& out, int max, SliceMemo& memo) const {
     if ((int)out.size() >= max) return;
-    uint8_t dtm = dtm_of(b);
+    uint8_t dtm = dtm_of(b, memo);
     if (dtm == 0) {
         out.push_back(path);
         return;
@@ -127,31 +132,37 @@ void Tablebase::collect_lines(Board& b, std::vector<std::string>& path,
     for (const Move& m : b.legal_moves()) {
         if ((int)out.size() >= max) return;
         b.make(m);
-        uint8_t ndtm = dtm_of(b);
+        uint8_t ndtm = dtm_of(b, memo);
         bool on_optimal = ndtm <= DTM_MAX && (int)ndtm == (int)dtm - 1;
         b.unmake(m);
         if (!on_optimal) continue;
         path.push_back(san(b, m));  // b is still pre-move here; san() restores it too
         b.make(m);
-        collect_lines(b, path, out, max);
+        collect_lines(b, path, out, max, memo);
         b.unmake(m);
         path.pop_back();
     }
 }
 
 std::vector<std::vector<std::string>> Tablebase::lines(const std::string& fen, int max) const {
+    SliceMemo memo;
+    return lines(fen, max, memo);
+}
+
+std::vector<std::vector<std::string>> Tablebase::lines(const std::string& fen, int max,
+                                                       SliceMemo& memo) const {
     auto b = Board::from_fen(fen);
     if (!b) throw std::invalid_argument("bad FEN (or castling rights): " + fen);
     std::vector<std::vector<std::string>> out;
     std::vector<std::string> path;
-    collect_lines(*b, path, out, max);
+    collect_lines(*b, path, out, max, memo);
     return out;
 }
 
 void Tablebase::collect_solutions(Board& b, std::vector<Ply>& path, std::vector<Solution>& out,
-                                  const Board& start, int max) const {
+                                  const Board& start, int max, SliceMemo& memo) const {
     if ((int)out.size() >= max) return;
-    uint8_t dtm = dtm_of(b);
+    uint8_t dtm = dtm_of(b, memo);
     if (dtm == 0) {
         out.push_back(Solution{start, path});
         return;
@@ -159,7 +170,7 @@ void Tablebase::collect_solutions(Board& b, std::vector<Ply>& path, std::vector<
     for (const Move& m : b.legal_moves()) {
         if ((int)out.size() >= max) return;
         b.make(m);
-        uint8_t ndtm = dtm_of(b);
+        uint8_t ndtm = dtm_of(b, memo);
         bool on_optimal = ndtm <= DTM_MAX && (int)ndtm == (int)dtm - 1;
         b.unmake(m);
         if (!on_optimal) continue;
@@ -181,19 +192,24 @@ void Tablebase::collect_solutions(Board& b, std::vector<Ply>& path, std::vector<
         p.is_check = b.in_check();
         p.after = b;
         path.push_back(std::move(p));
-        collect_solutions(b, path, out, start, max);
+        collect_solutions(b, path, out, start, max, memo);
         path.pop_back();
         b.unmake(m);
     }
 }
 
 std::vector<Solution> Tablebase::solutions(const std::string& fen, int max) const {
+    SliceMemo memo;
+    return solutions(fen, max, memo);
+}
+
+std::vector<Solution> Tablebase::solutions(const std::string& fen, int max, SliceMemo& memo) const {
     auto b = Board::from_fen(fen);
     if (!b) throw std::invalid_argument("bad FEN (or castling rights): " + fen);
     Board start = *b;
     std::vector<Solution> out;
     std::vector<Ply> path;
-    collect_solutions(*b, path, out, start, max);
+    collect_solutions(*b, path, out, start, max, memo);
     return out;
 }
 
@@ -427,6 +443,7 @@ bool Tablebase::mine_range(const MineScan& q, uint64_t begin, uint64_t end,
     const auto& dets = q.dets;
     const themes::Needs need = q.need;
     const bool want_shape = q.want_shape, want_solutions = q.want_solutions, want_plane = q.want_plane;
+    SliceMemo memo;  // shared by every candidate's search in this range
     std::vector<PlacedPiece> pp;
     // Read the two planes in block-sized chunks instead of one cell at a time.
     // get() on a compressed table takes the block cache's mutex and memcpys a
@@ -505,14 +522,14 @@ bool Tablebase::mine_range(const MineScan& q, uint64_t begin, uint64_t end,
                 int optimal = 0;
                 for (const Move& mv : b.legal_moves()) {
                     b.make(mv);
-                    uint8_t d = dtm_of(b);
+                    uint8_t d = dtm_of(b, memo);
                     b.unmake(mv);
                     if (d <= DTM_MAX && (int)d == (int)v.dtm - 1) ++optimal;
                 }
                 if (optimal < f.starts) continue;
             }
             fen = b.fen();
-            SolutionShape sh = shape_of((int)v.count, lines(fen, (int)v.count));
+            SolutionShape sh = shape_of((int)v.count, lines(fen, (int)v.count, memo));
             if (f.starts >= 0 && sh.starts != f.starts) continue;
             if (f.ends >= 0 && sh.ends != f.ends) continue;
         }
@@ -520,7 +537,7 @@ bool Tablebase::mine_range(const MineScan& q, uint64_t begin, uint64_t end,
             std::vector<Solution> sols;
             if (need == themes::Needs::Solutions) {
                 if (fen.empty()) fen = b.fen();
-                sols = solutions(fen, (int)v.count);
+                sols = solutions(fen, (int)v.count, memo);
             }
             std::optional<ValuePair> other;
             if (want_plane) other = ValuePair{other_buf[c - chunk_base], 0};

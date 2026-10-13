@@ -144,13 +144,22 @@ private:
                     const std::function<bool(const std::string&)>& cb, uint64_t* skipped_saturated) const;
     const Slice* load(const Material& m) const;
     ValuePair value_of(Board& b) const;
+    // The slices one search has already looked up, by material. A search
+    // visits a handful of materials, so a linear scan without a lock beats
+    // load()'s mutex and name-keyed map on every position. The pointers stay
+    // valid: cache_ never drops an entry while this Tablebase lives.
+    struct SliceMemo {
+        std::vector<std::pair<Material, const Slice*>> slices;
+    };
     // value_of(b).dtm without reading any count byte; the line searches use
     // only the DTM.
-    uint8_t dtm_of(Board& b) const;
-    void collect_lines(Board& b, std::vector<std::string>& path,
-                        std::vector<std::vector<std::string>>& out, int max) const;
+    uint8_t dtm_of(Board& b, SliceMemo& memo) const;
+    void collect_lines(Board& b, std::vector<std::string>& path, std::vector<std::vector<std::string>>& out,
+                       int max, SliceMemo& memo) const;
     void collect_solutions(Board& b, std::vector<Ply>& path, std::vector<Solution>& out, const Board& start,
-                           int max) const;
+                           int max, SliceMemo& memo) const;
+    std::vector<std::vector<std::string>> lines(const std::string& fen, int max, SliceMemo& memo) const;
+    std::vector<Solution> solutions(const std::string& fen, int max, SliceMemo& memo) const;
     // THE one place a ThemeInput is built (themes_of and shows_theme both
     // route here). `use` runs while the input's referents are alive.
     void with_theme_input(const std::string& fen, int max,
