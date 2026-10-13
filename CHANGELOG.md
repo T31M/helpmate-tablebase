@@ -11,6 +11,8 @@ bumps may change behavior).
 ### Added
 - `helpmate mine --threads N`: scans the table on N workers, each with its own
   readers and block caches; the output is identical for every N.
+- `helpmate mine --cache-mb N`: one fixed memory budget for decompressed table
+  blocks, shared by all tables and workers.
 - `helpmate-tables verify`: seven checks on a contributed table (PR contents,
   header and identity, zstd blocks, sidecar recomputed from the payload,
   deepest positions, local consistency with successors and sub-tables, and an

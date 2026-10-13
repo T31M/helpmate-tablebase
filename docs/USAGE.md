@@ -523,7 +523,7 @@ enumerate the actual positions at any (dtm, count).
 ## `mine` — scan for composition candidates
 
 ```
-helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N] [--theme NAME]... [--max N|infinity] [--themes] [--solutions] [--json|--jsonl] [--interactive] [--tables DIR] [--threads N]
+helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N] [--theme NAME]... [--max N|infinity] [--themes] [--solutions] [--json|--jsonl] [--interactive] [--tables DIR] [--threads N] [--cache-mb N]
 ```
 
 - `--dtm D` (**required**): exact distance-to-mate, in plies, to match;
@@ -560,6 +560,15 @@ helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N] [--theme NA
   and skipped-position note included -- is identical for every N; only the
   scan and the per-candidate solution search run in parallel, while the
   annotation of hits (`--themes`, `--solutions`, `--json`) stays on one thread.
+- `--cache-mb N`: the memory for decompressed table blocks, N MiB in total,
+  shared by every table and split equally among the `--threads` workers.
+  Without it, each table has its own cache of up to 64 MiB in each worker, so
+  the total grows with the tables a query touches and with the thread count.
+  A larger budget means fewer block decompressions in the solution search:
+  `mine KBvkqrn --dtm 14 --count 2 --starts 2 --ends 2 --threads 16` takes
+  26.6 s without it and 22.1 s with `--cache-mb 8192` (8 GiB). Beyond that it
+  stopped paying off. The table files themselves are memory-mapped on top of
+  this budget; the kernel can drop those pages again.
 
 `--starts`/`--ends` are exact-match filters, evaluated (cheaply) only for
 positions that already matched `--dtm`/`--count` — a position that matches

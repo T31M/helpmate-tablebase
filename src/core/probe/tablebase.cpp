@@ -29,7 +29,12 @@ Board flip_colors(const Board& b) {
 }
 }  // namespace
 
-Tablebase::Tablebase(std::string dir) : dir_(std::move(dir)) {}
+Tablebase::Tablebase(std::string dir, size_t cache_bytes)
+    : dir_(std::move(dir)),
+      cache_bytes_(cache_bytes),
+      shared_cache_(cache_bytes ? std::make_shared<BlockCache>(
+                                      std::max<size_t>(1, cache_bytes / kDefaultBlockSize), kDefaultBlockSize)
+                                : nullptr) {}
 
 const Tablebase::Slice* Tablebase::load(const Material& m) const {
     std::lock_guard lk(mu_);
@@ -37,7 +42,7 @@ const Tablebase::Slice* Tablebase::load(const Material& m) const {
     if (it != cache_.end()) return it->second.get();
     std::string path = dir_ + "/" + m.name() + ".hm";
     TableReader::OpenError oerr = TableReader::OpenError::None;
-    auto r = TableReader::open(path, &oerr);
+    auto r = TableReader::open(path, &oerr, shared_cache_);
     if (!r && oerr == TableReader::OpenError::UnsupportedVersion)
         throw UnsupportedTableVersionError("table " + path + " was written by a newer helpmate"
                                            " (unsupported table format version); upgrade this build");
@@ -146,11 +151,11 @@ void Tablebase::collect_lines(Board& b, std::vector<std::string>& path,
 
 std::vector<std::vector<std::string>> Tablebase::lines(const std::string& fen, int max) const {
     SliceMemo memo;
-    return lines(fen, max, memo);
+    return lines_in(fen, max, memo);
 }
 
-std::vector<std::vector<std::string>> Tablebase::lines(const std::string& fen, int max,
-                                                       SliceMemo& memo) const {
+std::vector<std::vector<std::string>> Tablebase::lines_in(const std::string& fen, int max,
+                                                          SliceMemo& memo) const {
     auto b = Board::from_fen(fen);
     if (!b) throw std::invalid_argument("bad FEN (or castling rights): " + fen);
     std::vector<std::vector<std::string>> out;
@@ -200,10 +205,10 @@ void Tablebase::collect_solutions(Board& b, std::vector<Ply>& path, std::vector<
 
 std::vector<Solution> Tablebase::solutions(const std::string& fen, int max) const {
     SliceMemo memo;
-    return solutions(fen, max, memo);
+    return solutions_in(fen, max, memo);
 }
 
-std::vector<Solution> Tablebase::solutions(const std::string& fen, int max, SliceMemo& memo) const {
+std::vector<Solution> Tablebase::solutions_in(const std::string& fen, int max, SliceMemo& memo) const {
     auto b = Board::from_fen(fen);
     if (!b) throw std::invalid_argument("bad FEN (or castling rights): " + fen);
     Board start = *b;
@@ -362,7 +367,7 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
 
     auto work = [&] {
         // Its own Tablebase: own readers, own block caches, no shared lock.
-        Tablebase own(dir_);
+        Tablebase own(dir_, cache_bytes_ ? std::max<size_t>(cache_bytes_ / workers, kDefaultBlockSize) : 0);
         for (;;) {
             uint64_t k;
             {
@@ -529,7 +534,7 @@ bool Tablebase::mine_range(const MineScan& q, uint64_t begin, uint64_t end,
                 if (optimal < f.starts) continue;
             }
             fen = b.fen();
-            SolutionShape sh = shape_of((int)v.count, lines(fen, (int)v.count, memo));
+            SolutionShape sh = shape_of((int)v.count, lines_in(fen, (int)v.count, memo));
             if (f.starts >= 0 && sh.starts != f.starts) continue;
             if (f.ends >= 0 && sh.ends != f.ends) continue;
         }
@@ -537,7 +542,7 @@ bool Tablebase::mine_range(const MineScan& q, uint64_t begin, uint64_t end,
             std::vector<Solution> sols;
             if (need == themes::Needs::Solutions) {
                 if (fen.empty()) fen = b.fen();
-                sols = solutions(fen, (int)v.count, memo);
+                sols = solutions_in(fen, (int)v.count, memo);
             }
             std::optional<ValuePair> other;
             if (want_plane) other = ValuePair{other_buf[c - chunk_base], 0};

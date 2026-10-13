@@ -439,3 +439,48 @@ TEST_CASE("mine --starts selects exactly what solution_shape says") {
         }
     }
 }
+
+TEST_CASE("mine on compressed tables with one small shared cache matches the raw tables") {
+    // Compressed copies of the same materials; a shared cache of one 64 KiB
+    // block makes every table switch evict, at 1 and 4 threads.
+    static std::string zdir = [] {
+        namespace fs = std::filesystem;
+        auto d = fs::temp_directory_path() / "hm_probe_z";
+        fs::remove_all(d);
+        fs::create_directories(d);
+        for (const auto& e : fs::directory_iterator(gen_dir())) {
+            if (e.path().extension() != ".hm") continue;
+            auto src = TableReader::open(e.path().string());
+            REQUIRE(src.has_value());
+            if (src->all_unsolvable()) fs::copy_file(e.path(), d / e.path().filename());
+            else TableWriter::compress_existing((d / e.path().filename()).string(), *src);
+        }
+        return d.string();
+    }();
+    Tablebase raw(gen_dir());
+    Tablebase shared(zdir, kDefaultBlockSize);
+    const std::vector<std::pair<std::string, MineFilter>> queries = {
+        {"KQvk", MineFilter{.dtm = 4, .starts = 1, .ends = 1}},
+        {"KQvk", MineFilter{.dtm = 4, .themes = {"mirror"}}},
+        {"KPvk", MineFilter{.dtm = 5, .starts = 2}},
+    };
+    auto run = [](const Tablebase& tb, const std::pair<std::string, MineFilter>& q, int threads) {
+        std::vector<std::string> out;
+        uint64_t skipped = 0;
+        tb.mine(
+            *Material::parse(q.first), q.second,
+            [&](const std::string& f) {
+                out.push_back(f);
+                return true;
+            },
+            &skipped, threads);
+        return std::make_pair(out, skipped);
+    };
+    for (const auto& q : queries) {
+        INFO(q.first << " dtm " << q.second.dtm);
+        auto want = run(raw, q, 1);
+        REQUIRE_FALSE(want.first.empty());
+        for (int threads : {1, 4}) CHECK(run(shared, q, threads) == want);
+    }
+    CHECK(shared.probe("8/7k/5K2/8/8/8/8/6Q1 b - - 0 1")->count == 4);
+}

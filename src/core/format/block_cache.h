@@ -56,6 +56,7 @@ public:
     size_t fills() const;
     size_t hits() const;
     size_t capacity() const { return cap_; }
+    uint32_t block_size() const { return block_size_; }
 
 private:
     struct Entry {

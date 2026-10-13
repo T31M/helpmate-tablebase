@@ -108,7 +108,14 @@ public:
     // Why open() returned nullopt. UnsupportedVersion means the file IS a helpmate
     // table, but was written by a newer build than this one.
     enum class OpenError { None, NotFound, Unreadable, UnsupportedVersion };
-    static std::optional<TableReader> open(const std::string& path, OpenError* err);
+    //
+    // `shared_cache`, if given, replaces the reader's own block cache: every
+    // reader opened with it draws on one LRU and one memory budget (each under
+    // its own key range, so their blocks never mix). It is used only when its
+    // block_size() equals the table's; a table with another block size keeps
+    // its own cache, as without it.
+    static std::optional<TableReader> open(const std::string& path, OpenError* err,
+                                           std::shared_ptr<BlockCache> shared_cache = nullptr);
     ValuePair get(Color stm, uint64_t cell) const;
     // get(stm, cell).dtm without reading the count byte. On a compressed table
     // the count lives 2 * plane_size bytes away, in another block, so a caller
@@ -182,7 +189,8 @@ private:
     // by dereferencing a uint64_t* cast of this pointer.
     const uint8_t* offsets_ = nullptr;
     const uint8_t* blocks_ = nullptr;  // first compressed byte
-    mutable std::unique_ptr<BlockCache> cache_;
+    mutable std::shared_ptr<BlockCache> cache_;
+    uint64_t cache_key_ = 0;  // added to every block index: this reader's range in a shared cache
 };
 
 }  // namespace hm

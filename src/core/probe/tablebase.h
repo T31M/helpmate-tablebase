@@ -87,7 +87,12 @@ SolutionShape shape_of(int count, const std::vector<std::vector<std::string>>& l
 // concurrently from multiple threads.
 class Tablebase {
 public:
-    explicit Tablebase(std::string dir);
+    // `cache_bytes` > 0 puts every table this Tablebase opens on one shared
+    // block cache of that many bytes (decompressed blocks, LRU across all
+    // tables) instead of each table's own cache of up to 64 MiB. It makes the
+    // block-cache memory one fixed number, however many tables a query
+    // touches. 0 keeps the per-table caches.
+    explicit Tablebase(std::string dir, size_t cache_bytes = 0);
 
     struct Probe { int dtm; int count; bool flipped; };  // flipped: colors were swapped to match a slice
 
@@ -116,6 +121,8 @@ public:
     //
     // `threads` > 1 scans the plane in segments on that many workers, each with
     // its own Tablebase (own readers and block caches, so no lock is shared).
+    // With a shared cache (cache_bytes > 0), each worker's Tablebase gets an
+    // equal share of it, so the total block-cache memory stays cache_bytes.
     // `cb` still runs only on the calling thread, in cell order, and sees exactly
     // the FENs -- and `skipped_saturated` exactly the tally -- that one thread
     // would give it.
@@ -158,14 +165,19 @@ private:
                        int max, SliceMemo& memo) const;
     void collect_solutions(Board& b, std::vector<Ply>& path, std::vector<Solution>& out, const Board& start,
                            int max, SliceMemo& memo) const;
-    std::vector<std::vector<std::string>> lines(const std::string& fen, int max, SliceMemo& memo) const;
-    std::vector<Solution> solutions(const std::string& fen, int max, SliceMemo& memo) const;
+    // lines() / solutions() on a caller's memo. Not overloads of the public
+    // names: a pointer to an overloaded member (&Tablebase::lines, as the
+    // Python bindings take it) would be ambiguous.
+    std::vector<std::vector<std::string>> lines_in(const std::string& fen, int max, SliceMemo& memo) const;
+    std::vector<Solution> solutions_in(const std::string& fen, int max, SliceMemo& memo) const;
     // THE one place a ThemeInput is built (themes_of and shows_theme both
     // route here). `use` runs while the input's referents are alive.
     void with_theme_input(const std::string& fen, int max,
                           const std::function<void(const themes::ThemeInput&)>& use) const;
 
     std::string dir_;
+    size_t cache_bytes_ = 0;
+    std::shared_ptr<BlockCache> shared_cache_;  // null unless cache_bytes_ > 0
     mutable std::mutex mu_;
     mutable std::map<std::string, std::unique_ptr<Slice>> cache_;
 };

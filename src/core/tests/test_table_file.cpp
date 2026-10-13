@@ -346,6 +346,51 @@ TEST_CASE("get_dtm agrees with get().dtm on raw, compressed and marker tables") 
     fs::remove_all(dir);
 }
 
+TEST_CASE("readers on one shared block cache never answer from each other's blocks") {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / ("hm_shared_cache_" + std::to_string(::getpid()));
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    // Several blocks per table at the default block size, and different
+    // bytes in the two tables at every cell.
+    const uint64_t ps = 70000;
+    std::vector<uint8_t> a(ps), b(ps), small(ps);
+    for (uint64_t i = 0; i < ps; ++i) {
+        a[i] = uint8_t(i * 7);
+        b[i] = uint8_t(i * 7 + 1);
+        small[i] = uint8_t(i * 3);
+    }
+    std::string pa = (dir / "a.hm").string(), pb = (dir / "b.hm").string(), ps16 = (dir / "s.hm").string();
+    TableWriter::write_compressed(pa, mat, ps, 30, "{}", a.data(), a.data(), a.data(), a.data());
+    TableWriter::write_compressed(pb, mat, ps, 30, "{}", b.data(), b.data(), b.data(), b.data());
+    // Another block size: this reader must keep its own cache.
+    TableWriter::write_compressed(ps16, mat, ps, 30, "{}", small.data(), small.data(), small.data(),
+                                  small.data(), 16384);
+
+    auto shared = std::make_shared<BlockCache>(1, kDefaultBlockSize);  // one block: every switch evicts
+    auto ra = TableReader::open(pa, nullptr, shared);
+    auto rb = TableReader::open(pb, nullptr, shared);
+    auto rs = TableReader::open(ps16, nullptr, shared);
+    REQUIRE(ra.has_value());
+    REQUIRE(rb.has_value());
+    REQUIRE(rs.has_value());
+    std::mt19937 rng(5);
+    for (int i = 0; i < 20000; ++i) {
+        uint64_t c = rng() % ps;
+        Color stm = rng() % 2 ? Color::White : Color::Black;
+        REQUIRE(ra->get(stm, c).dtm == a[c]);
+        REQUIRE(rb->get(stm, c).count == b[c]);
+        REQUIRE(rs->get_dtm(stm, c) == small[c]);
+        REQUIRE(ra->get_dtm(stm, c) == a[c]);
+    }
+    // Only the two default-size tables filled the shared cache; a and b
+    // alternate on one slot, so it held at most one block at any time.
+    CHECK(shared->fills() > 0);
+    CHECK(shared->capacity() == 1);
+    fs::remove_all(dir);
+}
+
 TEST_CASE("an out-of-range cell throws on a compressed table too") {
     namespace fs = std::filesystem;
     fs::path dir = fs::temp_directory_path() / "hm_blockfmt_range";
