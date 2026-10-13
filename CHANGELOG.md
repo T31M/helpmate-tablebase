@@ -77,6 +77,35 @@ bumps may change behavior).
     `--yes` it stops with a usage error instead of a traceback.
 
 ### Data
+- KQvkqrr (independently reproduced by popeye37 and T31M).
+- KQvkqrp (independently reproduced by T31M and popeye37).
+- KQvkqrn (independently reproduced by popeye37 and T31M).
+- KQvkqrb (independently reproduced by popeye37 and T31M).
+- KQvkqqr (independently reproduced by popeye37 and T31M).
+- KQvkqqp (independently reproduced by T31M and popeye37).
+- KQvkqqn (independently reproduced by popeye37 and T31M).
+- KQvkqqb (independently reproduced by popeye37 and T31M).
+- KQvkqpp (independently reproduced by T31M and popeye37).
+- KQvkqnp (independently reproduced by T31M and popeye37).
+- KQvkqnn (independently reproduced by popeye37 and T31M).
+- KQvkqbp (independently reproduced by T31M and popeye37).
+- KQvkqbn (independently reproduced by popeye37 and T31M).
+- KQvkqbb (independently reproduced by popeye37 and T31M).
+- KQvkbbp, KQvkbnp, KQvkbpp, KQvknnp, KQvknpp, KQvkppp, KQvkqbp, KQvkqnp, KQvkqpp, KQvkqqp, KQvkqrp, KQvkrbp, KQvkrnp, KQvkrpp, KQvkrrp contributed by popeye37 (dataset PR #46, claim #40).
+- KPvkqpp, KRvkqpp contributed by T31M (dataset PR #36, claim #67).
+- KPvkqnp, KRvkqnp contributed by T31M (dataset PR #35, claim #67).
+- KPvkqnn, KRvkqnn contributed by T31M (dataset PR #34, claim #67).
+- KPvkqbp, KRvkqbp contributed by T31M (dataset PR #33, claim #67).
+- KPvkqbn, KRvkqbn contributed by T31M (dataset PR #32, claim #67).
+- KPvkqbb, KRvkqbb contributed by T31M (dataset PR #31, claim #67).
+- KPvkqrp, KRvkqrp contributed by T31M (dataset PR #30, claim #67).
+- KPvkqrn, KRvkqrn contributed by T31M (dataset PR #29, claim #67).
+- KPvkqrb, KRvkqrb contributed by T31M (dataset PR #28, claim #67).
+- KPvkqrr, KRvkqrr contributed by T31M (dataset PR #27, claim #67).
+- KPvkqqp, KRvkqqp contributed by T31M (dataset PR #26, claim #67).
+- KPvkqqn, KRvkqqn contributed by T31M (dataset PR #25, claim #67).
+- KPvkqqb, KRvkqqb contributed by T31M (dataset PR #24, claim #67).
+- KPvkqqr, KRvkqqr contributed by T31M (dataset PR #23, claim #67).
 - KQvkqqq (independently reproduced by popeye37 and T31M).
 - KPvkqqq, KRvkqqq contributed by T31M (dataset PR #22, claim #67).
 - KNvkbbb, KNvkbbn, KNvkbbp, KNvkbnn, KNvkbnp, KNvkbpp, KNvknnp, KNvknpp, KNvkppp, KNvkqbb, KNvkqbn, KNvkqbp, KNvkqnn, KNvkqnp, KNvkqpp, KNvkqqb, KNvkqqn, KNvkqqp, KNvkqqr, KNvkqrb, KNvkqrn, KNvkqrp, KNvkqrr, KNvkrbb, KNvkrbn, KNvkrbp, KNvkrnn, KNvkrnp, KNvkrpp, KNvkrrb, KNvkrrn, KNvkrrp, KNvkrrr contributed by T31M (dataset PR #20, claim #62).

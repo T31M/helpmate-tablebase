@@ -1361,6 +1361,222 @@
       ],
       "published_from": 20
     },
+    "KPvkqbb": {
+      "contributor": "T31M",
+      "hf_pr": 31,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "59bd503213e06af6576cfc816c33ecf00503fa0c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 31,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 31
+    },
+    "KPvkqbn": {
+      "contributor": "T31M",
+      "hf_pr": 32,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "d161ae80a21edb25dbcd90958fca57e6b086769e",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 32,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 32
+    },
+    "KPvkqbp": {
+      "contributor": "T31M",
+      "hf_pr": 33,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "678cd2b07c833d604fde57b9ab82e568fbd3b305",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 33,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 33
+    },
+    "KPvkqnn": {
+      "contributor": "T31M",
+      "hf_pr": 34,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "d80088c3c10e2874cbb77a1f65fe2f8814c5b2ce",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 34,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 34
+    },
+    "KPvkqnp": {
+      "contributor": "T31M",
+      "hf_pr": 35,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "eff5834838afdb1e661c1a0bed5d974370ee4e5f",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 35,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 35
+    },
+    "KPvkqpp": {
+      "contributor": "T31M",
+      "hf_pr": 36,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "c7acbe3253fa8234fefc5bb8518f25cd11ffedfa",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 36,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 36
+    },
+    "KPvkqqb": {
+      "contributor": "T31M",
+      "hf_pr": 24,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "d2ca884860d781ad88388505e801eb47271412b8",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 24,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 24
+    },
+    "KPvkqqn": {
+      "contributor": "T31M",
+      "hf_pr": 25,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "d8a539d65684574bb4baa25a7da621ec90ea60f0",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 25,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 25
+    },
+    "KPvkqqp": {
+      "contributor": "T31M",
+      "hf_pr": 26,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "a4b5526366c8652d54c46daf94ddaebf9730502b",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 26,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 26
+    },
     "KPvkqqq": {
       "contributor": "T31M",
       "hf_pr": 22,
@@ -1384,6 +1600,126 @@
         }
       ],
       "published_from": 22
+    },
+    "KPvkqqr": {
+      "contributor": "T31M",
+      "hf_pr": 23,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "c5cdb37ff66c4d5994a14e05cd50b36ce0188a8b",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 23,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 23
+    },
+    "KPvkqrb": {
+      "contributor": "T31M",
+      "hf_pr": 28,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "408f3fac78ea5340b3dafa217dba8682fdcb4a90",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 28,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 28
+    },
+    "KPvkqrn": {
+      "contributor": "T31M",
+      "hf_pr": 29,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "f2fae8a4bd0e301e6cd77f669d1ad4206a0c6ed3",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 29,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 29
+    },
+    "KPvkqrp": {
+      "contributor": "T31M",
+      "hf_pr": 30,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "fe3bee4e2ed9338e694cab31655239f45246be97",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 30,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 30
+    },
+    "KPvkqrr": {
+      "contributor": "T31M",
+      "hf_pr": 27,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "f92c2e5523b756f6bdf7646f4a8e2bb58d6a3f3a",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 27,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 27
     },
     "KQvkbbb": {
       "contributor": "popeye37",
@@ -1433,6 +1769,30 @@
       ],
       "published_from": 19
     },
+    "KQvkbbp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
+    },
     "KQvkbnn": {
       "contributor": "popeye37",
       "hf_pr": 19,
@@ -1456,6 +1816,54 @@
         }
       ],
       "published_from": 19
+    },
+    "KQvkbnp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
+    },
+    "KQvkbpp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.19.0"
+        }
+      ],
+      "published_from": 46
     },
     "KQvknnn": {
       "contributor": "popeye37",
@@ -1481,6 +1889,78 @@
       ],
       "published_from": 19
     },
+    "KQvknnp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
+    },
+    "KQvknpp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.19.0"
+        }
+      ],
+      "published_from": 46
+    },
+    "KQvkppp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.19.0"
+        }
+      ],
+      "published_from": 46
+    },
     "KQvkqbb": {
       "contributor": "popeye37",
       "hf_pr": 19,
@@ -1501,6 +1981,12 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 31,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
@@ -1525,9 +2011,45 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 32,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
+    },
+    "KQvkqbp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 33,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        },
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
     },
     "KQvkqnn": {
       "contributor": "popeye37",
@@ -1549,9 +2071,75 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 34,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
+    },
+    "KQvkqnp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 35,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        },
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
+    },
+    "KQvkqpp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 36,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        },
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.19.0"
+        }
+      ],
+      "published_from": 46
     },
     "KQvkqqb": {
       "contributor": "popeye37",
@@ -1573,6 +2161,12 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 24,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
@@ -1597,9 +2191,45 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 25,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
+    },
+    "KQvkqqp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 26,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        },
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
     },
     "KQvkqqq": {
       "contributor": "popeye37",
@@ -1651,6 +2281,12 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 23,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
@@ -1675,6 +2311,12 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 28,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
@@ -1699,9 +2341,45 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 29,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
+    },
+    "KQvkqrp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 30,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        },
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
     },
     "KQvkqrr": {
       "contributor": "popeye37",
@@ -1723,6 +2401,12 @@
           "hf_pr": 19,
           "date": "2026-10-11",
           "generator_version": "0.19.0"
+        },
+        {
+          "contributor": "T31M",
+          "hf_pr": 27,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
         }
       ],
       "published_from": 19
@@ -1775,6 +2459,30 @@
       ],
       "published_from": 19
     },
+    "KQvkrbp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
+    },
     "KQvkrnn": {
       "contributor": "popeye37",
       "hf_pr": 19,
@@ -1798,6 +2506,54 @@
         }
       ],
       "published_from": 19
+    },
+    "KQvkrnp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
+    },
+    "KQvkrpp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.19.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.19.0"
+        }
+      ],
+      "published_from": 46
     },
     "KQvkrrb": {
       "contributor": "popeye37",
@@ -1846,6 +2602,30 @@
         }
       ],
       "published_from": 19
+    },
+    "KQvkrrp": {
+      "contributor": "popeye37",
+      "hf_pr": 46,
+      "claim": 40,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "890e91ef288b6c7a75e958521325f6dea053eb4c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "popeye37",
+          "hf_pr": 46,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 46
     },
     "KQvkrrr": {
       "contributor": "popeye37",
@@ -2846,6 +3626,222 @@
       ],
       "published_from": 7
     },
+    "KRvkqbb": {
+      "contributor": "T31M",
+      "hf_pr": 31,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "59bd503213e06af6576cfc816c33ecf00503fa0c",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 31,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 31
+    },
+    "KRvkqbn": {
+      "contributor": "T31M",
+      "hf_pr": 32,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "d161ae80a21edb25dbcd90958fca57e6b086769e",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 32,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 32
+    },
+    "KRvkqbp": {
+      "contributor": "T31M",
+      "hf_pr": 33,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "678cd2b07c833d604fde57b9ab82e568fbd3b305",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 33,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 33
+    },
+    "KRvkqnn": {
+      "contributor": "T31M",
+      "hf_pr": 34,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "d80088c3c10e2874cbb77a1f65fe2f8814c5b2ce",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 34,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 34
+    },
+    "KRvkqnp": {
+      "contributor": "T31M",
+      "hf_pr": 35,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "eff5834838afdb1e661c1a0bed5d974370ee4e5f",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 35,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 35
+    },
+    "KRvkqpp": {
+      "contributor": "T31M",
+      "hf_pr": 36,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "c7acbe3253fa8234fefc5bb8518f25cd11ffedfa",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 36,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 36
+    },
+    "KRvkqqb": {
+      "contributor": "T31M",
+      "hf_pr": 24,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "d2ca884860d781ad88388505e801eb47271412b8",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 24,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 24
+    },
+    "KRvkqqn": {
+      "contributor": "T31M",
+      "hf_pr": 25,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "d8a539d65684574bb4baa25a7da621ec90ea60f0",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 25,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 25
+    },
+    "KRvkqqp": {
+      "contributor": "T31M",
+      "hf_pr": 26,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "a4b5526366c8652d54c46daf94ddaebf9730502b",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 26,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 26
+    },
     "KRvkqqq": {
       "contributor": "T31M",
       "hf_pr": 22,
@@ -2869,6 +3865,126 @@
         }
       ],
       "published_from": 22
+    },
+    "KRvkqqr": {
+      "contributor": "T31M",
+      "hf_pr": 23,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "c5cdb37ff66c4d5994a14e05cd50b36ce0188a8b",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 23,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 23
+    },
+    "KRvkqrb": {
+      "contributor": "T31M",
+      "hf_pr": 28,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "408f3fac78ea5340b3dafa217dba8682fdcb4a90",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 28,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 28
+    },
+    "KRvkqrn": {
+      "contributor": "T31M",
+      "hf_pr": 29,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "f2fae8a4bd0e301e6cd77f669d1ad4206a0c6ed3",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 29,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 29
+    },
+    "KRvkqrp": {
+      "contributor": "T31M",
+      "hf_pr": 30,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "fe3bee4e2ed9338e694cab31655239f45246be97",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 30,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 30
+    },
+    "KRvkqrr": {
+      "contributor": "T31M",
+      "hf_pr": 27,
+      "claim": 67,
+      "merged": "2026-10-13",
+      "generator_version": "0.20.0",
+      "verification": {
+        "tool": "helpmate-tables 0.20.0",
+        "head": "f92c2e5523b756f6bdf7646f4a8e2bb58d6a3f3a",
+        "date": "2026-10-12",
+        "samples": 2000,
+        "seed": 1326788330,
+        "result": "pass"
+      },
+      "producers": [
+        {
+          "contributor": "T31M",
+          "hf_pr": 27,
+          "date": "2026-10-13",
+          "generator_version": "0.20.0"
+        }
+      ],
+      "published_from": 27
     }
   }
 }
