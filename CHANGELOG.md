@@ -77,6 +77,37 @@ bumps may change behavior).
     `--yes` it stops with a usage error instead of a traceback.
 
 ### Data
+- KQvkrrp (independently reproduced by T31M and popeye37).
+- KQvkrpp (independently reproduced by popeye37 and T31M).
+- KQvkrnp (independently reproduced by T31M and popeye37).
+- KQvkrbp (independently reproduced by T31M and popeye37).
+- KQvkppp (independently reproduced by popeye37 and T31M).
+- KQvknpp (independently reproduced by popeye37 and T31M).
+- KQvknnp (independently reproduced by popeye37 and T31M).
+- KQvkbpp (independently reproduced by popeye37 and T31M).
+- KQvkbnp (independently reproduced by popeye37 and T31M).
+- KQvkbbp (independently reproduced by popeye37 and T31M).
+- KBBvkbp, KBBvknp, KBBvkpp, KBBvkqb, KBBvkqn, KBBvkqp, KBBvkqq, KBBvkqr, KBBvkrb, KBBvkrn, KBBvkrp, KBBvkrr contributed by T31M (dataset PR #58, claim #68).
+- KPvkppp, KRvkppp contributed by T31M (dataset PR #57, claim #67).
+- KPvknpp, KRvknpp contributed by T31M (dataset PR #56, claim #67).
+- KPvknnp, KRvknnp contributed by T31M (dataset PR #55, claim #67).
+- KPvknnn, KRvknnn contributed by T31M (dataset PR #54, claim #67).
+- KPvkbpp, KRvkbpp contributed by T31M (dataset PR #53, claim #67).
+- KPvkbnp, KRvkbnp contributed by T31M (dataset PR #52, claim #67).
+- KPvkbnn, KRvkbnn contributed by T31M (dataset PR #51, claim #67).
+- KPvkbbp, KRvkbbp contributed by T31M (dataset PR #50, claim #67).
+- KPvkbbn, KRvkbbn contributed by T31M (dataset PR #49, claim #67).
+- KPvkbbb, KRvkbbb contributed by T31M (dataset PR #48, claim #67).
+- KPvkrpp, KRvkrpp contributed by T31M (dataset PR #47, claim #67).
+- KPvkrnn, KRvkrnn contributed by T31M (dataset PR #45, claim #67).
+- KPvkrnp, KRvkrnp contributed by T31M (dataset PR #44, claim #67).
+- KPvkrbp, KRvkrbp contributed by T31M (dataset PR #43, claim #67).
+- KPvkrbn, KRvkrbn contributed by T31M (dataset PR #42, claim #67).
+- KPvkrbb, KRvkrbb contributed by T31M (dataset PR #41, claim #67).
+- KPvkrrp, KRvkrrp contributed by T31M (dataset PR #40, claim #67).
+- KPvkrrn, KRvkrrn contributed by T31M (dataset PR #39, claim #67).
+- KPvkrrr, KRvkrrr contributed by T31M (dataset PR #38, claim #67).
+- KPvkrrb, KRvkrrb contributed by T31M (dataset PR #37, claim #67).
 - KQvkqrr (independently reproduced by popeye37 and T31M).
 - KQvkqrp (independently reproduced by T31M and popeye37).
 - KQvkqrn (independently reproduced by popeye37 and T31M).
