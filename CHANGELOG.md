@@ -194,6 +194,9 @@ bumps may change behavior).
 - `mine --starts/--ends` and solution enumeration read only the DTM byte of
   each position they visit, not the count byte in another block: a
   KBvkqrn `--dtm 14 --count 2 --starts 2 --ends 2` scan is 2.2x faster.
+- `mine --starts N` rejects a candidate with fewer than N optimal first moves
+  after one ply of lookups, before enumerating its lines: the same scan is
+  another 2.5x faster.
 
 ## [0.20.0] - 2026-09-26
 

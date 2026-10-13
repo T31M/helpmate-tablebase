@@ -495,6 +495,22 @@ bool Tablebase::mine_range(const MineScan& q, uint64_t begin, uint64_t end,
             // Changing --ends's meaning as a side effect of adding themes is not
             // acceptable, so this goes through lines()/shape_of exactly like
             // v0.6.2 did, not through solutions().
+            //
+            // Every line starts with an optimal root move, and two different
+            // moves never share a SAN, so sh.starts is at most the number of
+            // optimal root moves -- also when lines() stops at v.count. One
+            // ply of DTM lookups rejects a candidate with too few of them
+            // before the full-depth enumeration.
+            if (f.starts > 0) {
+                int optimal = 0;
+                for (const Move& mv : b.legal_moves()) {
+                    b.make(mv);
+                    uint8_t d = dtm_of(b);
+                    b.unmake(mv);
+                    if (d <= DTM_MAX && (int)d == (int)v.dtm - 1) ++optimal;
+                }
+                if (optimal < f.starts) continue;
+            }
             fen = b.fen();
             SolutionShape sh = shape_of((int)v.count, lines(fen, (int)v.count));
             if (f.starts >= 0 && sh.starts != f.starts) continue;

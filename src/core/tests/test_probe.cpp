@@ -400,3 +400,42 @@ TEST_CASE("multi-threaded mine reports a missing table as one thread does") {
                 *Material::parse("KRBvk"), f, [](const std::string&) { return true; }, nullptr, threads),
             MissingTableError);
 }
+
+TEST_CASE("mine --starts selects exactly what solution_shape says") {
+    // The scan rejects a candidate early when it has fewer optimal root moves
+    // than --starts; the selection must still equal the full enumeration's.
+    Tablebase tb(gen_dir());
+    for (const auto& [material, dtm] :
+         std::vector<std::pair<std::string, int>>{{"KQvk", 2}, {"KQvk", 4}, {"KPvk", 3}, {"KPvk", 5}}) {
+        auto m = *Material::parse(material);
+        std::vector<std::string> all;
+        tb.mine(m, MineFilter{.dtm = dtm}, [&](const std::string& f) {
+            all.push_back(f);
+            return true;
+        });
+        REQUIRE_FALSE(all.empty());
+        std::vector<SolutionShape> shapes;
+        for (const auto& f : all) shapes.push_back(tb.solution_shape(f));
+        for (int starts : {1, 2, 3}) {
+            for (int ends : {-1, 1, 2}) {
+                INFO(material << " dtm " << dtm << " starts " << starts << " ends " << ends);
+                std::vector<std::string> want;
+                for (size_t i = 0; i < all.size(); ++i) {
+                    const auto& sh = shapes[i];
+                    if (sh.exhaustive && sh.starts == starts && (ends < 0 || sh.ends == ends))
+                        want.push_back(all[i]);
+                }
+                std::vector<std::string> got;
+                uint64_t skipped = 0;
+                tb.mine(
+                    m, MineFilter{.dtm = dtm, .starts = starts, .ends = ends},
+                    [&](const std::string& f) {
+                        got.push_back(f);
+                        return true;
+                    },
+                    &skipped);
+                CHECK(got == want);
+            }
+        }
+    }
+}
