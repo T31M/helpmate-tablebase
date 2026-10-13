@@ -141,6 +141,33 @@ class BlockReader:
             yield self.read(base + off, min(chunk, ps - off))
 
 
+def marker_payload_sha256(sidecar: dict) -> str:
+    import hashlib
+
+    cells = json.dumps(sidecar.get("cells", {}), sort_keys=True, separators=(",", ":"))
+    return "marker:" + hashlib.sha256(cells.encode()).hexdigest()
+
+
+def payload_sha256(path: Path | str, sidecar: dict | None = None) -> str:
+    """Content identity of a table, independent of its header and embedded metadata:
+    sha256 over the four planes' hex digests (planes 0..3 in file order)."""
+    import hashlib
+
+    path = Path(path)
+    if read_header(path).marker:
+        if sidecar is None:
+            sidecar = json.loads(path.with_name(path.name[: -len(".hm")] + ".stats.json").read_text())
+        return marker_payload_sha256(sidecar)
+    digests = []
+    with BlockReader(path) as r:
+        for plane in range(4):
+            h = hashlib.sha256()
+            for chunk in r.plane_chunks(plane):
+                h.update(chunk)
+            digests.append(h.hexdigest())
+    return hashlib.sha256("".join(digests).encode()).hexdigest()
+
+
 def check_blocks(path: Path | str) -> tuple[str, int]:
     """Decode every block; verdict 'OK', 'skip ...' or 'BAD ...'."""
     import zstandard

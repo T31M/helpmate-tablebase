@@ -4,9 +4,9 @@ This project needs CPU and RAM more than it needs code.
 
 The corpus is **complete through five pieces** — all 220 five-piece classes,
 plus everything below them. At six pieces there are **<!-- contrib:six-total -->715<!-- /contrib --> material classes**, and
-**<!-- contrib:six-done -->133<!-- /contrib --> are done**, of which <!-- contrib:six-empty -->75<!-- /contrib --> are proven empty (marker
+**<!-- contrib:six-done -->254<!-- /contrib --> are done**, of which <!-- contrib:six-empty -->75<!-- /contrib --> are proven empty (marker
 tables: no helpmate exists in that class, so there is nothing to compute). The
-<!-- contrib:six-open -->582<!-- /contrib --> still to go are roughly six hundred
+<!-- contrib:six-open -->461<!-- /contrib --> still to go are roughly six hundred
 machine-days of work, and it is not going to come from one desk.
 
 If you have a machine with 32 GiB of RAM and a week where it would otherwise
@@ -17,16 +17,16 @@ idle, you can produce something nobody has ever computed.
 
 ## What is missing
 
-<!-- contrib:six-open -->582<!-- /contrib --> six-piece tables. Peak RAM equals the raw table size, because generation
+<!-- contrib:six-open -->461<!-- /contrib --> six-piece tables. Peak RAM equals the raw table size, because generation
 holds four bytes per cell resident:
 
 | pawns | tables missing | RAM needed | machine |
 | --- | --- | --- | --- |
-| **0** | **<!-- contrib:six-open-p0 -->247<!-- /contrib -->** | **28.9 GiB** | **32 GiB — the accessible tier** |
-| 3 | <!-- contrib:six-open-p3 -->28<!-- /contrib --> | 47.6 GiB | 64 GiB |
+| **0** | **<!-- contrib:six-open-p0 -->191<!-- /contrib -->** | **28.9 GiB** | **32 GiB — the accessible tier** |
+| 3 | <!-- contrib:six-open-p3 -->24<!-- /contrib --> | 47.6 GiB | 64 GiB |
 | 4 | <!-- contrib:six-open-p4 -->4<!-- /contrib --> | 35.7 GiB | 64 GiB |
-| 2 | <!-- contrib:six-open-p2 -->95<!-- /contrib --> | 63.5 GiB | 96 GiB (64 is too tight) |
-| 1 | <!-- contrib:six-open-p1 -->208<!-- /contrib --> | 84.7 GiB | 96 GiB |
+| 2 | <!-- contrib:six-open-p2 -->78<!-- /contrib --> | 63.5 GiB | 96 GiB (64 is too tight) |
+| 1 | <!-- contrib:six-open-p1 -->164<!-- /contrib --> | 84.7 GiB | 96 GiB |
 
 Start with the pawnless tier. It is the largest single group, it fits on
 ordinary hardware, and every table in it is 28.9 GiB raw — about 1–3 GiB once
@@ -131,11 +131,49 @@ the maintainer can link the two accounts and credit you. Run
 `huggingface-cli whoami` if you are unsure which account your token belongs
 to — it is easy to be logged in as an old one.
 
+### Duplicates and claims
+
+Two deliveries of the same material with identical content are an independent
+reproduction. That makes the table more trustworthy, so it is a joint result,
+not a conflict:
+
+1. **Equal credit.** Everyone whose delivery passed and matched is a
+   *producer* of that table, listed in order of delivery (dataset PR number).
+   Nobody is "author" and nobody is "confirmer"; every producer counts the table
+   fully.
+2. **Which file is published.** The content is identical, only the sidecar and
+   the generator version differ. The published file is the claim holder's
+   delivery; if no producer holds a valid claim, the earliest delivery. A file
+   that is already published is never replaced; a claim holder who delivers
+   later becomes a producer.
+3. **A claim does not block an identical delivery.** Someone else's delivery of
+   a claimed material is accepted when it equals the claim holder's delivery or
+   the published table; it adds a producer.
+4. **A claim still protects new material.** Someone else's delivery of a claimed
+   material that is neither published nor delivered by the claim holder is
+   *held*: it passes verify, `accept` skips it ("held for claim #N") and the PR
+   stays open until the claim holder delivers, the claim ends, or the
+   maintainer releases the material after asking the claim holder.
+5. **Different content is not a duplicate.** If two deliveries differ, V8 fails
+   for the later one and nothing is accepted for that material until it is
+   resolved.
+6. **A valid claim** is an open claim issue that covers the material, directly
+   or by pattern, and is the earliest open claim covering it.
+
+To reproduce a table on purpose, open a claim whose first line is `confirm:`
+(then the list of materials). A confirming claim never holds or conflicts with
+anything. A pattern claim such as `KQvk???` leaves out every material that an
+earlier claim already covers; the status comment lists them as "excluded:
+claimed earlier by others". Explicit overlaps are still flagged as a
+conflict. Every overlap with an earlier claim, explicit or by pattern, gets one
+notice that names both authors; there is none between two claims of the same
+author, and a material the earlier claim struck through does not count.
+
 ## What gets checked before a merge
 
 Being blunt about the state of this: **a donated table is currently reviewed,
-not proven.** `helpmate-tables verify` runs seven checks, cheapest first. You
-run V2 to V7 with `--material`; the maintainer runs V1 to V7 on your pull
+not proven.** `helpmate-tables verify` runs seven checks, cheapest first, plus V8 for duplicates. You
+run V2 to V7 with `--material`; the maintainer runs V1 to V7 (and V8) on your pull
 request with `--pr`. If V4 or V5 fails, V6 and V7 are skipped.
 
 - **V1 PR hygiene.** Only `<M>.hm` plus `<M>.stats.json` pairs with safe file
@@ -163,6 +201,15 @@ request with `--pr`. If V4 or V5 fails, V6 and V7 are skipped.
   plies deep (`--oracle-samples`, `--oracle-plies`). The limit is runtime:
   python-chess needs minutes per six-piece position at 5 plies. The report
   records the settings used.
+
+- **V8 identical to the published table.** Only for a material that is already
+  published or delivered by an earlier PR in the same run: the payload hash
+  (SHA-256 of the four plane hashes) must equal the other copy. A duplicate of a
+  published table is checked with V2 to V4 and V8; V5 to V7 are skipped as
+  "independent reproduction". A duplicate of an earlier PR in the same run is
+  checked with V2 to V5 and V8: its sidecar may be the one that gets published
+  (the claim holder's delivery, or a release), so its deepest positions are
+  probed; only V6 and V7 are skipped.
 
 **What is not checked is full correctness.** Proving a donated table right
 means regenerating it, which costs exactly what the donation saved. The
@@ -208,14 +255,47 @@ tier. The setup instructions below are theirs too (#42).
 ```bash
 helpmate-tables status                                  # what is waiting
 helpmate-tables verify --tables ~/tb --pr 2 3 4         # asks before downloading; posts reports
+helpmate-tables accept 2 3 4 --tables ~/tb --plan       # what accept would do; writes nothing
 helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credits, docs PR
 ```
 
 - `verify --pr` lists the PR files and sizes and asks before downloading
   (`--yes` skips the question, `--plan-only` stops after the list, `--no-post`
   keeps the report off HF and GitHub). Downloads are staged in `~/tb-staging`,
-  bound to the PR head, and a rerun resumes size-exactly. It exits with status 2
-  if `--tables` lacks a sub-table the PR needs.
+  per file (`files/.files.json`), and a rerun downloads only the files that changed
+  or are incomplete. It exits with status 2
+  if `--tables` lacks a sub-table the PR needs. Without a terminal (`nohup`,
+  `systemd-run`, a cron job) it cannot ask: pass `--yes`, or it stops with a usage
+  error. Files staged by an older helpmate-tables (only `files/.head`) are listed as
+  "already downloaded, will be checked" when their size matches; their checksums are
+  compared before verifying and a mismatching file is downloaded again.
+- Delta verify: a table whose file and settings (`samples`, `oracle_samples`,
+  `oracle_plies`) are unchanged since the last report reuses its result
+  ("reused from <head>"); a killed run resumes from `report.partial.json`;
+  `--full` re-checks everything. Progress lines read
+  `[i/n] <material> <check> ... <status> (<time>)`. V1 labels each material new,
+  duplicate of published, duplicate of HF PR #N, or held for claim #N;
+  `--no-post` still reads the claims. Run it from the checkout (or pass `--checkout`):
+  the contributor registry tells V1 who sent a PR that has no `GitHub:` line.
+- `accept N... --plan` runs everything accept checks before its first write (open
+  PRs, report heads, staged files, contributors, claims, decisions) and prints, per
+  PR, the contributor, one line per material (`publish from #N`, `reproduction of
+  published table -> producer`, `co-producer (file published from #M)`, `held for
+  claim #K by @holder` or `CONFLICT: ...`) and what happens to the PR (merge,
+  partial copy + close, partial copy and stays open, comment only, close with
+  thank-you), then the producers and CHANGELOG lines it would add. It writes
+  nothing: no Hub or GitHub write, no checkout change, no state file. Exit 1 means
+  a conflict, 2 an error accept would stop with. Run it before every real accept
+  of a batch, with the same `--release` and `--contributor` arguments.
+- `accept` publishes the claim holder's file, else the earliest, never replaces a
+  published one, and adds identical deliveries as producers. It skips held
+  deliveries (the PR stays open with a comment); `accept --release M` publishes
+  someone else's delivery of claimed material after you asked the claim holder.
+  Differing content stops it before anything is merged. A reproduction of your
+  own table credits "maintainer" plus the reproducer. `accept --no-pages` leaves
+  out the site pages.
+- `helpmate-tables pages --tables ~/tb (--missing | --material M...) [--jobs N]`
+  mines the missing site pages in parallel jobs, resumable, and ships a docs PR.
 - `accept` refuses a PR that changed since its passing verification, and needs
   a clean checkout on its first run. Steps: merge the HF PR, regenerate and
   push the manifest, move the files into `--tables`, open a docs PR
@@ -226,7 +306,7 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   manifest; skipped with a message if `--tables` is incomplete), then comment on and close the finished claims. It
   is resumable: rerun the same command after a failure. Use
   `--contributor LOGIN` when neither the PR description nor the claim issue
-  names one.
+  names one; it applies to every PR of a run, so accept that PR on its own.
   The docs PR also carries the accepted materials' site pages
   (`site/data/material/<M>.json`, mined by `tools/build_problems.py`), so accept
   needs the `helpmate` binary on `PATH` (`--binary PATH` to point elsewhere).

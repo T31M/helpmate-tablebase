@@ -172,11 +172,12 @@ class Hub:
         self.api.change_discussion_status(self.repo, num, "closed", comment=comment, repo_type="dataset")
 
     def merge_by_copy(self, num: int, head: str, files: list[str], message: str,
-                      comment: Callable[[str, bool], str],
+                      comment: Callable[[str, bool], str], *, close: bool = True,
                       on_commit: Callable[[str, bool], None] | None = None) -> str:
         """Land `files` from the PR's `head` on main with one server-side copy commit (LFS
         files never leave the Hub), check main now has exactly the head's files, then close
-        the PR with `comment(ref, already)`.
+        the PR with `comment(ref, already)` — or, with `close=False`, post that comment and
+        leave the PR open (it still holds material that is not published).
 
         `ref` is the copy commit's URL, or, when every file was already on main (huggingface_hub
         then drops all copies and makes no commit), main's head sha with `already` True.
@@ -197,7 +198,10 @@ class Hub:
                                f"in {', '.join(wrong)}; the PR stays open, check main by hand")
         if on_commit is not None:
             on_commit(ref, already)
-        self.close_pr(num, comment(ref, already))
+        if close:
+            self.close_pr(num, comment(ref, already))
+        else:
+            self.comment(num, comment(ref, already))
         return ref
 
     def main_files(self) -> dict[str, FileMeta]:

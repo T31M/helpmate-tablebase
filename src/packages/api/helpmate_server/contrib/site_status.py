@@ -42,6 +42,11 @@ def _registered(registry, key: str | None) -> str | None:
     return "anonymous" if c.anonymous else c.display
 
 
+def _producers(registry, material: str) -> list[str]:
+    """Every producer of a done table, in delivery order; the maintainer is shown as such."""
+    return [_registered(registry, k) or str(k) for k in registry.producers_of(material)]
+
+
 def build_status(hub, gh, registry, now: datetime) -> dict:
     done = {f[: -len(".hm")] for f in hub.fetch_manifest().get("files", {}) if f.endswith(".hm")}
     index = load_index(gh)
@@ -60,8 +65,10 @@ def build_status(hub, gh, registry, now: datetime) -> dict:
         entry: dict
         if s.state == "done":
             table = registry.tables.get(m.name, {})
-            entry = {"state": "done", "contributor": _registered(registry, table.get("contributor")),
-                     "hf_pr": table.get("hf_pr"), "claim": None}
+            names = _producers(registry, m.name)
+            entry = {"state": "done",
+                     "contributor": names[0] if names else _registered(registry, table.get("contributor")),
+                     "producers": names, "hf_pr": table.get("hf_pr"), "claim": None}
         elif s.state == "in review":
             pr = in_review[m.name]
             known = registry.by_hf(pr.author)
@@ -79,19 +86,21 @@ def build_status(hub, gh, registry, now: datetime) -> dict:
         materials[m.name] = entry
     people = []
     hidden: dict = {"display": "anonymous", "hf": None, "github": None, "anonymous": True,
-                    "tables": 0, "six": 0, "materials": []}
+                    "tables": 0, "reproduced": 0, "six": 0, "materials": []}
     for key, c in registry.contributors.items():
         mats = [m.name for m in universe()
-                if registry.tables.get(m.name, {}).get("contributor") == key and m.name in done]
+                if m.name in done and key in registry.producers_of(m.name)]
         if not mats:
             continue
+        repro = len([m for m in mats if len(registry.producers_of(m)) > 1])
         six = sum(Material(x).pieces == 6 for x in mats)
         if c.anonymous:
             hidden["tables"] += len(mats)
+            hidden["reproduced"] += repro
             hidden["six"] += six
             continue
         people.append({"display": c.display, "hf": c.hf, "github": c.github, "anonymous": False,
-                       "tables": len(mats), "six": six, "materials": mats})
+                       "tables": len(mats), "reproduced": repro, "six": six, "materials": mats})
     people.sort(key=lambda p: (-p["tables"], p["display"].lower()))
     if hidden["tables"]:
         people.append(hidden)

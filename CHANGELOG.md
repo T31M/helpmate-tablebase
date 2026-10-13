@@ -34,8 +34,83 @@ bumps may change behavior).
 - Stats check workflow (daily and after each Pages run) fails when the published
   statistics miss a table of the manifest; a repo test fails a PR whose
   `stats.json` disagrees with `materials.json`.
+- Batch processing of dataset PRs in `helpmate-tables`:
+  - `verify` hashes every table's payload. A material that is already published
+    is checked with V2 to V4 and the new V8 "identical to the published table";
+    V5 to V7 are recorded as "independent reproduction". One delivered by an
+    earlier PR in the same run gets V5 as well (its sidecar may be the one
+    published); only V6 and V7 are skipped. V1 labels each material new, duplicate of
+    published, duplicate of HF PR #N, or held for claim #N. `--no-post` still
+    reads the claims.
+  - Staging is per file (`files/.files.json`): a revised PR downloads only the
+    files that changed.
+  - Delta verify: unchanged tables reuse the earlier result ("reused from
+    <head>"), a killed run resumes from `report.partial.json`, `--full` turns the
+    reuse off. Progress lines `[i/n] <material> <check> ... <status> (<time>)`.
+  - Equal credit: identical deliveries of a material are independent
+    reproductions; every deliverer is a producer, counted fully. The published
+    file is the claim holder's, else the earliest, and is never replaced. The
+    registry keeps `producers` and `published_from` (old entries are migrated).
+    Reproductions of the maintainer's own tables credit "maintainer" plus the
+    reproducer. Shown on the site ("popeye37 · T31M ✓ reproduced"), in
+    `status.json`, the credit table ("tables | reproduced"), the Parquet
+    statistics (`contributor`, `producers_count`, `published_from_pr`) and this
+    changelog ("independently reproduced by ...").
+  - Held deliveries: someone else's delivery of claimed, unpublished material
+    is held (verify passes it, `accept` skips it, the PR stays open with a
+    comment) unless `accept --release M`. Differing content stops `accept`
+    before anything is merged.
+  - Claims bot: `confirm:` claims never hold or conflict; a wildcard claim
+    excludes materials claimed earlier; one overlap notice per pair of claims;
+    rows "produced by X and Y" and "held for claim #N".
+  - `accept --no-pages` skips the site pages; `helpmate-tables pages --tables DIR
+    (--missing | --material M...) [--jobs N]` builds them in parallel jobs,
+    resumable, and ships a docs PR.
+  - `accept N [N ...] --plan` shows what accept would do and writes nothing: per
+    PR its contributor, one line per material (publish, reproduction, co-producer,
+    held, or CONFLICT), what happens to the PR, then the producers and CHANGELOG
+    lines it would add. Exits 1 on a conflict; works with `--release` and
+    `--contributor`.
+  - `verify --pr`: the download plan counts files staged by an older
+    helpmate-tables (only a `.head` marker) as downloaded when their size matches
+    ("already downloaded, will be checked"); without a terminal and without
+    `--yes` it stops with a usage error instead of a traceback.
 
 ### Data
+- KQvkqrr (independently reproduced by popeye37 and T31M).
+- KQvkqrp (independently reproduced by T31M and popeye37).
+- KQvkqrn (independently reproduced by popeye37 and T31M).
+- KQvkqrb (independently reproduced by popeye37 and T31M).
+- KQvkqqr (independently reproduced by popeye37 and T31M).
+- KQvkqqp (independently reproduced by T31M and popeye37).
+- KQvkqqn (independently reproduced by popeye37 and T31M).
+- KQvkqqb (independently reproduced by popeye37 and T31M).
+- KQvkqpp (independently reproduced by T31M and popeye37).
+- KQvkqnp (independently reproduced by T31M and popeye37).
+- KQvkqnn (independently reproduced by popeye37 and T31M).
+- KQvkqbp (independently reproduced by T31M and popeye37).
+- KQvkqbn (independently reproduced by popeye37 and T31M).
+- KQvkqbb (independently reproduced by popeye37 and T31M).
+- KQvkbbp, KQvkbnp, KQvkbpp, KQvknnp, KQvknpp, KQvkppp, KQvkqbp, KQvkqnp, KQvkqpp, KQvkqqp, KQvkqrp, KQvkrbp, KQvkrnp, KQvkrpp, KQvkrrp contributed by popeye37 (dataset PR #46, claim #40).
+- KPvkqpp, KRvkqpp contributed by T31M (dataset PR #36, claim #67).
+- KPvkqnp, KRvkqnp contributed by T31M (dataset PR #35, claim #67).
+- KPvkqnn, KRvkqnn contributed by T31M (dataset PR #34, claim #67).
+- KPvkqbp, KRvkqbp contributed by T31M (dataset PR #33, claim #67).
+- KPvkqbn, KRvkqbn contributed by T31M (dataset PR #32, claim #67).
+- KPvkqbb, KRvkqbb contributed by T31M (dataset PR #31, claim #67).
+- KPvkqrp, KRvkqrp contributed by T31M (dataset PR #30, claim #67).
+- KPvkqrn, KRvkqrn contributed by T31M (dataset PR #29, claim #67).
+- KPvkqrb, KRvkqrb contributed by T31M (dataset PR #28, claim #67).
+- KPvkqrr, KRvkqrr contributed by T31M (dataset PR #27, claim #67).
+- KPvkqqp, KRvkqqp contributed by T31M (dataset PR #26, claim #67).
+- KPvkqqn, KRvkqqn contributed by T31M (dataset PR #25, claim #67).
+- KPvkqqb, KRvkqqb contributed by T31M (dataset PR #24, claim #67).
+- KPvkqqr, KRvkqqr contributed by T31M (dataset PR #23, claim #67).
+- KQvkqqq (independently reproduced by popeye37 and T31M).
+- KPvkqqq, KRvkqqq contributed by T31M (dataset PR #22, claim #67).
+- KNvkbbb, KNvkbbn, KNvkbbp, KNvkbnn, KNvkbnp, KNvkbpp, KNvknnp, KNvknpp, KNvkppp, KNvkqbb, KNvkqbn, KNvkqbp, KNvkqnn, KNvkqnp, KNvkqpp, KNvkqqb, KNvkqqn, KNvkqqp, KNvkqqr, KNvkqrb, KNvkqrn, KNvkqrp, KNvkqrr, KNvkrbb, KNvkrbn, KNvkrbp, KNvkrnn, KNvkrnp, KNvkrpp, KNvkrrb, KNvkrrn, KNvkrrp, KNvkrrr contributed by T31M (dataset PR #20, claim #62).
+- KQvkbbb, KQvkbbn, KQvkbnn, KQvknnn, KQvkqbb, KQvkqbn, KQvkqnn, KQvkqqb, KQvkqqn, KQvkqqq, KQvkqqr, KQvkqrb, KQvkqrn, KQvkqrr, KQvkrbb, KQvkrbn, KQvkrnn, KQvkrrb, KQvkrrn, KQvkrrr contributed by popeye37 (dataset PR #19, claim #40).
+- KBvkbbb, KBvkbbn, KBvkbbp, KBvkbnn, KBvkbnp, KBvkbpp, KBvknnn, KBvknnp, KBvknpp, KBvkppp, KBvkqbp, KBvkqnp, KBvkqpp, KBvkqqp, KBvkqrp, KBvkrbn, KBvkrbp, KBvkrnn, KBvkrnp, KBvkrpp, KBvkrrb, KBvkrrn, KBvkrrp contributed by T31M (dataset PR #18, claim #52).
 - KRNvkbb, KRNvkbn, KRNvkbp, KRNvknn, KRNvknp, KRNvkpp, KRNvkqb, KRNvkqn, KRNvkqp, KRNvkqq, KRNvkqr, KRNvkrb, KRNvkrn, KRNvkrp, KRNvkrr contributed by T31M (dataset PR #17, claim #45).
 - KRRvkpp contributed by T31M (dataset PR #16).
 - KRRvknp contributed by popeye37 (dataset PR #15, claim #39).
@@ -59,6 +134,14 @@ bumps may change behavior).
   empty.
 
 ### Fixed
+- `helpmate-tables accept`: a dataset PR merged on the Hub by hand after its passing
+  verification, at the verified head, is taken as merged and the run carries on (manifest,
+  files, credits) instead of stopping with "PR #N is merged". A hand-merged PR that accept
+  would not merge whole (partial copy, held material) still stops it before any write.
+- `helpmate-tables verify --pr`: a PR without a `GitHub:` line in its description is
+  attributed as `accept` does (contributor registry by HF user, else the claim that speaks
+  for it), so a claim holder's own delivery is no longer labelled "held for claim #N" in V1.
+  The registry is read from the checkout (`--checkout`, default the current directory).
 - Site: after a deploy a browser could pair a cached old `js/materials.js`
   (GitHub Pages sends `max-age=600`) with the new `index.html`, and the
   Materials screen crashed ("Cannot read properties of null"). The Pages

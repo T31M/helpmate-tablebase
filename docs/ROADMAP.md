@@ -324,11 +324,11 @@ s#? one Hugging Face repo or one per genre?
 Unprioritised unless noted. Agreed next small PRs are marked **next**.
 
 **Contributors — more tables, faster**
-- **next** — *Delta verify*: `verify --pr N` re-checks only tables that failed or are
+- **done (2026-10)** — *Delta verify*: `verify --pr N` re-checks only tables that failed or are
   missing in the existing report and reuses the passed ones when the PR head, the file
   and the tool version are unchanged (PR #18 had to be re-verified fully, ~3 h, for one
   table). `accept` keeps trusting only a complete, consistent report.
-- **next** — *Per-table progress lines in `verify`*: long PRs looked stuck.
+- **done (2026-10)** — *Per-table progress lines in `verify`*: long PRs looked stuck.
 - **next** — *Sub-table block cache fix* (analysed 2026-10-03): round the cache capacity
   up, dtm-only probes in the scan passes, thread-local zstd context (6× on KQvkr), then
   `gen --subtable-cache auto|0|N` resident sub-tables inside a RAM-guard-counted budget
@@ -344,8 +344,8 @@ Unprioritised unless noted. Agreed next small PRs are marked **next**.
 **Trust and provenance**
 - Generator commit hash / build id in every sidecar: a version string alone cannot show
   which build wrote a table.
-- Second-builder confirmation: a second contributor regenerates a table; a matching
-  sha256 marks it "independently confirmed".
+- Second-builder confirmation — **done**: identical deliveries are independent
+  reproductions, all producers credited equally (`confirm:` claims, V8).
 - C++ `helpmate verify` with the internal oracle on large samples.
 
 **Chess problems**
@@ -366,7 +366,8 @@ Unprioritised unless noted. Agreed next small PRs are marked **next**.
 
 **Community**
 - Contributor statistics on the site (tables, CPU hours).
-- Claim expiry with reminder and release (the bot only labels stale claims today).
+- Claim expiry with reminder and release — **partly done**: held deliveries and
+  `accept --release M`; the bot still only labels stale claims.
 - Write-up of the first community-computed six-piece tables and the h#17 records.
 
 ### Compression — promoted to v0.7.5

@@ -6,16 +6,21 @@ import re
 import secrets
 import shutil
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from .checks import (
-    Check, TableReport, check_block_integrity, check_deepest, check_header, check_sidecar,
+    Check, MissingPublished, TableReport, check_block_integrity, check_deepest, check_header,
+    check_identical, check_sidecar,
 )
+from .claims import ClaimIndex, identity_claim, load_index
 from .consistency import check_consistency
 from .links import parse_links
 from .materials import Material, canonical
 from .oracle import check_oracle
+from .registry import Registry
 from .report import render_markdown, report_json
 from .tablefile import read_header
 
@@ -40,28 +45,115 @@ class VerifyOptions:
                 "date": datetime.now(timezone.utc).date().isoformat()}
 
 
+class PublishedHashes:
+    """Payload hashes of published tables, from the local corpus copy, cached per manifest sha."""
+
+    def __init__(self, tables: Path, manifest_files: dict, persist: bool = True):
+        """`persist=False`: keep new hashes in memory only (accept --plan writes nothing)."""
+        self.tables, self.files, self.persist = Path(tables), manifest_files, persist
+        self.path = self.tables / ".payload-sha256.json"
+        try:
+            self.cache: dict = json.loads(self.path.read_text())
+        except (OSError, ValueError):
+            self.cache = {}
+
+    def get(self, material: str) -> str:
+        from .tablefile import payload_sha256
+        sha = self.files.get(f"{material}.hm", {}).get("sha256")
+        hit = self.cache.get(material)
+        if hit and hit.get("hm_sha256") == sha:
+            return hit["payload"]
+        hm = self.tables / f"{material}.hm"
+        if not hm.exists():
+            raise MissingPublished(material)
+        payload = payload_sha256(hm)
+        self.cache[material] = {"hm_sha256": sha, "payload": payload}
+        if self.persist:
+            self.path.write_text(json.dumps(self.cache, indent=1, sort_keys=True))
+        return payload
+
+
+REUSE_SETTINGS = ("samples", "oracle_samples", "oracle_plies")
+
+
+def reusable(prev: dict | None, material: str, shas: tuple[str, str], tool: str,
+             settings: dict, source_payload: str | None = None,
+             needs_deepest: bool = False) -> dict | None:
+    """The table entry of the previous report if its result may be taken over: same tool and
+    sampling, the table passed, its files are unchanged, and it was compared against the same
+    source (the published table, an earlier delivery, or none) as it would be now.
+    `needs_deepest`: the entry must have run V5 (a duplicate of an earlier delivery of the same
+    run; an entry from before that rule skipped V5 as an independent reproduction)."""
+    if not prev or prev.get("tool") != tool:
+        return None
+    if any(prev.get(k) != settings.get(k) for k in REUSE_SETTINGS):
+        return None
+    entry = prev.get("tables", {}).get(material)
+    if not entry or not entry.get("passed") or None in shas:
+        return None
+    if (entry.get("hm_sha256"), entry.get("stats_sha256")) != shas:
+        return None
+    if entry.get("source_payload") != source_payload:
+        return None
+    if needs_deepest:
+        v5 = next((c for c in entry.get("checks", []) if c.get("id") == "V5"), None)
+        if v5 is None or str(v5.get("detail", "")).startswith("independent reproduction"):
+            return None
+    return entry
+
+
 def verify_table(material: str, tables: Path, opts: VerifyOptions,
-                 installed_version: str) -> TableReport:
+                 installed_version: str, *, published: str | None = None,
+                 source: str = "the published table", probe_deepest: bool = False,
+                 progress: Callable[[str], None] | None = None) -> TableReport:
+    """`published`: the payload hash a duplicate must equal (V8), from `source`. A duplicate
+    skips V5 to V7, or with `probe_deepest` (a duplicate of an earlier delivery of the same run,
+    whose sidecar may be the one published) only V6 and V7."""
     rep = TableReport(material)
     path = tables / f"{material}.hm"
+    t0 = time.monotonic()
+
+    def note(check: Check) -> Check:
+        nonlocal t0
+        rep.checks.append(check)
+        if progress is not None:
+            now = time.monotonic()
+            progress(f"{material} {check.id} {check.title} … {check.status} ({now - t0:.1f}s)")
+            t0 = now
+        return check
+
     if not path.exists():
-        rep.checks.append(Check("V2", "header and identity", "fail", f"{path} not found"))
+        note(Check("V2", "header and identity", "fail", f"{path} not found"))
         return rep
     for check in (lambda: check_header(path, installed_version),
                   lambda: check_block_integrity(path)):
-        rep.checks.append(check())
+        note(check())
         if not rep.passed:
             return rep  # later checks would only restate a structural failure
-    rep.checks.append(check_sidecar(path))
-    rep.checks.append(check_deepest(path, tables))
+    v4, payload = check_sidecar(path)
+    note(v4)
+    rep.payload_sha256 = payload
+    if published is not None:
+        note(check_identical(rep.payload_sha256, published, source))
+        skipped = [("V6", "local consistency"), ("V7", "independent solver")]
+        if probe_deepest and rep.passed:
+            note(check_deepest(path, tables))
+        else:
+            skipped.insert(0, ("V5", "deepest positions probe as recorded"))
+        why = (f"independent reproduction: identical to {source}" if rep.passed
+               else "an earlier check failed")
+        for cid, title in skipped:
+            note(Check(cid, title, "skip", why))
+        return rep
+    note(check_deepest(path, tables))
     if read_header(path).marker:
-        rep.checks.append(Check("V6", "local consistency", "skip", "marker table"))
-        rep.checks.append(Check("V7", "independent solver", "skip", "marker table"))
+        note(Check("V6", "local consistency", "skip", "marker table"))
+        note(Check("V7", "independent solver", "skip", "marker table"))
         return rep
     if not rep.passed:
         why = "an earlier check failed"
-        rep.checks.append(Check("V6", "local consistency", "skip", why))
-        rep.checks.append(Check("V7", "independent solver", "skip", why))
+        note(Check("V6", "local consistency", "skip", why))
+        note(Check("V7", "independent solver", "skip", why))
         return rep
     seed = opts.resolved_seed()
     try:
@@ -69,17 +161,18 @@ def verify_table(material: str, tables: Path, opts: VerifyOptions,
         extra = list(sc.get("deepest", [])) + list(sc.get("deepest_unique", []))
     except (OSError, ValueError, AttributeError, TypeError) as exc:
         why = f"sidecar unreadable: {exc}"
-        rep.checks.append(Check("V6", "local consistency", "skip", why))
-        rep.checks.append(Check("V7", "independent solver", "skip", why))
+        note(Check("V6", "local consistency", "skip", why))
+        note(Check("V7", "independent solver", "skip", why))
         return rep
     v6, fens = check_consistency(material, tables, opts.samples, seed, extra)
-    rep.checks.append(v6)
-    rep.checks.append(check_oracle(material, tables, samples=opts.oracle_samples,
-                                   max_plies=opts.oracle_plies, seed=seed, others=fens))
+    note(v6)
+    note(check_oracle(material, tables, samples=opts.oracle_samples,
+                      max_plies=opts.oracle_plies, seed=seed, others=fens))
     return rep
 
 
-def check_pr_hygiene(pr, manifest_files: dict) -> Check:
+def check_pr_hygiene(pr, manifest_files: dict) -> tuple[Check, set[str]]:
+    """The V1 check, and the materials of the PR that are already published."""
     title = "only canonical table + sidecar pairs, nothing already published"
     problems: list[str] = []
     hms = {f[:-3] for f in pr.files if f.endswith(".hm")}
@@ -98,16 +191,52 @@ def check_pr_hygiene(pr, manifest_files: dict) -> Check:
         problems.append("no tables in this PR")
     for f in pr.deleted:
         problems.append(f"PR deletes {f}")
+    dups = {f[:-3] for f in pr.files if f.endswith(".hm") and f in manifest_files}
     for f in pr.files:
-        if f in manifest_files:
+        if f in manifest_files and f.split(".")[0] not in dups:
             problems.append(f"{f} is already published "
                             f"(sha256 {manifest_files[f]['sha256'][:12]}…)")
     if problems:
-        return Check("V1", title, "fail", "; ".join(problems))
+        return Check("V1", title, "fail", "; ".join(problems)), dups
+    detail = f"{len(hms)} table(s)"
+    if dups:
+        detail += f"; duplicates of published tables: {', '.join(sorted(dups))}"
     if parse_links(pr.description)[0] is None:
-        return Check("V1", title, "warn", f"{len(hms)} table(s); no `Claim:` line in the "
-                     "description (push with --claim N next time)")
-    return Check("V1", title, "pass", f"{len(hms)} table(s)")
+        return Check("V1", title, "warn", f"{detail}; no `Claim:` line in the "
+                     "description (push with --claim N next time)"), dups
+    return Check("V1", title, "pass", detail), dups
+
+
+def pr_login(pr, index: ClaimIndex | None, registry) -> str | None:
+    """The PR's GitHub login as accept resolves it: the description's `GitHub:` line, the
+    registry entry of its HF user, else the author of the claim that speaks for it. Without the
+    registry only the description counts (someone else's claim must not speak for the PR)."""
+    login = parse_links(pr.description)[1]
+    if login or registry is None:
+        return login
+    known = registry.by_hf(pr.author)
+    if known and known.github:
+        return known.github
+    claim = identity_claim(pr, index, registry) if index is not None else None
+    return claim.author if claim else None
+
+
+def classify(pr, manifest_files: dict, index: ClaimIndex | None, earlier: dict[str, int],
+             login: str | None) -> dict[str, str]:
+    """One label per material of the PR: published, delivered by an earlier PR of this run,
+    held for someone else's claim, or new."""
+    out = {}
+    for m in pr.materials:
+        claim = index.claim_for(m) if index is not None else None
+        if f"{m}.hm" in manifest_files:
+            out[m] = "duplicate of published"
+        elif m in earlier:
+            out[m] = f"duplicate of HF PR #{earlier[m]}"
+        elif claim is not None and (login is None or claim.author.lower() != login.lower()):
+            out[m] = f"held for claim #{claim.issue}"
+        else:
+            out[m] = "new"
+    return out
 
 
 def _build_overlay(tables: Path, files_dir: Path, overlay: Path,
@@ -147,8 +276,8 @@ def _verified_files(staging: Path, exclude: int, open_heads: dict[int, str | Non
         d = staging / f"pr-{num}"
         if num == exclude or head is None:
             continue
-        rep, marker = _passed_report(d), d / "files" / ".head"
-        if rep is not None and rep.get("head") == head and marker.exists() and marker.read_text() == head:
+        rep = _passed_report(d)
+        if rep is not None and rep.get("head") == head and _is_staged_for(d / "files", head):
             out[num] = d / "files"
     return out
 
@@ -194,29 +323,71 @@ def _unsafe(name: str) -> bool:
     return "/" in name or "\\" in name or name.startswith(".")
 
 
-def _staged_ok(have: Path, head: str | None, name: str, size: int) -> bool:
-    marker = have / ".head"
-    if head is not None and (not marker.exists() or marker.read_text() != head):
-        return False
-    return (have / name).exists() and (have / name).stat().st_size == size
+def _files_record(files_dir: Path) -> dict:
+    try:
+        rec = json.loads((files_dir / ".files.json").read_text())
+        if isinstance(rec, dict) and isinstance(rec.get("files"), dict):
+            return rec
+    except (OSError, ValueError):
+        pass
+    return {"head": None, "files": {}}
 
 
-def _stage(hub, pr, files_dir: Path) -> None:
-    """Download what is missing or the wrong size, bound to the PR's head."""
-    marker = files_dir / ".head"
-    if pr.head is not None and files_dir.exists() and (
-            not marker.exists() or marker.read_text() != pr.head):
-        shutil.rmtree(files_dir)  # staged from another revision
+def _is_staged_for(files_dir: Path, head: str | None) -> bool:
+    return head is not None and _files_record(files_dir).get("head") == head
+
+
+def _staged_ok(files_dir: Path, name: str, want: tuple[int, str]) -> bool:
+    p = files_dir / name
+    rec = _files_record(files_dir)["files"].get(name)
+    return p.exists() and p.stat().st_size == want[0] and rec is not None and rec.get("sha256") == want[1]
+
+
+def _sha256_file(p: Path) -> str:
+    import hashlib
+
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 24), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _stage(hub, pr, files_dir: Path) -> list[str]:
+    """Download what is missing or changed at the PR's head; keep unchanged files.
+    Returns the names actually downloaded."""
     files_dir.mkdir(parents=True, exist_ok=True)
-    if pr.head is not None:
-        marker.write_text(pr.head)  # before downloading: an interrupted run resumes
     revision = pr.head or f"refs/pr/{pr.num}"
-    sizes = hub.file_sizes(pr.files, revision)
-    for f in pr.files:
-        p = files_dir / f
-        if not (p.exists() and p.stat().st_size == sizes[f]):
-            p.unlink(missing_ok=True)
-            hub.download(f, revision, files_dir)
+    tree = hub._tree(revision)
+    want = {f: tree[f] for f in pr.files}
+    rec = _files_record(files_dir)
+    legacy = files_dir / ".head"
+    if legacy.exists() and not (files_dir / ".files.json").exists():
+        rec = {"head": None, "files": {
+            f.name: {"sha256": _sha256_file(f), "size": f.stat().st_size}
+            for f in files_dir.iterdir() if f.is_file() and not f.name.startswith(".")}}
+    legacy.unlink(missing_ok=True)
+    for f in files_dir.iterdir():
+        if f.is_file() and not f.name.startswith(".") and f.name not in want:
+            f.unlink()
+            rec["files"].pop(f.name, None)
+    rec["head"] = pr.head
+
+    def save() -> None:
+        (files_dir / ".files.json").write_text(json.dumps(rec, indent=1, sort_keys=True))
+
+    save()  # before downloading: an interrupted run resumes
+    fetched = []
+    for name, (size, sha) in sorted(want.items()):
+        p = files_dir / name
+        if p.exists() and p.stat().st_size == size and rec["files"].get(name, {}).get("sha256") == sha:
+            continue
+        p.unlink(missing_ok=True)
+        hub.download(name, revision, files_dir)
+        rec["files"][name] = {"sha256": sha, "size": size}
+        save()
+        fetched.append(name)
+    return fetched
 
 
 def _gib(n: int) -> str:
@@ -239,15 +410,21 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         if pr.status != "open":
             print(f"error: PR #{num} is {pr.status}", file=sys.stderr)
             return 2
-        sizes = hub.file_sizes([f for f in pr.files if not _unsafe(f)], pr.head or f"refs/pr/{num}")
+        tree = hub._tree(pr.head or f"refs/pr/{num}")
+        sizes = {f: tree[f][0] for f in pr.files if not _unsafe(f)}
         have = staging / f"pr-{num}" / "files"
-        todo = {f: s for f, s in sizes.items() if not _staged_ok(have, pr.head, f, s)}
+        # staged before .files.json: a file of the right size is probably kept (_stage checks its sha)
+        legacy = (have / ".head").exists() and not (have / ".files.json").exists()
+        unsure = {f for f in sizes if legacy and (have / f).is_file() and (have / f).stat().st_size == sizes[f]}
+        todo = {f: tree[f][0] for f in sizes if f not in unsure and not _staged_ok(have, f, tree[f])}
         if any(_unsafe(f) for f in pr.files):
             print(f"  unsafe file names in PR #{num}: nothing will be downloaded")
         total += sum(todo.values())
         print(f"PR #{num} by {pr.author}: {', '.join(pr.materials) or '(no tables)'}")
         for f, s in sorted(sizes.items()):
-            print(f"  {f:28} {_gib(s):>12}{'' if f in todo else '  (already downloaded)'}")
+            note = ("" if f in todo else "  (already downloaded, will be checked)" if f in unsure
+                    else "  (already downloaded)")
+            print(f"  {f:28} {_gib(s):>12}{note}")
         prs.append(pr)
     free = shutil.disk_usage(staging).free
     print(f"to download: {_gib(total)}; free in {staging}: {_gib(free)}")
@@ -256,36 +433,116 @@ def verify_prs(a, opts: VerifyOptions, version: str, tool: str, hub_factory, gh_
         return 2
     if a.plan_only:
         return 0
-    if total and not a.yes and input(f"download {_gib(total)}? [y/N] ").strip().lower() != "y":
-        return 2
+    if total and not a.yes:
+        if not (sys.stdin and sys.stdin.isatty()):
+            raise UsageError(f"{_gib(total)} to download and nobody to ask: run with --yes when "
+                             "not interactive")
+        if input(f"download {_gib(total)}? [y/N] ").strip().lower() != "y":
+            return 2
     manifest_files = hub.fetch_manifest().get("files", {})
     gh = None if a.no_post else (gh_factory or GitHub)(a.github_repo)
+    index, claims_note = None, ""
+    try:
+        index = load_index(gh if gh is not None else (gh_factory or GitHub)(a.github_repo))
+    except Exception:  # noqa: BLE001 - claims are advisory; verification goes on without them
+        claims_note = "; claims unavailable"
+    reg_path = Path(getattr(a, "checkout", None) or ".") / "data" / "contributions.json"
+    registry = Registry.load(reg_path) if reg_path.exists() else None
+    if registry is None and index is not None:
+        claims_note += ("; contributor registry not found (run from the checkout or pass "
+                        "--checkout), so only the PR description names its author")
+    hashes = PublishedHashes(tables, manifest_files)
+    delivered: dict[str, tuple[int, str | None]] = {}   # material -> (PR, payload if it passed)
     rc = 0
     open_prs = hub.open_pull_requests()
     open_heads = {p.num: p.head for p in open_prs}
     for pr in sorted(prs, key=_batch_order):
+        login = pr_login(pr, index, registry)
         d = staging / f"pr-{pr.num}"
         files_dir = d / "files"
         d.mkdir(parents=True, exist_ok=True)
-        v1 = check_pr_hygiene(pr, manifest_files)
+        v1, dups = check_pr_hygiene(pr, manifest_files)
+        earlier = {m: n for m, (n, _) in delivered.items() if n < pr.num}
+        labels = classify(pr, manifest_files, index, earlier, login)
+        notes = [f"{m}: {label}" for m, label in labels.items() if label != "new"]
+        if notes or claims_note:
+            v1.detail += ("; " + ", ".join(notes) if notes else "") + claims_note
         reports: list = []
+        table_meta: dict[str, dict] = {}
         subtables_from: list[int] = []
+        sources: list[dict] = []
+        if not getattr(a, "full", False):
+            for name in ("report.json", "report.partial.json"):
+                try:
+                    src_rep = json.loads((d / name).read_text())
+                except (OSError, ValueError):
+                    continue
+                if isinstance(src_rep, dict) and src_rep.get("head"):
+                    sources.append(src_rep)
+        n = len(pr.materials)
         try:
             if not any(_unsafe(f) for f in pr.files):
                 _stage(hub, pr, files_dir)
                 subtables_from = _build_overlay(tables, files_dir, d / "overlay",
                                                 _verified_files(staging, pr.num, open_heads))
-                reports = [verify_table(m, d / "overlay", opts, version) for m in pr.materials]
+                recorded = _files_record(files_dir)["files"]
+                for i, m in enumerate(pr.materials, 1):
+                    prior = delivered.get(m)
+                    same_run = False   # a duplicate of an earlier delivery: V5 too (R19)
+                    if m in dups:
+                        pub, src = hashes.get(m), "the published table"
+                    elif prior and prior[1] and prior[0] < pr.num:
+                        pub, src, same_run = prior[1], f"HF PR #{prior[0]}", True
+                    else:
+                        pub, src = None, "the published table"
+                    shas = (recorded.get(f"{m}.hm", {}).get("sha256"),
+                            recorded.get(f"{m}.stats.json", {}).get("sha256"))
+                    entry, verified = None, ""
+                    for src_rep in sources:
+                        entry = reusable(src_rep, m, shas, tool, opts.settings(), pub, needs_deepest=same_run)
+                        if entry is not None:
+                            verified = str(entry.get("verified_head") or src_rep["head"])
+                            break
+                    if entry is not None:
+                        head = verified
+                        reports.append(TableReport.from_json(m, entry, head))
+                        seed_used = entry.get("seed")
+                        print(f"[{i}/{n}] {m} reused from {head[:7]}", flush=True)
+                    else:
+                        def show(line: str, i: int = i) -> None:
+                            print(f"[{i}/{n}] {line}", flush=True)
+
+                        reports.append(verify_table(m, d / "overlay", opts, version,
+                                                    published=pub, source=src,
+                                                    probe_deepest=same_run, progress=show))
+                        seed_used = opts.resolved_seed()
+                        head = pr.head or ""
+                    table_meta[m] = {"hm_sha256": shas[0], "stats_sha256": shas[1],
+                                     "seed": seed_used, "source_payload": pub,
+                                     "verified_head": head}
+                    (d / "report.partial.json").write_text(json.dumps(report_json(
+                        reports, seed=opts.resolved_seed(), tool=tool, head=pr.head, pr=pr.num,
+                        settings=opts.settings(), table_meta=table_meta), indent=2))
+        except MissingPublished as exc:
+            raise UsageError(f"{exc.material} is published but not in {tables}; "
+                             "sync the corpus first") from exc
         except MissingSubtable as exc:
             # Our corpus is incomplete, not the PR's fault: post nothing.
             raise UsageError(_who_has(exc, open_prs, staging)) from exc
+        for rep in reports:
+            if rep.passed and rep.payload_sha256:
+                delivered.setdefault(rep.material, (pr.num, rep.payload_sha256))
         seed = opts.resolved_seed()
         md = render_markdown(reports, heading=f"Verification of PR #{pr.num}", seed=seed,
                              tool=tool, pr_checks=[v1], subtables_from=subtables_from)
         js = report_json(reports, seed=seed, tool=tool, head=pr.head, pr=pr.num, pr_checks=[v1],
-                         settings=opts.settings(), subtables_from=subtables_from)
+                         settings=opts.settings(), subtables_from=subtables_from,
+                         table_meta=table_meta)
         (d / "report.md").write_text(md)
+        if (d / "report.json").exists():
+            (d / "report.json").replace(d / "report.prev.json")
         (d / "report.json").write_text(json.dumps(js, indent=2))
+        (d / "report.partial.json").unlink(missing_ok=True)
         print(md)
         if js["result"] != "pass":
             rc = 1

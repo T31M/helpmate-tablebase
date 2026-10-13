@@ -63,6 +63,11 @@ class FakeHub:
             return int(revision.rsplit("/", 1)[1])
         return next(n for n, (p, _) in self.prs.items() if p.head == revision)
 
+    def _tree(self, revision):
+        import hashlib
+        tree = self._pr_tree(self._num(revision))
+        return {k: (len(v), hashlib.sha256(v).hexdigest()) for k, v in tree.items()}
+
     def file_sizes(self, files, revision):
         tree = self._pr_tree(self._num(revision))
         return {f: len(tree[f]) for f in files if f in tree}
@@ -95,8 +100,9 @@ class FakeHub:
         self.closed.append((num, comment))
         self.prs[num][0].status = "closed"
 
-    def merge_by_copy(self, num, head, files, message, comment, on_commit=None):
-        """Copies `files` from the PR's tree into main, then closes the PR. If main already
+    def merge_by_copy(self, num, head, files, message, comment, *, close=True, on_commit=None):
+        """Copies `files` from the PR's tree into main, then closes the PR (with `close=False`
+        only comments, the PR stays open). If main already
         has them all, no commit is made and the ref is main's head ("main-sha")."""
         assert head == self.prs[num][0].head, "copy from a head that is not the PR's"
         tree = self._pr_tree(num)
@@ -104,10 +110,13 @@ class FakeHub:
         self.main.update({f: tree[f] for f in files})
         ref = "main-sha" if already else f"https://hf.example/commit/copy-{len(self.copies) + 1}"
         self.copies.append({"num": num, "head": head, "files": list(files), "message": message,
-                            "already": already})
+                            "already": already, "close": close})
         if on_commit is not None:
             on_commit(ref, already)
-        self.close_pr(num, comment(ref, already))
+        if close:
+            self.close_pr(num, comment(ref, already))
+        else:
+            self.comment(num, comment(ref, already))
         return ref
 
     def main_files(self):

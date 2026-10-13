@@ -10,7 +10,7 @@ from pathlib import Path
 from .materials import Material, canonical
 from .tablefile import (
     DTM_INVALID, DTM_UNSET, DTM_UNSOLVABLE, BlockReader, TableFormatError,
-    check_blocks, read_header, read_meta,
+    check_blocks, marker_payload_sha256, read_header, read_meta,
 )
 
 
@@ -20,16 +20,25 @@ class Check:
     title: str
     status: str  # "pass" | "fail" | "warn" | "skip"
     detail: str = ""
+    reused_from: str | None = None   # head of the earlier verification this result was taken from
 
 
 @dataclass
 class TableReport:
     material: str
     checks: list[Check] = field(default_factory=list)
+    payload_sha256: str | None = None
 
     @property
     def passed(self) -> bool:
         return all(c.status != "fail" for c in self.checks)
+
+    @classmethod
+    def from_json(cls, material: str, entry: dict, reused_from: str) -> "TableReport":
+        """Rebuild a report from a report.json table entry, marking every check as reused."""
+        checks = [Check(c["id"], c["title"], c["status"], c.get("detail", ""), reused_from)
+                  for c in entry.get("checks", [])]
+        return cls(material, checks, entry.get("payload_sha256"))
 
 
 def _stem(path: Path) -> str:
@@ -122,17 +131,28 @@ def check_block_integrity(path: Path) -> Check:
     return Check("V3", "block integrity", "fail", verdict)
 
 
+def payload_from_planes(digests: list[str]) -> str:
+    import hashlib
+
+    return hashlib.sha256("".join(digests).encode()).hexdigest()
+
+
 def recompute_stats(reader: BlockReader) -> dict:
     """The sidecar's statistics, recomputed from the payload the way
     SliceGen::stats_json computes them (src/core/generator/generator.cpp)."""
+    import hashlib
+
     import numpy as np
 
+    hashers = [hashlib.sha256() for _ in range(4)]
     out: dict = {"cells": {"invalid": {}, "unsolvable": {}},
                  "dtm_histogram": {}, "uniqueness": {}, "unset": 0}
     max_dtm = -1
     for s, stm in ((0, "wtm"), (1, "btm")):
         joint = np.zeros(65536, dtype=np.uint64)
         for d, c in zip(reader.plane_chunks(s), reader.plane_chunks(2 + s)):
+            hashers[s].update(d)
+            hashers[2 + s].update(c)
             dv = np.frombuffer(d, dtype=np.uint8).astype(np.uint32)
             cv = np.frombuffer(c, dtype=np.uint8).astype(np.uint32)
             joint += np.bincount(dv * 256 + cv, minlength=65536).astype(np.uint64)
@@ -149,33 +169,37 @@ def recompute_stats(reader: BlockReader) -> dict:
         if depths:
             max_dtm = max(max_dtm, depths[-1])
     out["max_dtm"] = max_dtm if max_dtm >= 0 else DTM_UNSOLVABLE
+    out["plane_sha256"] = [h.hexdigest() for h in hashers]
     return out
 
 
-def check_sidecar(path: Path) -> Check:
+def check_sidecar(path: Path) -> tuple[Check, str | None]:
+    """The V4 check and the table's payload hash (None when V4 could not decode it)."""
     title = "sidecar recomputed from the payload"
     try:
         h = read_header(path)
     except TableFormatError as exc:
-        return Check("V4", title, "fail", str(exc))
-    if h.marker:
-        return Check("V4", title, "skip", "marker table: no payload")
+        return Check("V4", title, "fail", str(exc)), None
     sc, why = _load_sidecar(path)
+    if h.marker:
+        payload = marker_payload_sha256(sc) if sc is not None else None
+        return Check("V4", title, "skip", "marker table: no payload"), payload
     if sc is None:
-        return Check("V4", title, "fail", why)
+        return Check("V4", title, "fail", why), None
     try:
         with BlockReader(path) as r:
             got = recompute_stats(r)
     except TableFormatError as exc:
-        return Check("V4", title, "fail", str(exc))
+        return Check("V4", title, "fail", str(exc)), None
+    payload = payload_from_planes(got["plane_sha256"])
     diffs = [k for k in ("cells", "dtm_histogram", "uniqueness", "max_dtm") if sc.get(k) != got[k]]
     if got["unset"]:
         diffs.append(f"{got['unset']} cells still DTM_UNSET")
     if h.max_dtm != got["max_dtm"]:
         diffs.append(f"header max_dtm {h.max_dtm}, payload {got['max_dtm']}")
     if diffs:
-        return Check("V4", title, "fail", "differs: " + ", ".join(diffs))
-    return Check("V4", title, "pass", f"{2 * h.plane_size:,} cells, max_dtm {got['max_dtm']}")
+        return Check("V4", title, "fail", "differs: " + ", ".join(diffs)), payload
+    return Check("V4", title, "pass", f"{2 * h.plane_size:,} cells, max_dtm {got['max_dtm']}"), payload
 
 
 def check_deepest(path: Path, tables: Path) -> Check:
@@ -215,3 +239,18 @@ def check_deepest(path: Path, tables: Path) -> Check:
         return Check("V5", title, "fail", "; ".join(bad[:10]))
     return Check("V5", title, "pass",
                  f"{len(sc.get('deepest', []))} deepest + {len(uniq)} deepest-unique positions")
+
+
+class MissingPublished(Exception):
+    def __init__(self, material: str):
+        super().__init__(material)
+        self.material = material
+
+
+def check_identical(payload: str | None, published: str, source: str = "the published table") -> Check:
+    title = "identical to the published table"
+    if payload is None:
+        return Check("V8", title, "fail", "payload unknown (V4 did not decode)")
+    if payload != published:
+        return Check("V8", title, "fail", f"content differs from {source}")
+    return Check("V8", title, "pass", f"identical to {source} (payload {payload[:12]}…)")

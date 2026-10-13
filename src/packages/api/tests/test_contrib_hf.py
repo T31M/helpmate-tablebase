@@ -374,6 +374,22 @@ def test_merge_by_copy_refuses_to_close_when_main_does_not_match_the_head():
     assert api.status_changes == [] and seen == []
 
 
+def test_merge_by_copy_without_close_commits_and_comments_but_leaves_the_pr_open():
+    api = _conflicting()
+    head = api.prs[2]["oids"][-1]
+    comments = []
+    api.comment_discussion = lambda repo, num, text, repo_type=None: comments.append((num, text, repo_type))
+    seen = []
+    url = Hub("o/d", api=api).merge_by_copy(
+        2, head, ["KRRvkqq.hm"], message="Add KRRvkqq", comment=_comment, close=False,
+        on_commit=lambda ref, already: seen.append((ref, already)))
+    (msg, ops), = api.commit_ops
+    assert [o.src_path_in_repo for o in ops] == ["KRRvkqq.hm"]
+    assert api.commits[api.main][1]["KRRvkqq.hm"] == KRR["KRRvkqq.hm"]
+    assert seen == [(url, False)] and comments == [(2, f"Merged as {url}. Thank you!", "dataset")]
+    assert api.status_changes == [] and api.prs[2]["status"] == "open"
+
+
 def test_close_and_status_of_a_pr():
     api = _conflicting()
     hub = Hub("o/d", api=api)

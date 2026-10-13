@@ -54,7 +54,8 @@ def _default_hub(repo_id: str):
     hub.fetch_manifest = fetch_manifest  # type: ignore[method-assign]
     return hub
 
-def main(argv: list[str] | None = None, hub_factory=_default_hub, gh_factory=None) -> int:
+def main(argv: list[str] | None = None, hub_factory=_default_hub, gh_factory=None,
+         git_factory=None) -> int:
     p = argparse.ArgumentParser("helpmate-tables")
     sub = p.add_subparsers(dest="cmd")
     for name in ("push", "pull"):
@@ -79,7 +80,8 @@ def main(argv: list[str] | None = None, hub_factory=_default_hub, gh_factory=Non
         return 2
     if a.cmd in contrib_cli.CONTRIB_COMMANDS:
         return contrib_cli.run(a, hub_factory=None if hub_factory is _default_hub
-                               else hub_factory, gh_factory=gh_factory)
+                               else hub_factory, gh_factory=gh_factory,
+                               git_factory=git_factory)
     tables = Path(a.tables)
     if not tables.is_dir():
         print(f"error: not a directory: {tables}", file=sys.stderr)

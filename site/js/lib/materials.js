@@ -34,7 +34,8 @@ export function mergeStatus(rows, status) {
   return rows.map((r) => {
     const s = st[r.material];
     const state = s ? s.state : r.done ? "done" : r.priority === null ? "not needed" : "open";
-    return { ...r, state, contributor: s ? s.contributor : null,
+    const producers = s && Array.isArray(s.producers) ? s.producers : s && s.contributor ? [s.contributor] : [];
+    return { ...r, state, contributor: s ? s.contributor : null, producers,
       hf_pr: s ? s.hf_pr : null, claim: s ? s.claim : null };
   });
 }
@@ -46,7 +47,8 @@ export function filterRows(rows, f) {
     (!on(f.state) || r.state === f.state) &&
     (!on(f.prio) || String(r.priority) === String(f.prio)) &&
     (!on(f.pawns) || String(r.pawns) === String(f.pawns)) &&
-    (!on(f.contributor) || r.contributor === f.contributor) &&
+    (!on(f.contributor) || r.contributor === f.contributor ||
+      (Array.isArray(r.producers) && r.producers.includes(f.contributor))) &&
     wildcardMatch(r.material, f.q));
 }
 
@@ -76,6 +78,13 @@ export function validStatus(s) {
   return STATES.every((k) => typeof s.counts.six[k] === "number" && Number.isFinite(s.counts.six[k]));
 }
 
+// "popeye37 · T31M" plus a mark when several people independently produced the table.
+export function contributorCell(r) {
+  const ps = Array.isArray(r.producers) && r.producers.length ? r.producers : r.contributor ? [r.contributor] : [];
+  const mark = ps.length > 1 ? ` <span class="reproduced" title="independently reproduced">✓ reproduced</span>` : "";
+  return ps.map(esc).join(" · ") + mark;
+}
+
 export function parseQuery(hash) {
   const i = (hash || "").indexOf("?");
   if (i < 0) return {};
@@ -103,7 +112,7 @@ export function contributorCards(status) {
        c.github ? `<a href="https://github.com/${encodeURIComponent(c.github)}">GitHub</a>` : ""]
         .filter(Boolean).join(" · ");
     return `<div class="card"><strong>${esc(c.display)}</strong>
-      <span>${Number(c.tables)} table${Number(c.tables) === 1 ? "" : "s"}${Number(c.six) ? `, ${Number(c.six)} with six men` : ""}</span>
+      <span>${Number(c.tables)} table${Number(c.tables) === 1 ? "" : "s"}${Number(c.six) ? `, ${Number(c.six)} with six men` : ""}${Number(c.reproduced) ? ` · ${Number(c.reproduced)} independently reproduced` : ""}</span>
       ${links ? `<span>${links}</span>` : ""}
       <a href="#/materials?contributor=${encodeURIComponent(c.display)}">their tables →</a></div>`;
   }).join("");

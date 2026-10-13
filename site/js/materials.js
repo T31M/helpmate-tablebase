@@ -1,5 +1,5 @@
 import { stipulation, humanBytes } from "./lib/solution.js";
-import { mergeStatus, filterRows, defaultOrder, sortMaterials, parseQuery, toQuery, priorityLabel, esc }
+import { mergeStatus, filterRows, defaultOrder, sortMaterials, parseQuery, toQuery, priorityLabel, esc, contributorCell }
   from "./lib/materials.js";
 
 const fmt = (n) => Number(n).toLocaleString("en-US");
@@ -19,7 +19,7 @@ export function initMaterials({ materials, corpus, status }) {
     ? `State as of ${status.generated_at.replace("T", " ").replace("Z", " UTC")}.`
     : "State unavailable — showing done from the last build; everything else as open.";
   const who = document.querySelector('#materials-controls [data-f="contributor"]');
-  const names = [...new Set(rows.map((r) => r.contributor).filter(Boolean))].sort();
+  const names = [...new Set(rows.flatMap((r) => (r.producers && r.producers.length ? r.producers : [r.contributor])).filter(Boolean))].sort();
   who.insertAdjacentHTML("beforeend", names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join(""));
   for (const el of controls()) el.addEventListener(el.tagName === "INPUT" ? "input" : "change", onChange);
   document.querySelectorAll("#materials-table th").forEach((th) => th.addEventListener("click", () => {
@@ -78,7 +78,7 @@ function render() {
     return `<tr class="state-${cls}">
       <td class="mono">${name}${statsLink}</td><td class="num">${r.pieces}</td>
       <td class="num">${priorityLabel(r.priority)}</td><td class="state-${cls}">${state}</td>
-      <td>${esc(r.contributor || "")}</td><td class="num">${r.ram_gib ? `${r.ram_gib} GiB` : ""}</td>
+      <td>${contributorCell(r)}</td><td class="num">${r.ram_gib ? `${r.ram_gib} GiB` : ""}</td>
       <td class="num">${r.done ? (marker ? "—" : stipulation(r.max_dtm)) : ""}</td>
       <td class="num">${stat(r.solvable, fmt)}</td><td class="num">${stat(r.unique, fmt)}</td>
       <td class="num">${stat(r.size_bytes, humanBytes)}</td></tr>`;

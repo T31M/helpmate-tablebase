@@ -15,7 +15,7 @@ def test_clean_tables_pass_v2_to_v5(compressed_tables):
         p = compressed_tables / f"{mat}.hm"
         assert check_header(p, V).status == "pass"
         assert check_block_integrity(p).status == "pass"
-        assert check_sidecar(p).status == "pass", check_sidecar(p).detail
+        assert check_sidecar(p)[0].status == "pass", check_sidecar(p)[0].detail
         assert check_deepest(p, compressed_tables).status == "pass"
 
 
@@ -55,7 +55,7 @@ def test_v4_catches_one_changed_dtm_cell(table_copy):
                 payload[i] += 2
                 return
     rewrite_payload(p, bump)
-    c = check_sidecar(p)
+    c = check_sidecar(p)[0]
     assert c.status == "fail" and "dtm_histogram" in c.detail
     assert check_block_integrity(p).status == "pass"   # V3 cannot see it
 
@@ -69,7 +69,7 @@ def test_v4_catches_a_changed_count_cell(table_copy):
                 payload[2 * ps + i] = 2 if payload[2 * ps + i] == 1 else 1
                 return
     rewrite_payload(p, bump)
-    c = check_sidecar(p)
+    c = check_sidecar(p)[0]
     assert c.status == "fail" and "uniqueness" in c.detail
 
 
@@ -86,7 +86,7 @@ def test_malformed_sidecar_fails_every_check_without_raising(table_copy):
     p = table_copy / "KQvk.hm"
     (table_copy / "KQvk.stats.json").write_text("{not json")
     assert check_header(p, V).status == "fail"
-    assert check_sidecar(p).status == "fail"
+    assert check_sidecar(p)[0].status == "fail"
     assert check_deepest(p, table_copy).status == "fail"
 
 
@@ -94,14 +94,14 @@ def test_missing_sidecar_fails_v4_and_v5_without_raising(table_copy):
     p = table_copy / "KQvk.hm"
     (table_copy / "KQvk.stats.json").unlink()
     assert check_header(p, V).status == "fail"
-    for c in (check_sidecar(p), check_deepest(p, table_copy)):
+    for c in (check_sidecar(p)[0], check_deepest(p, table_copy)):
         assert c.status == "fail" and "no .stats.json" in c.detail
 
 
 def test_v4_reports_a_bad_header_as_fail(table_copy):
     p = table_copy / "KQvk.hm"
     p.write_bytes(b"XXXX" + p.read_bytes()[4:])
-    assert check_sidecar(p).status == "fail"
+    assert check_sidecar(p)[0].status == "fail"
 
 
 def test_generator_versions_with_a_suffix_are_versions():

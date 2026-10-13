@@ -30,9 +30,18 @@ def _put(d: Path, stats: dict, size: int = 100, hm: bool = True) -> None:
 
 def _registry(tmp_path: Path) -> Registry:
     data = {"schema": 1,
-            "contributors": {"T31M": {"github": "T31M", "hf": "T31M", "display": "T31M"},
+            "contributors": {"popeye37": {"github": "popeye37", "hf": "popeye37", "display": "popeye37"},
+                             "T31M": {"github": "T31M", "hf": "T31M", "display": "T31M"},
                              "anon": {"github": "a", "hf": "a", "display": "A", "anonymous": True}},
             "tables": {"KPvk": {"contributor": "T31M", "hf_pr": 18, "merged": "2026-10-04"},
+                       "KRvk": {"contributor": "popeye37", "hf_pr": 19, "merged": "2026-10-05",
+                                "published_from": 19,
+                                "producers": [{"contributor": "popeye37", "hf_pr": 19, "date": None},
+                                              {"contributor": "T31M", "hf_pr": 20, "date": None}]},
+                       "KBvk": {"contributor": "maintainer", "hf_pr": None, "merged": None,
+                                "published_from": None,
+                                "producers": [{"contributor": "maintainer", "hf_pr": None, "date": None},
+                                              {"contributor": "T31M", "hf_pr": 22, "date": None}]},
                        "Kvkq": {"contributor": "anon", "hf_pr": 3, "merged": "2026-09-30"}}}
     p = tmp_path / "contributions.json"
     p.write_text(json.dumps(data))
@@ -70,7 +79,7 @@ def test_materials_rows(tmp_path):
                  "invalid_wtm": 10, "invalid_btm": 20, "unsolvable_wtm": 0, "unsolvable_btm": 5,
                  "solvable": 2000 - 30 - 5, "unique": 3 + 2 + 5, "size_bytes": 123,
                  "generator_version": "0.6.1", "contributor": "maintainer",
-                 "hf_pr": None, "merged": None}
+                 "producers_count": 1, "published_from_pr": None, "hf_pr": None, "merged": None}
     m = rows["Kvkq"]
     assert m["marker"] is True and m["max_dtm"] is None
     assert m["solvable"] == 0 and m["unique"] == 0 and m["contributor"] == "anonymous"
@@ -125,6 +134,11 @@ def test_parquet_round_trip_with_fixed_schema(tmp_path):
     assert mat.column("material").to_pylist() == ["KQvk", "Kvkq"]
     assert str(mat.schema.field("max_dtm").type) == "int16"
     assert str(mat.schema.field("merged").type) == "date32[day]"
+    assert str(mat.schema.field("producers_count").type) == "int8"
+    assert str(mat.schema.field("published_from_pr").type) == "int32"
+    names = mat.schema.names
+    assert names[names.index("contributor") + 1:names.index("contributor") + 3] == [
+        "producers_count", "published_from_pr"]
     assert mat.column("max_dtm").to_pylist() == [3, None]
     hist = pq.read_table(io.BytesIO(files[HISTOGRAM_PATH]))
     assert hist.num_rows == 6
@@ -169,3 +183,17 @@ def test_write_site_data_writes_stats_json(tmp_path):
     assert out / "stats.json" in written
     assert json.loads((out / "stats.json").read_text())["materials"]["KQvk"]["max_dtm"] == 3
     assert out / "stats.json" not in write_site_data(out, tables)   # unchanged → not rewritten
+
+
+def test_every_producer_is_in_the_row(tmp_path):
+    for m in ("KRvk", "KBvk", "KPvk"):
+        _put(tmp_path, dict(KQVK, material=m))
+    rows = {r["material"]: r for r in materials_rows(collect(tmp_path), _registry(tmp_path))}
+    r = rows["KRvk"]
+    assert (r["contributor"], r["producers_count"], r["published_from_pr"]) == ("popeye37, T31M", 2, 19)
+    assert (r["hf_pr"], r["merged"]) == (19, "2026-10-05")
+    b = rows["KBvk"]    # a reproduction of a maintainer table: nothing was published from a PR
+    assert (b["contributor"], b["producers_count"], b["published_from_pr"]) == ("maintainer, T31M", 2, None)
+    assert (b["hf_pr"], b["merged"]) == (None, None)
+    p = rows["KPvk"]    # an old single-producer entry
+    assert (p["contributor"], p["producers_count"], p["published_from_pr"]) == ("T31M", 1, 18)
