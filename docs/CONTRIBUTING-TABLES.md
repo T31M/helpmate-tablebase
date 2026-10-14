@@ -300,7 +300,8 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   a clean checkout on its first run. Steps: merge the HF PR, regenerate and
   push the manifest, move the files into `--tables`, open a docs PR
   (`contributions.json`, the site's materials data, README and card figures, CHANGELOG,
-  all-contributors) and wait for CI before squash-merging it, upload the dataset
+  all-contributors) and wait for the required CI checks (not the informational coverage
+  job) before squash-merging it, upload the dataset
   card once that PR is merged (together with the statistics,
   `stats/materials.parquet` and `stats/histogram.parquet`, checked against the
   manifest; skipped with a message if `--tables` is incomplete), then comment on and close the finished claims. It

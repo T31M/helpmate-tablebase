@@ -607,8 +607,35 @@ def test_branch_cleanup_tolerates_branches_already_gone(tmp_path):
     r = Runner(["ci"], fail={tuple(PUSH_DELETE): "error: unable to delete 'br': remote ref does not exist",
                              ("git", "branch", "-D"): "error: branch 'br' not found."})
     Git(tmp_path, runner=r, sleep=lambda s: None).wait_and_merge("u", "br")
-    r = Runner(["ci"], fail={tuple(PUSH_DELETE): "fatal: could not read from remote"})
-    with pytest.raises(subprocess.CalledProcessError):
+    r = Runner(["ci"], fail={tuple(PUSH_DELETE): "fatal: could not read from remote",
+                             ("git", "ls-remote"): "fatal: could not read from remote"})
+    with pytest.raises(subprocess.CalledProcessError, match="could not read from remote"):
+        Git(tmp_path, runner=r, sleep=lambda s: None).wait_and_merge("u", "br")
+    assert ["git", "branch", "-D", "br"] not in r.calls
+
+
+def test_branch_cleanup_tolerates_losing_the_race_with_githubs_own_delete(tmp_path):
+    """GitHub deletes a merged PR's branch itself; a delete racing it failed with a message other
+    than "remote ref does not exist" and stopped accept 2b (2026-10-13). origin decides."""
+    from helpmate_server.contrib.accept import Git
+    r = Runner(["ci"], fail={tuple(PUSH_DELETE): "! [remote rejected] br (cannot lock ref)"})
+    Git(tmp_path, runner=r, sleep=lambda s: None).wait_and_merge("u", "br")
+    assert ["git", "ls-remote", "--heads", "origin", "br"] in r.calls
+    assert r.calls[-1] == ["git", "branch", "-D", "br"]
+
+
+def test_branch_cleanup_stops_when_the_branch_is_still_on_origin(tmp_path):
+    import subprocess
+    from helpmate_server.contrib.accept import Git
+
+    class Present(Runner):
+        def __call__(self, args, **kw):
+            done = super().__call__(args, **kw)
+            if args[:2] == ["git", "ls-remote"]:
+                done.stdout = "0123abcd\trefs/heads/br\n"
+            return done
+    r = Present(["ci"], fail={tuple(PUSH_DELETE): "! [remote rejected] br (permission denied)"})
+    with pytest.raises(subprocess.CalledProcessError, match="permission denied"):
         Git(tmp_path, runner=r, sleep=lambda s: None).wait_and_merge("u", "br")
 
 
@@ -698,6 +725,7 @@ def test_wait_and_merge_polls_until_checks_are_reported(tmp_path):
     assert r.slept == 2
     watch = next(c for c in r.calls if "--watch" in c)
     assert watch[:4] == ["gh", "pr", "checks", "u"]
+    assert "--required" in watch    # the informational coverage job (~50 min) must not block
     assert r.calls.index(watch) < r.calls.index(["gh", "pr", "merge", "u", "--squash"])
 
 

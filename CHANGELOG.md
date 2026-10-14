@@ -165,6 +165,12 @@ bumps may change behavior).
   empty.
 
 ### Fixed
+- `helpmate-tables accept` and `pages`: the docs PR is merged once the checks branch protection
+  requires have passed; the informational coverage job (~50 minutes) keeps running on the PR
+  but no longer holds up the merge.
+- `helpmate-tables accept` and `pages`: deleting the merged docs PR's branch no longer stops the
+  run when it races GitHub's own automatic delete; origin is asked whether the branch is gone,
+  and a real failure now shows git's message.
 - `helpmate-tables accept`: a dataset PR merged on the Hub by hand after its passing
   verification, at the verified head, is taken as merged and the run carries on (manifest,
   files, credits) instead of stopping with "PR #N is merged". A hand-merged PR that accept
