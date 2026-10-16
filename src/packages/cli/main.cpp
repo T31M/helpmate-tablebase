@@ -629,18 +629,25 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
         // which is the whole point of the format on a --max infinity scan.
         std::cout << set.jsonl_header();
         size_t n = 0, unavailable = 0;
+        // Each hit is probed, enriched and formatted where the scan found it
+        // (on its worker, next to the blocks that worker just decompressed);
+        // this thread only writes the records in order. The first character
+        // says whether the hit could not be annotated, for the note below.
         if (maxn > 0)
             tb.mine(
                 *m, filter,
-                [&](const std::string& fen) {
-                    Hit h = set.make_hit(fen);
-                    set.enrich(h, facets);
-                    if (!h.unavailable.empty()) ++unavailable;
-                    std::cout << set.jsonl_record(h, facets);
+                [&](const std::string& prepared) {
+                    if (prepared[0] == '1') ++unavailable;
+                    std::cout.write(prepared.data() + 1, (std::streamsize)prepared.size() - 1);
                     ++n;
                     return (int)n < maxn;
                 },
-                &skipped, threads);
+                &skipped, threads,
+                [&](const Tablebase& wtb, const std::string& fen) {
+                    Hit h = set.make_hit(wtb, fen);
+                    set.enrich(wtb, h, facets);
+                    return (h.unavailable.empty() ? "0" : "1") + set.jsonl_record(h, facets);
+                });
         set.set_skipped_saturated(skipped);
         std::cout << set.jsonl_footer(n);
         if (skipped) note_skipped(skipped);

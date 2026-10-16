@@ -37,10 +37,12 @@ void MineSet::set_threads(int threads) {
     workers_.reset();  // rebuilt for the new count on first use
 }
 
-Hit MineSet::make_hit(const std::string& fen) const {
+Hit MineSet::make_hit(const std::string& fen) const { return make_hit(*tb_, fen); }
+
+Hit MineSet::make_hit(const Tablebase& tb, const std::string& fen) const {
     Hit h;
     h.fen = fen;
-    if (auto p = tb_->probe(fen)) {
+    if (auto p = tb.probe(fen)) {
         h.dtm = p->dtm;
         h.count = p->count;
     }
@@ -49,11 +51,13 @@ Hit MineSet::make_hit(const std::string& fen) const {
 
 void MineSet::add(const std::string& fen) { hits_.push_back(make_hit(fen)); }
 
-void MineSet::enrich(Hit& h, Facets f) const {
-    if (f.themes) ensure_themes(h);
+void MineSet::enrich(Hit& h, Facets f) const { enrich(*tb_, h, f); }
+
+void MineSet::enrich(const Tablebase& tb, Hit& h, Facets f) const {
+    if (f.themes) themes_on(tb, h);
     if (f.solutions) {
-        ensure_solutions(h);
-        ensure_shape(h);
+        solutions_on(tb, h);
+        shape_on(tb, h);
     }
 }
 

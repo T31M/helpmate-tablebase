@@ -296,7 +296,7 @@ struct Tablebase::MineScan {
 
 void Tablebase::mine(const Material& m, const MineFilter& f,
                      const std::function<bool(const std::string&)>& cb, uint64_t* skipped_saturated,
-                     int threads) const {
+                     int threads, const Prepare& prepare) const {
     const Slice* s = load(m);
     if (!s) throw MissingTableError("no table for " + m.name());
     Color stm = (f.dtm % 2) ? Color::White : Color::Black;  // parity invariant: wtm dtm odd, btm dtm even
@@ -339,7 +339,11 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
                                                    uint64_t{1} << 12, uint64_t{1} << 20);
     const uint64_t segments = (plane_cells + kSegment - 1) / kSegment;
     if (threads <= 1 || segments <= 1) {
-        mine_range(q, 0, plane_cells, cb, skipped_saturated);
+        if (!prepare) mine_range(q, 0, plane_cells, cb, skipped_saturated);
+        else
+            mine_range(
+                q, 0, plane_cells, [&](const std::string& fen) { return cb(prepare(*this, fen)); },
+                skipped_saturated);
         return;
     }
 
@@ -382,7 +386,7 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
                 own.mine_range(
                     q, begin, std::min(plane_cells, begin + kSegment),
                     [&](const std::string& fen) {
-                        seg.hits.emplace_back(fen, seg.skipped);
+                        seg.hits.emplace_back(prepare ? prepare(own, fen) : fen, seg.skipped);
                         return !stop.load();
                     },
                     &seg.skipped);

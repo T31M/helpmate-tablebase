@@ -57,6 +57,11 @@ public:
     // one.
     Hit make_hit(const std::string& fen) const;
     void enrich(Hit& h, Facets f) const;
+    // The same against another Tablebase on the same tables -- a scan
+    // worker's, so a streamed hit is probed and enriched where it was found.
+    // Safe to call concurrently: they touch only `h` and the given Tablebase.
+    Hit make_hit(const Tablebase& tb, const std::string& fen) const;
+    void enrich(const Tablebase& tb, Hit& h, Facets f) const;
     const std::vector<Hit>& hits() const { return hits_; }
     // Mutable access to one hit, so a caller can enrich it IN the set (the
     // cache) instead of enriching a copy. Throws std::out_of_range.

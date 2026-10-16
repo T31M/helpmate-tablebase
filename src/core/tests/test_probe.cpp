@@ -484,3 +484,40 @@ TEST_CASE("mine on compressed tables with one small shared cache matches the raw
     }
     CHECK(shared.probe("8/7k/5K2/8/8/8/8/6Q1 b - - 0 1")->count == 4);
 }
+
+TEST_CASE("mine's prepare hook gives the single-threaded results on any thread count") {
+    Tablebase tb(gen_dir());
+    const Material m = *Material::parse("KQvk");
+    const MineFilter f{.dtm = 4};
+    auto run = [&](int threads, int cap, bool* saw_other_tb) {
+        std::vector<std::string> out;
+        uint64_t skipped = 0;
+        tb.mine(
+            m, f,
+            [&](const std::string& s) {
+                if ((int)out.size() >= cap) return false;
+                out.push_back(s);
+                return (int)out.size() < cap;
+            },
+            &skipped, threads,
+            [&](const Tablebase& wtb, const std::string& fen) {
+                if (&wtb != &tb && saw_other_tb) *saw_other_tb = true;
+                auto p = wtb.probe(fen);
+                return fen + "|" + std::to_string(p ? p->count : -1);
+            });
+        return out;
+    };
+    bool other = false;
+    auto full = run(1, 1 << 30, &other);
+    REQUIRE(full.size() > 100);
+    CHECK_FALSE(other);  // one thread: prepare runs with *this
+    for (int cap : {0, 1, 7, (int)full.size() / 2, 1 << 30}) {
+        auto one = run(1, cap, nullptr);
+        for (int threads : {2, 3, 8}) {
+            INFO("threads " << threads << " cap " << cap);
+            bool worker = false;
+            CHECK(run(threads, cap, &worker) == one);
+            if (cap > 0) CHECK(worker);  // several threads: each worker's own Tablebase
+        }
+    }
+}

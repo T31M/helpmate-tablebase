@@ -130,8 +130,17 @@ public:
     // `cb` still runs only on the calling thread, in cell order, and sees exactly
     // the FENs -- and `skipped_saturated` exactly the tally -- that one thread
     // would give it.
+    //
+    // `prepare`, if given, turns each hit's FEN into what `cb` receives, and
+    // runs where the hit was found: on the worker, with the worker's own
+    // Tablebase (on the calling thread with *this when threads <= 1). It lets
+    // per-hit work (probing, enriching, formatting a --jsonl record) run in
+    // parallel, next to the blocks the scan just decompressed. It must be
+    // safe to call concurrently, and may run for a few hits past the one at
+    // which `cb` stops the scan; their results are dropped.
+    using Prepare = std::function<std::string(const Tablebase& tb, const std::string& fen)>;
     void mine(const Material& m, const MineFilter& f, const std::function<bool(const std::string&)>& cb,
-              uint64_t* skipped_saturated = nullptr, int threads = 1) const;
+              uint64_t* skipped_saturated = nullptr, int threads = 1, const Prepare& prepare = nullptr) const;
     // Theme names this position shows. CLI, bindings and API all route here,
     // so they cannot drift apart; the ThemeInput itself is built in exactly
     // one place, with_theme_input (private, below), shared with shows_theme.
