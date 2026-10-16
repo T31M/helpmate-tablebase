@@ -1,9 +1,15 @@
 #include "probe/mine_set.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <climits>
+#include <condition_variable>
+#include <exception>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
+#include <thread>
 
 #include "chess/types.h"
 #include "themes/registry.h"
@@ -21,6 +27,15 @@ std::vector<std::string> non_parametric(const std::vector<std::string>& names) {
 
 MineSet::MineSet(const Tablebase& tb, Material m, MineFilter f, int max)
     : tb_(&tb), m_(std::move(m)), f_(std::move(f)), max_(max) {}
+
+struct MineSet::Workers {
+    std::vector<std::unique_ptr<Tablebase>> tbs;
+};
+
+void MineSet::set_threads(int threads) {
+    threads_ = std::max(threads, 1);
+    workers_.reset();  // rebuilt for the new count on first use
+}
 
 Hit MineSet::make_hit(const std::string& fen) const {
     Hit h;
@@ -68,40 +83,117 @@ void MineSet::guarded(Hit& h, F&& f) const {
     }
 }
 
-void MineSet::ensure_shape(Hit& h) const {
+void MineSet::shape_on(const Tablebase& tb, Hit& h) const {
     if (h.shape) return;
-    guarded(h, [&] { h.shape = tb_->solution_shape(h.fen); });
+    guarded(h, [&] { h.shape = tb.solution_shape(h.fen); });
 }
 
-void MineSet::ensure_themes(Hit& h) const {
+void MineSet::themes_on(const Tablebase& tb, Hit& h) const {
     if (h.themes) return;
-    guarded(h, [&] { h.themes = non_parametric(tb_->themes_of(h.fen, enum_cap(h))); });
+    guarded(h, [&] { h.themes = non_parametric(tb.themes_of(h.fen, enum_cap(h))); });
 }
 
-void MineSet::ensure_solutions(Hit& h) const {
+void MineSet::solutions_on(const Tablebase& tb, Hit& h) const {
     if (h.solutions) return;
-    guarded(h, [&] { h.solutions = tb_->lines(h.fen, enum_cap(h)); });
+    guarded(h, [&] { h.solutions = tb.lines(h.fen, enum_cap(h)); });
+}
+
+void MineSet::ensure_shape(Hit& h) const { shape_on(*tb_, h); }
+void MineSet::ensure_themes(Hit& h) const { themes_on(*tb_, h); }
+void MineSet::ensure_solutions(Hit& h) const { solutions_on(*tb_, h); }
+
+template <class Need, class Work>
+void MineSet::for_each_needing(Need&& need, Work&& work, const Progress& progress) {
+    std::vector<size_t> todo;
+    for (size_t i = 0; i < hits_.size(); ++i)
+        if (need(hits_[i])) todo.push_back(i);
+    if (todo.empty()) return;
+    const size_t total = hits_.size();
+    if (threads_ <= 1 || todo.size() == 1) {
+        for (size_t i : todo) {
+            work(*tb_, i);
+            if (progress) progress(i + 1, total);
+        }
+        return;
+    }
+
+    // One Tablebase per worker (own readers and block caches, no shared
+    // lock), as in Tablebase::mine; kept across calls so caches stay warm.
+    if (!workers_) {
+        workers_ = std::make_shared<Workers>();
+        const size_t share =
+            tb_->cache_bytes() ? std::max<size_t>(tb_->cache_bytes() / threads_, 1 << 16) : 0;
+        for (int w = 0; w < threads_; ++w)
+            workers_->tbs.push_back(std::make_unique<Tablebase>(tb_->dir(), share));
+    }
+    const size_t n = std::min<size_t>(workers_->tbs.size(), todo.size());
+    // Workers claim contiguous chunks, not single hits: a set is in table
+    // order, so neighbouring hits share table blocks, and one worker reading
+    // a run of them finds those blocks in its own cache. Handing neighbours
+    // to different workers made each decompress the same blocks again (5.5x
+    // the CPU of one thread on 20,000 KBvkqrn hits). Four chunks per worker
+    // still balance an uneven tail; 16 were as fast with 15% more CPU.
+    const size_t chunk = std::max<size_t>(1, todo.size() / (4 * n));
+    std::atomic<size_t> next{0}, finished{0};
+    std::atomic<bool> failed{false};
+    std::exception_ptr error;
+    std::mutex mu;
+    std::condition_variable cv;
+    std::vector<std::thread> pool;
+    for (size_t w = 0; w < n; ++w)
+        pool.emplace_back([&, w] {
+            const Tablebase& tb = *workers_->tbs[w];
+            for (size_t first; !failed.load() && (first = next.fetch_add(chunk)) < todo.size();) {
+                const size_t last = std::min(first + chunk, todo.size());
+                for (size_t k = first; k < last && !failed.load(); ++k) {
+                    try {
+                        work(tb, todo[k]);
+                    } catch (...) {
+                        std::lock_guard lk(mu);
+                        if (!error) error = std::current_exception();
+                        failed = true;
+                    }
+                    if (finished.fetch_add(1) + 1 == todo.size()) {
+                        std::lock_guard lk(mu);
+                        cv.notify_all();
+                    }
+                }
+            }
+        });
+    // Progress from this thread only: the callback may write to a stream.
+    // `done` counts the hits that needed no work as already done.
+    const size_t skipped = total - todo.size();
+    size_t reported = 0;
+    {
+        std::unique_lock lk(mu);
+        while (!failed.load() && finished.load() < todo.size()) {
+            cv.wait_for(lk, std::chrono::milliseconds(100));
+            const size_t now = finished.load();
+            if (progress && now > reported && now < todo.size()) {
+                reported = now;
+                lk.unlock();
+                progress(skipped + now, total);
+                lk.lock();
+            }
+        }
+    }
+    for (auto& t : pool) t.join();
+    if (error) std::rethrow_exception(error);
+    if (progress) progress(total, total);
 }
 
 void MineSet::ensure_themes_all(const Progress& progress) {
-    size_t done = 0;
-    for (auto& h : hits_) {
-        ++done;
-        if (h.themes || !h.unavailable.empty()) continue;
-        ensure_themes(h);
-        if (progress) progress(done, hits_.size());
-    }
+    for_each_needing([](const Hit& h) { return !h.themes && h.unavailable.empty(); },
+                     [&](const Tablebase& tb, size_t i) { themes_on(tb, hits_[i]); }, progress);
 }
 
 void MineSet::ensure_solutions_all(const Progress& progress) {
-    size_t done = 0;
-    for (auto& h : hits_) {
-        ++done;
-        if ((h.solutions && h.shape) || !h.unavailable.empty()) continue;
-        ensure_solutions(h);
-        ensure_shape(h);
-        if (progress) progress(done, hits_.size());
-    }
+    for_each_needing([](const Hit& h) { return !(h.solutions && h.shape) && h.unavailable.empty(); },
+                     [&](const Tablebase& tb, size_t i) {
+                         solutions_on(tb, hits_[i]);
+                         shape_on(tb, hits_[i]);
+                     },
+                     progress);
 }
 
 bool MineSet::all_have_themes() const {
@@ -119,6 +211,8 @@ size_t MineSet::unavailable_count() const {
 MineSet MineSet::empty_like() const {
     MineSet s(*tb_, m_, f_, max_);
     s.skipped_ = skipped_;
+    s.threads_ = threads_;
+    s.workers_ = workers_;
     return s;
 }
 
@@ -143,16 +237,16 @@ MineSet MineSet::with_theme(const std::string& name, bool negate, const Progress
         });
     }
     // Parametric: the registry's own eval per hit; no cache, the value differs per query.
+    std::vector<char> shows(hits_.size(), 0);
+    for_each_needing([](const Hit& h) { return h.unavailable.empty(); },
+                     [&](const Tablebase& tb, size_t i) {
+                         guarded(hits_[i],
+                                 [&] { shows[i] = tb.shows_theme(hits_[i].fen, *r, enum_cap(hits_[i])); });
+                     },
+                     progress);
     MineSet out = empty_like();
-    size_t done = 0;
-    for (auto& h : hits_) {
-        ++done;
-        if (!h.unavailable.empty()) continue;
-        bool shows = false;
-        guarded(h, [&] { shows = tb_->shows_theme(h.fen, *r, enum_cap(h)); });
-        if (h.unavailable.empty() && shows != negate) out.hits_.push_back(h);
-        if (progress) progress(done, hits_.size());
-    }
+    for (size_t i = 0; i < hits_.size(); ++i)
+        if (hits_[i].unavailable.empty() && (shows[i] != 0) != negate) out.hits_.push_back(hits_[i]);
     return out;
 }
 
@@ -161,12 +255,14 @@ MineSet MineSet::with_count(int n) {
 }
 
 MineSet MineSet::with_starts(int n) {
-    for (auto& h : hits_) ensure_shape(h);
+    for_each_needing([](const Hit& h) { return !h.shape && h.unavailable.empty(); },
+                     [&](const Tablebase& tb, size_t i) { shape_on(tb, hits_[i]); }, nullptr);
     return filtered([&](const Hit& h) { return h.shape->exhaustive && h.shape->starts == n; });
 }
 
 MineSet MineSet::with_ends(int n) {
-    for (auto& h : hits_) ensure_shape(h);
+    for_each_needing([](const Hit& h) { return !h.shape && h.unavailable.empty(); },
+                     [&](const Tablebase& tb, size_t i) { shape_on(tb, hits_[i]); }, nullptr);
     return filtered([&](const Hit& h) { return h.shape->exhaustive && h.shape->ends == n; });
 }
 

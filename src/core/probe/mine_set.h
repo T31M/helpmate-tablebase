@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <ostream>
@@ -66,12 +67,21 @@ public:
     int max() const { return max_; }  // INT_MAX = infinity
     uint64_t skipped_saturated() const { return skipped_; }
     void set_skipped_saturated(uint64_t n) { skipped_ = n; }
+    // Enrich on `threads` workers (default 1: on the calling thread, as
+    // before). Each worker opens its own Tablebase on the same directory,
+    // with an equal share of the set's Tablebase's cache budget, so no lock
+    // is shared; the workers are created on first use and kept, by this set
+    // and every set derived from it, so their caches stay warm across
+    // narrowings. Results do not depend on the thread count.
+    void set_threads(int threads);
 
     // Enrichment: idempotent, cached in the hit. A MissingTableError marks
     // the hit unavailable (its text) instead of propagating; a hit already
-    // marked is skipped. Progress, when given, is called after every hit
-    // that actually needed work, with (done, total) over the whole set, and
-    // never when there was nothing to do.
+    // marked is skipped. Progress, when given, is called with (done, total)
+    // over the whole set while hits that need work are processed -- after
+    // every one on one thread, periodically on several -- ending with
+    // (total, total), and never when there was nothing to do. It always runs
+    // on the calling thread.
     void ensure_shape(Hit& h) const;
     void ensure_themes(Hit& h) const;
     void ensure_solutions(Hit& h) const;
@@ -120,6 +130,16 @@ private:
     int enum_cap(const Hit& h) const;  // COUNT_SAT -> 100, else the hit's own count
     template <class F>
     void guarded(Hit& h, F&& f) const;  // runs f, marks unavailable on MissingTableError
+    // The ensure_* above, against a given Tablebase (a worker's or tb_).
+    void shape_on(const Tablebase& tb, Hit& h) const;
+    void themes_on(const Tablebase& tb, Hit& h) const;
+    void solutions_on(const Tablebase& tb, Hit& h) const;
+    // Runs work(tb, index) for every hit index where need(hit) holds, on
+    // threads_ workers or inline, with the progress contract described at
+    // ensure_themes_all. Each call writes only its own hit (or slot).
+    template <class Need, class Work>
+    void for_each_needing(Need&& need, Work&& work, const Progress& progress);
+    struct Workers;                     // the worker Tablebases; shared by derived sets
     MineSet empty_like() const;         // same tb/material/filter/max/skipped, no hits
     template <class Pred>
     MineSet filtered(Pred&& keep) const;
@@ -133,6 +153,8 @@ private:
     int max_;
     uint64_t skipped_ = 0;
     std::vector<Hit> hits_;
+    int threads_ = 1;
+    std::shared_ptr<Workers> workers_;
 };
 
 }  // namespace hm

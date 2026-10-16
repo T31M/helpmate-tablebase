@@ -181,6 +181,56 @@ TEST_CASE("count/starts/ends narrowing", "[mine_set]") {
     REQUIRE(g.with_starts(3).size() == 0);
 }
 
+TEST_CASE("enrichment on several threads gives the single-threaded results", "[mine_set]") {
+    Tablebase tb(gen_kqvk());
+    auto fens = [](const MineSet& s) {
+        std::vector<std::string> out;
+        for (const auto& h : s.hits()) out.push_back(h.fen);
+        return out;
+    };
+    auto one = kqvk_set(tb, 4);
+    auto many = kqvk_set(tb, 4);
+    many.set_threads(4);
+    REQUIRE(one.size() > 100);
+
+    std::vector<std::pair<size_t, size_t>> ticks;
+    auto mirror_many =
+        many.with_theme("mirror", false, [&](size_t d, size_t t) { ticks.emplace_back(d, t); });
+    REQUIRE_FALSE(ticks.empty());
+    REQUIRE(ticks.back() == std::pair<size_t, size_t>{many.size(), many.size()});
+    for (const auto& [d, t] : ticks) REQUIRE(d <= t);
+    ticks.clear();
+    many.ensure_themes_all([&](size_t d, size_t t) { ticks.emplace_back(d, t); });
+    REQUIRE(ticks.empty());  // nothing left to do: no callback at all
+
+    CHECK(fens(mirror_many) == fens(one.with_theme("mirror", false)));
+    CHECK(fens(many.with_theme("mirror", true)) == fens(one.with_theme("mirror", true)));
+    CHECK(fens(many.with_theme("promotions:q", true)) == fens(one.with_theme("promotions:q", true)));
+    // A derived set keeps the thread count and the workers.
+    CHECK(fens(mirror_many.with_ends(1)) == fens(one.with_theme("mirror", false).with_ends(1)));
+    CHECK(fens(many.with_starts(1)) == fens(one.with_starts(1)));
+    CHECK(many.theme_histogram() == one.theme_histogram());
+    MineSet::Facets all{.themes = true, .solutions = true};
+    CHECK(many.to_json(all) == one.to_json(all));
+
+    // A missing table still marks the hit instead of failing the batch.
+    auto empty = (std::filesystem::temp_directory_path() / "hm_mine_set_empty_mt").string();
+    std::filesystem::create_directories(empty);
+    Tablebase none(empty);
+    MineSet s(none, *Material::parse("KQvk"), MineFilter{.dtm = 2}, 10);
+    for (const char* f : {kGolden, kFirst, kSecond}) {
+        Hit h;
+        h.fen = f;
+        h.dtm = 2;
+        h.count = 1;
+        s.add(h);
+    }
+    s.set_threads(3);
+    s.ensure_themes_all();
+    CHECK(s.unavailable_count() == 3);
+    CHECK(s.with_theme("mirror", true).size() == 0);
+}
+
 TEST_CASE("theme_histogram lists every non-parametric theme in registry order", "[mine_set]") {
     Tablebase tb(gen_kqvk());
     auto s = kqvk_set(tb, 2, 50);

@@ -620,6 +620,7 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
         return 0;
     }
     MineSet set(tb, *m, filter, maxn);
+    set.set_threads(threads);  // enrichment (--themes/--solutions/--json, the shell) on the same workers
     MineSet::Facets facets{out.themes, out.solutions};
     if (out.jsonl && !out.interactive) {
         // JSON Lines streams: header, then each hit the moment the scan finds

@@ -93,6 +93,10 @@ public:
     // block-cache memory one fixed number, however many tables a query
     // touches. 0 keeps the per-table caches.
     explicit Tablebase(std::string dir, size_t cache_bytes = 0);
+    // What this Tablebase was opened with, so a caller can open more of the
+    // same kind (one per worker thread).
+    const std::string& dir() const { return dir_; }
+    size_t cache_bytes() const { return cache_bytes_; }
 
     struct Probe { int dtm; int count; bool flipped; };  // flipped: colors were swapped to match a slice
 
