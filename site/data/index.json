@@ -2304,9 +2304,105 @@
   "has_helpmate": true
  },
  {
+  "material": "KBBvkbp",
+  "pieces": 6,
+  "stipulation": "h#10",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
   "material": "KBBvknn",
   "pieces": 6,
   "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvknp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkpp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkqb",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkqn",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkqp",
+  "pieces": 6,
+  "stipulation": "h#10",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkqq",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkqr",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkrb",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 2,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkrn",
+  "pieces": 6,
+  "stipulation": "h#9",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkrp",
+  "pieces": 6,
+  "stipulation": "h#11",
+  "unique": 1,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KBBvkrr",
+  "pieces": 6,
+  "stipulation": "h#6.5",
   "unique": 3,
   "duals": 3,
   "has_helpmate": true
@@ -2600,11 +2696,155 @@
   "has_helpmate": true
  },
  {
+  "material": "KNvkbbb",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkbbn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkbbp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkbnn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkbnp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 2,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkbpp",
+  "pieces": 6,
+  "stipulation": "h#9",
+  "unique": 1,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
   "material": "KNvknnn",
   "pieces": 6,
   "stipulation": "h#8.5",
   "unique": 3,
   "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvknnp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvknpp",
+  "pieces": 6,
+  "stipulation": "h#9",
+  "unique": 2,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkppp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqbb",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqbn",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqbp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqnn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqnp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqpp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqqb",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqqn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqqp",
+  "pieces": 6,
+  "stipulation": "h#10.5",
+  "unique": 3,
+  "duals": 3,
   "has_helpmate": true
  },
  {
@@ -2614,6 +2854,686 @@
   "unique": 0,
   "duals": 0,
   "has_helpmate": false
+ },
+ {
+  "material": "KNvkqqr",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 2,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqrb",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqrn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqrp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkqrr",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 1,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrbb",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrbn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrbp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrnn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrnp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrpp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrrb",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrrn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrrp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KNvkrrr",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkbbb",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkbbn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkbbp",
+  "pieces": 6,
+  "stipulation": "h#10.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkbnn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkbnp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkbpp",
+  "pieces": 6,
+  "stipulation": "h#12.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvknnn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvknnp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvknpp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkppp",
+  "pieces": 6,
+  "stipulation": "h#11.5",
+  "unique": 2,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqbb",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 2,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqbn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 2,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqbp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqnn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqnp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqpp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqqb",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqqn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqqp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqqq",
+  "pieces": 6,
+  "stipulation": "h#8",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqqr",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqrb",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqrn",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 1,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqrp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkqrr",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrbb",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrbn",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrbp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrnn",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrnp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrpp",
+  "pieces": 6,
+  "stipulation": "h#9.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrrb",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrrn",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrrp",
+  "pieces": 6,
+  "stipulation": "h#8.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KPvkrrr",
+  "pieces": 6,
+  "stipulation": "h#7.5",
+  "unique": 2,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkbbb",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkbbn",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkbbp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkbnn",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkbnp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkbpp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 2,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvknnn",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvknnp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvknpp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkppp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqbb",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqbn",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqbp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqnn",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqnp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqpp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqqb",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqqn",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqqp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqqq",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 1,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqqr",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqrb",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqrn",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqrp",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkqrr",
+  "pieces": 6,
+  "stipulation": "h#5",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrbb",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrbn",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrbp",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrnn",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrnp",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrpp",
+  "pieces": 6,
+  "stipulation": "h#5.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrrb",
+  "pieces": 6,
+  "stipulation": "h#5",
+  "unique": 2,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrrn",
+  "pieces": 6,
+  "stipulation": "h#5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrrp",
+  "pieces": 6,
+  "stipulation": "h#5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KQvkrrr",
+  "pieces": 6,
+  "stipulation": "h#4.5",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
  },
  {
   "material": "KRBvkbb",
@@ -2971,6 +3891,286 @@
   "material": "KRRvkrr",
   "pieces": 6,
   "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkbbb",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkbbn",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkbbp",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkbnn",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkbnp",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkbpp",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvknnn",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvknnp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvknpp",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkppp",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqbb",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqbn",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqbp",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqnn",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqnp",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqpp",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqqb",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqqn",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 1,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqqp",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqqq",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqqr",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqrb",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqrn",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqrp",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 2,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkqrr",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrbb",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrbn",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrbp",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrnn",
+  "pieces": 6,
+  "stipulation": "h#6",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrnp",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrpp",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 1,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrrb",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrrn",
+  "pieces": 6,
+  "stipulation": "h#6.5",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrrp",
+  "pieces": 6,
+  "stipulation": "h#7",
+  "unique": 3,
+  "duals": 3,
+  "has_helpmate": true
+ },
+ {
+  "material": "KRvkrrr",
+  "pieces": 6,
+  "stipulation": "h#6.5",
   "unique": 3,
   "duals": 3,
   "has_helpmate": true

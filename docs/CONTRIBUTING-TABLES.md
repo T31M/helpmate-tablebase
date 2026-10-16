@@ -4,9 +4,9 @@ This project needs CPU and RAM more than it needs code.
 
 The corpus is **complete through five pieces** — all 220 five-piece classes,
 plus everything below them. At six pieces there are **<!-- contrib:six-total -->715<!-- /contrib --> material classes**, and
-**<!-- contrib:six-done -->254<!-- /contrib --> are done**, of which <!-- contrib:six-empty -->75<!-- /contrib --> are proven empty (marker
+**<!-- contrib:six-done -->306<!-- /contrib --> are done**, of which <!-- contrib:six-empty -->75<!-- /contrib --> are proven empty (marker
 tables: no helpmate exists in that class, so there is nothing to compute). The
-<!-- contrib:six-open -->461<!-- /contrib --> still to go are roughly six hundred
+<!-- contrib:six-open -->409<!-- /contrib --> still to go are roughly six hundred
 machine-days of work, and it is not going to come from one desk.
 
 If you have a machine with 32 GiB of RAM and a week where it would otherwise
@@ -17,16 +17,16 @@ idle, you can produce something nobody has ever computed.
 
 ## What is missing
 
-<!-- contrib:six-open -->461<!-- /contrib --> six-piece tables. Peak RAM equals the raw table size, because generation
+<!-- contrib:six-open -->409<!-- /contrib --> six-piece tables. Peak RAM equals the raw table size, because generation
 holds four bytes per cell resident:
 
 | pawns | tables missing | RAM needed | machine |
 | --- | --- | --- | --- |
-| **0** | **<!-- contrib:six-open-p0 -->191<!-- /contrib -->** | **28.9 GiB** | **32 GiB — the accessible tier** |
-| 3 | <!-- contrib:six-open-p3 -->24<!-- /contrib --> | 47.6 GiB | 64 GiB |
-| 4 | <!-- contrib:six-open-p4 -->4<!-- /contrib --> | 35.7 GiB | 64 GiB |
-| 2 | <!-- contrib:six-open-p2 -->78<!-- /contrib --> | 63.5 GiB | 96 GiB (64 is too tight) |
-| 1 | <!-- contrib:six-open-p1 -->164<!-- /contrib --> | 84.7 GiB | 96 GiB |
+| **0** | **<!-- contrib:six-open-p0 -->174<!-- /contrib -->** | **28.9 GiB** | **32 GiB — the accessible tier** |
+| 3 | <!-- contrib:six-open-p3 -->20<!-- /contrib --> | 47.6 GiB | 64 GiB |
+| 4 | <!-- contrib:six-open-p4 -->3<!-- /contrib --> | 35.7 GiB | 64 GiB |
+| 2 | <!-- contrib:six-open-p2 -->68<!-- /contrib --> | 63.5 GiB | 96 GiB (64 is too tight) |
+| 1 | <!-- contrib:six-open-p1 -->144<!-- /contrib --> | 84.7 GiB | 96 GiB |
 
 Start with the pawnless tier. It is the largest single group, it fits on
 ordinary hardware, and every table in it is 28.9 GiB raw — about 1–3 GiB once
@@ -300,7 +300,8 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   a clean checkout on its first run. Steps: merge the HF PR, regenerate and
   push the manifest, move the files into `--tables`, open a docs PR
   (`contributions.json`, the site's materials data, README and card figures, CHANGELOG,
-  all-contributors) and wait for CI before squash-merging it, upload the dataset
+  all-contributors) and wait for the required CI checks (not the informational coverage
+  job) before squash-merging it, upload the dataset
   card once that PR is merged (together with the statistics,
   `stats/materials.parquet` and `stats/histogram.parquet`, checked against the
   manifest; skipped with a message if `--tables` is incomplete), then comment on and close the finished claims. It

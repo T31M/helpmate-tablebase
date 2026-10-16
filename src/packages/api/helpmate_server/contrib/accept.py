@@ -83,6 +83,13 @@ def add_changelog_data(text: str, line: str) -> str:
     return text[:m.end()] + "\n### Data\n" + line + "\n" + text[m.end():]
 
 
+class GitFailed(subprocess.CalledProcessError):
+    """A failed git call whose message shows git's stderr (CalledProcessError's does not)."""
+
+    def __str__(self) -> str:
+        return f"{super().__str__()}\n{(self.stderr or '').strip()}"
+
+
 class MergeConflict(Exception):
     """The docs PR cannot be merged: main changed underneath it."""
 
@@ -185,7 +192,10 @@ class Git:
                     raise MergeConflict(url)
                 raise RuntimeError(f"no checks were reported for {url} after 2 minutes")
             # not captured: the maintainer watches CI progress in the terminal
-            self._runner(["gh", "pr", "checks", url, "--watch", "--fail-fast"], cwd=self.cwd, check=True)
+            # only the checks branch protection requires: the informational coverage job takes
+            # ~50 minutes and must not hold up the merge
+            self._runner(["gh", "pr", "checks", url, "--watch", "--fail-fast", "--required"],
+                         cwd=self.cwd, check=True)
             try:
                 self._run("gh", "pr", "merge", url, "--squash", env=_NO_GLOBAL)
             except subprocess.CalledProcessError as exc:
@@ -199,12 +209,20 @@ class Git:
                   "Conflicts with main; `helpmate-tables accept` is redoing this from the current main.")
 
     def _delete_branch(self, branch: str) -> None:
-        for args, gone in ((("git", "-c", "credential.helper=", "-c", _GH_CREDENTIALS,
-                             "push", "origin", "--delete", branch), "remote ref does not exist"),
-                           (("git", "branch", "-D", branch), "not found")):
-            r = self._run(*args, env=_NO_GLOBAL, check=False)
-            if r.returncode != 0 and gone not in r.stderr:
-                raise subprocess.CalledProcessError(r.returncode, list(args), r.stdout, r.stderr)
+        push = ("git", "-c", "credential.helper=", "-c", _GH_CREDENTIALS, "push", "origin", "--delete", branch)
+        r = self._run(*push, env=_NO_GLOBAL, check=False)
+        if (r.returncode != 0 and "remote ref does not exist" not in r.stderr
+                and not self._remote_branch_gone(branch)):
+            raise GitFailed(r.returncode, list(push), r.stdout, r.stderr)
+        r = self._run("git", "branch", "-D", branch, env=_NO_GLOBAL, check=False)
+        if r.returncode != 0 and "not found" not in r.stderr:
+            raise GitFailed(r.returncode, ["git", "branch", "-D", branch], r.stdout, r.stderr)
+
+    def _remote_branch_gone(self, branch: str) -> bool:
+        """GitHub deletes a merged PR's branch itself ("automatically delete head branches"); a
+        delete racing it fails with some other message, so ask origin whether the branch is gone."""
+        r = self._run("git", "ls-remote", "--heads", "origin", branch, env=_NO_GLOBAL, check=False)
+        return r.returncode == 0 and not r.stdout.strip()
 
     def back(self, ref: str) -> None:
         self._run("git", "switch", ref)
