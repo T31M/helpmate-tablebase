@@ -92,18 +92,58 @@ struct SubTables {
                                          std::to_string(si.size()) + " for " + s.name());
             t_.emplace(s.name(), std::pair(std::move(*r), std::move(si)));
         }
+        // Map nodes never move, so these pointers stay valid across later loads.
+        by_material_.clear();
+        for (auto& [name, table] : t_) {
+            Material mat = *Material::parse(name);
+            by_material_.push_back({mat.counts(), mat, &table});
+        }
     }
     // Each step is checked rather than assumed: only direct successors of the slice being
     // generated are loaded, and encode() is disengaged for positions no slice can hold (e.g.
     // adjacent kings), so an unexpected post-move position must fail loudly and locally.
     ValuePair lookup(const Material& m, const std::vector<PlacedPiece>& pp, Color stm) const {
-        auto it = t_.find(m.name());
-        if (it == t_.end())
-            throw GeneratorLookupError("no sub-table loaded for material " + m.name() +
-                                       " (only direct successors are loaded); position after move " +
-                                       describe_position(pp, stm));
-        auto& [rd, si] = it->second;
-        auto e = si.encode(pp);
+        return lookup_impl(m, pp, stm, false);
+    }
+
+private:
+    friend class SliceGen;
+
+    struct Loaded {
+        Material::Counts counts;
+        Material mat;
+        const std::pair<TableReader, SliceIndex>* table;
+    };
+    // A handful of direct successors: a linear scan beats building m.name()
+    // and searching the string-keyed map on every lookup.
+    std::vector<Loaded> by_material_;
+
+    // Generator hot path: material arrives packed from Board::pieces(out, counts).
+    ValuePair lookup_for_counts(const Material::Counts& c, const std::vector<PlacedPiece>& pp,
+                                Color stm) const {
+        for (auto& l : by_material_)
+            if (l.counts == c) return lookup_in(l, l.mat, pp, stm, true);
+        throw_not_loaded(Material::from_counts(c), pp, stm);
+    }
+
+    ValuePair lookup_impl(const Material& m, const std::vector<PlacedPiece>& pp, Color stm,
+                          bool material_is_known) const {
+        for (auto& l : by_material_)
+            if (l.mat == m) return lookup_in(l, m, pp, stm, material_is_known);
+        throw_not_loaded(m, pp, stm);
+    }
+
+    [[noreturn]] static void throw_not_loaded(const Material& m, const std::vector<PlacedPiece>& pp,
+                                              Color stm) {
+        throw GeneratorLookupError("no sub-table loaded for material " + m.name() +
+                                   " (only direct successors are loaded); position after move " +
+                                   describe_position(pp, stm));
+    }
+
+    ValuePair lookup_in(const Loaded& l, const Material& m, const std::vector<PlacedPiece>& pp, Color stm,
+                        bool material_is_known) const {
+        auto& [rd, si] = *l.table;
+        auto e = material_is_known ? si.encode_for_material(pp, m) : si.encode(pp);
         if (!e)
             throw GeneratorLookupError("position not encodable in sub-table " + m.name() +
                                        "; position after move " + describe_position(pp, stm));
@@ -121,7 +161,6 @@ public:
     void init_pass();
     bool scan_pass(int d);              // Task 10
     void run_all_passes();              // Task 10: scan until fixed point; sets max_dtm_
-    void count_sweep();                 // Task 12
     void finalize_and_write();          // Task 10 (stats extended in Task 13)
     nlohmann::json stats_json() const;  // Task 13
     // test accessors:
@@ -131,9 +170,10 @@ public:
     int max_dtm() const;
 
 private:
-    ValuePair lookup_epless(Board& b);  // Task 10: routes to own table or a sub-table
+    ValuePair lookup_epless(Board& b, std::vector<PlacedPiece>& piece_scratch);
 
     Material mat_;
+    Material::Counts mat_counts_;
     GenOptions opt_;
     SliceIndex idx_;
     uint64_t ps_;

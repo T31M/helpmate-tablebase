@@ -3,23 +3,37 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
 
 namespace hm {
 
-// A bounded LRU of decompressed blocks. Mutex-guarded because generation is
-// multi-threaded and a TableReader may be probed concurrently.
+// A bounded cache of decompressed blocks. Blocks are assigned to independent
+// LRU shards so concurrent TableReader probes need not all take one mutex.
 //
-// The cache never hands out a pointer into its storage. An entry can be
-// evicted by another thread the moment the lock is released, so any pointer
-// returned to a caller would be a use-after-free waiting to happen. There is
-// therefore no lifetime rule to document: every access copies the byte it
-// needs out while holding the lock.
+// The cache never hands out a raw pointer into its storage: an entry can be
+// evicted by another thread the moment the lock is released. byte_at and
+// read_range copy the bytes out while holding the lock; block() hands out a
+// shared owner of the immutable decompressed block, which stays valid after
+// the cache evicts it.
 class BlockCache {
 public:
+    using Block = std::vector<uint8_t>;
+
     BlockCache(size_t capacity_blocks, uint32_t block_size);
+
+    // Distinct for every BlockCache this process creates, never reused, so a
+    // (id, index) pair names one block's bytes for the life of the process.
+    uint64_t id() const { return id_; }
+
+    // The decompressed block `index` (length `len`), shared and immutable.
+    // Same fill/miss contract and hit/fill accounting as read_range. A caller
+    // may keep it past eviction to read without locking; while it does, the
+    // block's memory is outside this cache's capacity.
+    std::shared_ptr<const Block> block(uint64_t index, size_t len,
+                                       const std::function<void(uint8_t*, size_t)>& fill);
 
     // Returns one byte from block `index` at `offset`, calling `fill(dst,
     // len)` to decompress the block only on a miss. `fill` is invoked without
@@ -46,16 +60,28 @@ public:
 private:
     struct Entry {
         uint64_t index;
-        std::vector<uint8_t> data;
+        std::shared_ptr<const Block> data;
     };
 
+    // Looks up or fills block `index` and returns it; the shared core of
+    // read_range and block().
+    std::shared_ptr<const Block> acquire(uint64_t index, size_t len,
+                                         const std::function<void(uint8_t*, size_t)>& fill);
+
+    struct alignas(64) Shard {
+        size_t cap = 0;
+        mutable std::mutex mu;
+        std::list<Entry> lru;  // front = most recent within this shard
+        std::unordered_map<uint64_t, std::list<Entry>::iterator> map;
+        size_t fills = 0;
+        size_t hits = 0;
+    };
+
+    uint64_t id_;
     size_t cap_;
     uint32_t block_size_;
-    mutable std::mutex mu_;
-    std::list<Entry> lru_;  // front = most recent
-    std::unordered_map<uint64_t, std::list<Entry>::iterator> map_;
-    size_t fills_ = 0;
-    size_t hits_ = 0;
+    size_t shard_count_;
+    std::unique_ptr<Shard[]> shards_;
 };
 
 }  // namespace hm

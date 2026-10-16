@@ -142,17 +142,13 @@ TEST_CASE("a short final block is cached at its own length") {
 }
 
 TEST_CASE("the cache is safe under concurrent byte_at from multiple threads, with forced eviction") {
-    // Capacity (4) is deliberately smaller than the working set (32 distinct
-    // indices), so eviction is constant while threads race on the same
-    // cache. byte_at never hands out a pointer, so there is nothing to
-    // dangle -- this is exactly the scenario a pointer-returning cache API
-    // could not survive. Each block's contents are a deterministic function of its
-    // index (every byte == index & 0xFF), so a byte read back from the wrong
-    // entry (cross-contamination between a fresh insert and a stale one, or
-    // between two threads' concurrent fills of the same index) is caught.
+    // Exercise the many-shard case with a working set larger than capacity.
+    // byte_at never hands out a pointer, so eviction cannot leave a dangling
+    // one. Each block's contents depend on its index, catching cross-
+    // contamination between concurrent fills and evictions.
     constexpr size_t kIters = 5000;
-    constexpr uint64_t kNumIndices = 32;
-    BlockCache c(4, 32);
+    constexpr uint64_t kNumIndices = 256;
+    BlockCache c(64, 32);
     std::atomic<bool> mismatch{false};
 
     auto worker = [&](unsigned seed) {
@@ -169,15 +165,48 @@ TEST_CASE("the cache is safe under concurrent byte_at from multiple threads, wit
         }
     };
 
-    std::thread t1([&] { worker(1); });
-    std::thread t2([&] { worker(2); });
-    std::thread t3([&] { worker(3); });
-    std::thread t4([&] { worker(4); });
-    t1.join();
-    t2.join();
-    t3.join();
-    t4.join();
+    std::vector<std::thread> workers;
+    for (unsigned seed = 1; seed <= 16; ++seed) workers.emplace_back(worker, seed);
+    for (auto& thread : workers) thread.join();
 
     CHECK_FALSE(mismatch.load());
     CHECK(c.fills() > kNumIndices);  // capacity < working set forces repeated refills
+}
+
+TEST_CASE("block() shares the cached block, keeps it alive past eviction, and counts like read_range") {
+    BlockCache c(1, 16);
+    auto fill_with = [](uint8_t v) {
+        return [v](uint8_t* dst, size_t len) { std::fill(dst, dst + len, v); };
+    };
+    auto first = c.block(1, 16, fill_with(1));
+    REQUIRE(first->size() == 16);
+    CHECK(c.block(1, 16, fill_with(9)) == first);  // a hit returns the same block
+    CHECK(c.fills() == 1);
+    CHECK(c.hits() == 1);
+    c.block(2, 16, fill_with(2));                   // capacity 1: evicts block 1
+    CHECK((*first)[15] == 1);                       // the shared owner still reads the old bytes
+    CHECK(c.byte_at(1, 0, 16, fill_with(3)) == 3);  // the cache itself refills
+    CHECK(c.fills() == 3);
+    CHECK(BlockCache(1, 16).id() != c.id());
+}
+
+TEST_CASE("a reused BlockCompressor writes the same frames as compress_block") {
+    // write_block_compressed keeps one context per thread across many blocks;
+    // its frames must not depend on what that context compressed before.
+    std::mt19937 rng(7);
+    BlockCompressor reused(kDefaultZstdLevel);
+    std::vector<uint8_t> out;
+    for (int n = 0; n < 200; ++n) {
+        size_t len = 1 + rng() % 70000;
+        std::vector<uint8_t> src(len);
+        int kind = n % 4;  // constant, runs, small-alphabet noise, full noise
+        for (size_t i = 0; i < len; ++i)
+            src[i] = kind == 0   ? 0xFE
+                     : kind == 1 ? uint8_t((i / 97) % 7)
+                     : kind == 2 ? uint8_t(rng() % 4)
+                                 : uint8_t(rng());
+        reused.compress(src.data(), len, out);
+        INFO("block " << n << " len " << len);
+        REQUIRE(out == compress_block(src.data(), len, kDefaultZstdLevel));
+    }
 }

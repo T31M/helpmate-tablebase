@@ -15,8 +15,12 @@ inline int transform_sq(int sq, int t) {
 }
 
 struct KKTable {
+    static constexpr uint16_t kNoChoice = UINT16_MAX;
     int size = 0;
     std::array<int32_t, 4096> index_of;               // wk*64+bk -> kk index, -1 if outside canonical region/illegal
+    // Raw wk*64+bk -> up to two eligible (kk index << 3 | transform) choices.
+    // Entries follow transform order; unused entries are kNoChoice.
+    std::array<std::array<uint16_t, 2>, 4096> choices_of;
     std::vector<std::pair<uint8_t, uint8_t>> squares_of;
     static const KKTable& with_pawns();               // wK on files a-d; size 1806
     static const KKTable& pawnless();                 // wK in a1-d1-d4 triangle; size 462

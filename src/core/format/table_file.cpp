@@ -6,17 +6,20 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <stdexcept>
 #include <system_error>
 #include <vector>
 
 #include "format/block_codec.h"
+#include "generator/parallel.h"
 
 namespace hm {
 
@@ -120,9 +123,17 @@ private:
 namespace {
 // Shared by write_compressed and compress_existing: writes the header, JSON,
 // block index and compressed payload to "<path>.tmp", then atomic-renames it
-// over `path`. `block_at(begin, len)` must return a pointer to `len` valid
-// bytes for the block starting at logical offset `begin`, valid until the
-// call returns.
+// over `path`. `block_at(begin, len, scratch)` must return a pointer to `len`
+// valid bytes for the block starting at logical offset `begin`, either into
+// the caller's source or into `scratch` (block_size bytes, owned by the
+// calling thread), valid until the block is compressed.
+//
+// With threads > 1, blocks are compressed in batches on up to `threads`
+// threads, each with its own zstd context and scratch buffer, and the main
+// thread writes every batch in block order. Each block is an independent
+// zstd frame from the same parameters, so the file is byte-identical to a
+// single-threaded write. block_at must then be safe to call concurrently for
+// different blocks.
 //
 // write_compressed's four planes are separate buffers, so its block_at
 // gathers each block into a small reusable scratch buffer (block_size
@@ -133,7 +144,8 @@ namespace {
 // O(plane_size).
 template <class BlockAt>
 void write_block_compressed(const std::string& path, const TableHeader& hdr, const std::string& meta_json,
-                            uint64_t logical_size, uint32_t block_size, int level, BlockAt block_at) {
+                            uint64_t logical_size, uint32_t block_size, int level, int threads,
+                            BlockAt block_at) {
     if (block_size == 0) throw std::runtime_error("write_block_compressed: block_size is zero");
     const uint64_t nblocks = block_count(logical_size, block_size);
 
@@ -152,16 +164,32 @@ void write_block_compressed(const std::string& path, const TableHeader& hdr, con
         out.write(reinterpret_cast<const char*>(offsets.data()),
                   static_cast<std::streamsize>(offsets.size() * sizeof(uint64_t)));
 
+        // A batch gives each thread a run of blocks to compress; its frames
+        // wait in `packed` (about batch * block_size bytes) until the main
+        // thread writes them in order.
+        const int workers = std::max(1, threads);
+        constexpr uint64_t kBlocksPerWorker = 32;
+        const uint64_t batch = (uint64_t)workers * kBlocksPerWorker;
+        std::vector<std::vector<uint8_t>> packed(static_cast<size_t>(std::min<uint64_t>(batch, nblocks)));
         uint64_t written = 0;
-        for (uint64_t b = 0; b < nblocks; ++b) {
-            const uint64_t begin = b * block_size;
-            const size_t len = static_cast<size_t>(std::min<uint64_t>(block_size, logical_size - begin));
-            const uint8_t* src = block_at(begin, len);
-            auto packed = compress_block(src, len, level);
-            offsets[b] = written;
-            out.write(reinterpret_cast<const char*>(packed.data()),
-                      static_cast<std::streamsize>(packed.size()));
-            written += packed.size();
+        for (uint64_t first = 0; first < nblocks; first += batch) {
+            const uint64_t count = std::min<uint64_t>(batch, nblocks - first);
+            parallel_for(count, workers, [&](uint64_t lo, uint64_t hi) {
+                BlockCompressor compressor(level);
+                std::vector<uint8_t> scratch(block_size);
+                for (uint64_t i = lo; i < hi; ++i) {
+                    const uint64_t begin = (first + i) * block_size;
+                    const size_t len =
+                        static_cast<size_t>(std::min<uint64_t>(block_size, logical_size - begin));
+                    compressor.compress(block_at(begin, len, scratch.data()), len, packed[i]);
+                }
+            });
+            for (uint64_t i = 0; i < count; ++i) {
+                offsets[first + i] = written;
+                out.write(reinterpret_cast<const char*>(packed[i].data()),
+                          static_cast<std::streamsize>(packed[i].size()));
+                written += packed[i].size();
+            }
         }
         offsets[nblocks] = written;
 
@@ -273,7 +301,7 @@ void TableWriter::write_unsolvable(const std::string& path, const Material& mat,
 void TableWriter::write_compressed(const std::string& path, const Material& mat, uint64_t plane_size,
                                    uint8_t max_dtm, const std::string& meta_json, const uint8_t* dtm_w,
                                    const uint8_t* dtm_b, const uint8_t* cnt_w, const uint8_t* cnt_b,
-                                   uint32_t block_size, int level) {
+                                   uint32_t block_size, int level, int threads) {
     if (block_size == 0) throw std::runtime_error("write_compressed: block_size is zero");
     TableHeader hdr{};
     std::memcpy(hdr.magic, "HM8P", 4);
@@ -295,20 +323,29 @@ void TableWriter::write_compressed(const std::string& path, const Material& mat,
 
     // The four planes are one logical byte range, in the same order the raw
     // layout uses: dtm_w, dtm_b, cnt_w, cnt_b. They are four separate
-    // buffers, so each block is gathered into a small reusable scratch
-    // buffer -- unlike compress_existing below, whose source planes are
-    // already contiguous in its mmap and need no gathering at all.
+    // buffers. A block inside one plane is read straight from it; a block
+    // that crosses a plane boundary (or several, when a plane is smaller than
+    // a block) is copied piecewise into the calling thread's scratch buffer
+    // -- unlike compress_existing below, whose source planes are already
+    // contiguous in its mmap and need no gathering at all. It only reads the
+    // planes, so several threads may call it at once.
     const uint8_t* planes[4] = {dtm_w, dtm_b, cnt_w, cnt_b};
     const uint64_t logical = 4 * plane_size;
-    std::vector<uint8_t> scratch(block_size);
-    write_block_compressed(path, hdr, meta_json, logical, block_size, level,
-                           [&](uint64_t begin, size_t len) -> const uint8_t* {
-                               for (size_t i = 0; i < len; ++i) {
-                                   const uint64_t o = begin + i;
-                                   scratch[i] = planes[o / plane_size][o % plane_size];
-                               }
-                               return scratch.data();
-                           });
+    write_block_compressed(
+        path, hdr, meta_json, logical, block_size, level, threads,
+        [&](uint64_t begin, size_t len, uint8_t* scratch) -> const uint8_t* {
+            const uint64_t off = begin % plane_size;
+            if (plane_size - off >= len) return planes[begin / plane_size] + off;
+            size_t copied = 0;
+            while (copied < len) {
+                const uint64_t o = begin + copied;
+                const uint64_t in_plane = o % plane_size;
+                const size_t n = static_cast<size_t>(std::min<uint64_t>(len - copied, plane_size - in_plane));
+                std::memcpy(scratch + copied, planes[o / plane_size] + in_plane, n);
+                copied += n;
+            }
+            return scratch;
+        });
 }
 
 void TableWriter::compress_existing(const std::string& path, const TableReader& src, uint32_t block_size,
@@ -344,9 +381,10 @@ void TableWriter::compress_existing(const std::string& path, const TableReader& 
         // borrowed, not moved), so `payload` is safe to read from throughout
         // -- including after the temp file is renamed over `path`, since the
         // source and destination are different files until that rename.
+        // One thread: the releaser drops pages behind a single forward cursor.
         SequentialPageReleaser releaser(payload, logical);
-        write_block_compressed(path, hdr, meta_json, logical, block_size, level,
-                               [&](uint64_t begin, size_t /*len*/) -> const uint8_t* {
+        write_block_compressed(path, hdr, meta_json, logical, block_size, level, 1,
+                               [&](uint64_t begin, size_t /*len*/, uint8_t* /*scratch*/) -> const uint8_t* {
                                    releaser.advance(begin);  // drop pages fully behind us
                                    return payload + begin;   // straight into the source mmap; no copy
                                });
@@ -356,11 +394,10 @@ void TableWriter::compress_existing(const std::string& path, const TableReader& 
         // each covering source block through the reader's own bounded cache
         // (a few MB) rather than a decompress-to-disk round trip or
         // buffering the whole table.
-        std::vector<uint8_t> scratch(block_size);
-        write_block_compressed(path, hdr, meta_json, logical, block_size, level,
-                               [&](uint64_t begin, size_t len) -> const uint8_t* {
-                                   src.read_range(begin, len, scratch.data());
-                                   return scratch.data();
+        write_block_compressed(path, hdr, meta_json, logical, block_size, level, 1,
+                               [&](uint64_t begin, size_t len, uint8_t* scratch) -> const uint8_t* {
+                                   src.read_range(begin, len, scratch);
+                                   return scratch;
                                });
     }
 }
@@ -619,16 +656,51 @@ void TableReader::read_values(Color stm, uint64_t first_cell, size_t n, uint8_t*
     if (cnt) read_range(2 * ps_ + o, n, cnt);
 }
 
+size_t TableReader::cache_lookups() const { return cache_ ? cache_->hits() + cache_->fills() : 0; }
+
 uint8_t TableReader::byte_at(uint64_t logical) const {
     const uint64_t b = logical / block_size_;
     const uint64_t begin = b * block_size_;
+    const size_t offset = static_cast<size_t>(logical - begin);
+    // Each thread keeps the last few blocks it read, so the common repeat
+    // probe of a block skips the cache's shard mutex. A slot names a block by
+    // (cache id, block index): ids are never reused and a cached block never
+    // changes, so a slot cannot answer for the wrong table or stale bytes,
+    // and its shared owner keeps the block alive after the cache evicts it.
+    // get() reads a DTM byte and then its count byte 2 * ps_ further on, so
+    // the two halves have separate banks: with one shared bank, any table
+    // whose 2 * ps_ is a multiple of kLocalBlocks blocks (every five-piece
+    // pawnless table at the default block size) mapped both reads to one
+    // slot, and they evicted each other on every probe. A multiplicative hash
+    // spreads the white and black planes of a half the same way. All tables
+    // share the banks, and one cell's successors probe many of them (a pawn
+    // table's promotion and capture predecessors are a dozen or more): with
+    // 8 slots per bank, KBPvkp missed the slots on 30% of probes and spent
+    // more time in shard-mutex futex waits than in decompression. 32 slots
+    // cut that to 8.5%. The cost is up to 2 * kLocalBlocks blocks per thread
+    // beyond the cache's capacity (4 MiB at the 64 KiB maximum block size).
+    struct LocalBlock {
+        uint64_t cache_id = 0;
+        uint64_t index = 0;
+        std::shared_ptr<const BlockCache::Block> data;
+    };
+    constexpr int kSlotBits = 5;
+    constexpr size_t kLocalBlocks = size_t{1} << kSlotBits;
+    thread_local std::array<std::array<LocalBlock, kLocalBlocks>, 2> local;
+    const uint64_t id = cache_->id();
+    constexpr uint64_t kGolden = 0x9E3779B97F4A7C15ull;
+    LocalBlock& slot = local[logical >= 2 * ps_][((b + id * kGolden) * kGolden) >> (64 - kSlotBits)];
+    if (slot.cache_id == id && slot.index == b) return (*slot.data)[offset];
+
     const size_t len = static_cast<size_t>(std::min<uint64_t>(block_size_, 4 * ps_ - begin));
     const uint64_t off_b = load_u64(offsets_ + b * sizeof(uint64_t));
     const uint64_t off_b1 = load_u64(offsets_ + (b + 1) * sizeof(uint64_t));
     const uint8_t* src = blocks_ + off_b;
     const size_t clen = static_cast<size_t>(off_b1 - off_b);
-    return cache_->byte_at(b, static_cast<size_t>(logical - begin), len,
-                           [&](uint8_t* dst, size_t n) { decompress_block(src, clen, dst, n); });
+    slot.data = cache_->block(b, len, [&](uint8_t* dst, size_t n) { decompress_block(src, clen, dst, n); });
+    slot.cache_id = id;
+    slot.index = b;
+    return (*slot.data)[offset];
 }
 
 void TableReader::read_range(uint64_t logical_offset, size_t len, uint8_t* dst) const {

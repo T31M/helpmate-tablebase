@@ -1,5 +1,6 @@
 #include <unistd.h>
 
+#include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 #include <cstring>
@@ -7,6 +8,7 @@
 #include <fstream>
 #include <iterator>
 #include <random>
+#include <thread>
 #include <vector>
 
 #include "format/block_codec.h"
@@ -811,5 +813,175 @@ TEST_CASE("read_values on a marker table matches get() without touching a payloa
         REQUIRE(c[i] == 0);
     }
     CHECK_THROWS_AS(t->read_values(Color::White, ps, 1, d.data(), c.data()), std::out_of_range);
+    fs::remove_all(dir);
+}
+
+TEST_CASE("interleaved compressed readers never answer from each other's blocks") {
+    // TableReader keeps recently read blocks per thread, keyed by cache id and
+    // block index. Two tables with the same layout share every block index;
+    // a reader reopened after another is destroyed may reuse its address.
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "hm_local_blocks_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    const uint64_t ps = 3000;
+    std::vector<uint8_t> planes[2][4];
+    for (int t = 0; t < 2; ++t)
+        for (int k = 0; k < 4; ++k) {
+            planes[t][k].resize(ps);
+            for (uint64_t i = 0; i < ps; ++i)
+                planes[t][k][i] = uint8_t((i * (t + 3) + k * 11 + t * 101) % 251);
+        }
+    std::string path[2] = {(dir / "a.hm").string(), (dir / "b.hm").string()};
+    for (int t = 0; t < 2; ++t)
+        TableWriter::write_compressed(path[t], mat, ps, 30, "{}", planes[t][0].data(), planes[t][1].data(),
+                                      planes[t][2].data(), planes[t][3].data(), 1024);
+    auto check_cell = [&](const TableReader& r, int t, Color stm, uint64_t i) {
+        ValuePair v = r.get(stm, i);
+        int s = stm == Color::White ? 0 : 1;
+        return v.dtm == planes[t][s][i] && v.count == planes[t][2 + s][i];
+    };
+
+    {
+        auto a = TableReader::open(path[0]);
+        auto b = TableReader::open(path[1]);
+        REQUIRE(a);
+        REQUIRE(b);
+        bool ok = true;
+        for (uint64_t i = 0; i < ps; ++i)
+            for (Color stm : {Color::White, Color::Black})
+                ok = ok && check_cell(*a, 0, stm, i) && check_cell(*b, 1, stm, i);
+        CHECK(ok);
+
+        std::atomic<bool> mismatch{false};
+        std::vector<std::thread> workers;
+        for (unsigned seed = 1; seed <= 8; ++seed)
+            workers.emplace_back([&, seed] {
+                std::mt19937_64 rng(seed);
+                for (int n = 0; n < 20000; ++n) {
+                    uint64_t i = rng() % ps;
+                    int t = (int)(rng() & 1);
+                    Color stm = (rng() & 2) ? Color::Black : Color::White;
+                    if (!check_cell(t ? *b : *a, t, stm, i)) mismatch = true;
+                }
+            });
+        for (auto& w : workers) w.join();
+        CHECK_FALSE(mismatch.load());
+    }
+    // This thread still holds blocks of the destroyed readers; reopened
+    // readers must not be served from them.
+    for (int round = 0; round < 3; ++round) {
+        int t = round % 2 ? 0 : 1;
+        auto r = TableReader::open(path[t]);
+        REQUIRE(r);
+        bool ok = true;
+        for (uint64_t i = 0; i < ps; i += 7) ok = ok && check_cell(*r, t, Color::Black, i);
+        CHECK(ok);
+    }
+    fs::remove_all(dir);
+}
+
+TEST_CASE("a cell's DTM and count bytes stay in the per-thread slots together") {
+    // get() reads the DTM byte at o and the count byte at 2 * ps + o. Here
+    // 2 * ps is exactly 8 blocks, the geometry of every five-piece pawnless
+    // table at the default block size: both blocks once mapped to the same
+    // slot and evicted each other, so every get() went to the shared cache.
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "hm_slot_pair_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    const uint32_t block = 1024;
+    const uint64_t ps = 4 * block;
+    std::vector<uint8_t> planes[4];
+    for (int k = 0; k < 4; ++k) {
+        planes[k].resize(ps);
+        for (uint64_t i = 0; i < ps; ++i) planes[k][i] = uint8_t((i * 7 + k * 31) % 253);
+    }
+    std::string path = (dir / "pair.hm").string();
+    TableWriter::write_compressed(path, mat, ps, 30, "{}", planes[0].data(), planes[1].data(),
+                                  planes[2].data(), planes[3].data(), block);
+    auto r = TableReader::open(path);
+    REQUIRE(r);
+    REQUIRE(r->block_size() == block);
+    bool ok = true;
+    for (int pass = 0; pass < 4; ++pass)
+        for (uint64_t i = 0; i < block; ++i) {  // all in DTM block 0 and count block 8
+            ValuePair v = r->get(Color::White, i);
+            ok = ok && v.dtm == planes[0][i] && v.count == planes[2][i];
+        }
+    CHECK(ok);
+    // One fill per block; every later probe is a slot hit.
+    CHECK(r->cache_lookups() == 2);
+    fs::remove_all(dir);
+}
+
+TEST_CASE("write_compressed gathers blocks that span one, two or all four planes") {
+    // Plane sizes below, at and above the block size, and not multiples of it:
+    // a block may sit inside one plane, cross one boundary, or cover several
+    // whole planes. Reading the logical payload back must give the planes in
+    // order (dtm_w, dtm_b, cnt_w, cnt_b).
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "hm_gather_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    for (uint64_t ps : {1000ull, 4096ull, 5000ull, 12289ull}) {
+        std::vector<uint8_t> planes[4];
+        std::vector<uint8_t> logical;
+        for (int k = 0; k < 4; ++k) {
+            planes[k].resize(ps);
+            for (uint64_t i = 0; i < ps; ++i) planes[k][i] = uint8_t((i * 7 + k * 61 + (i >> 5)) % 251);
+            logical.insert(logical.end(), planes[k].begin(), planes[k].end());
+        }
+        std::string path = (dir / ("t" + std::to_string(ps) + ".hm")).string();
+        TableWriter::write_compressed(path, mat, ps, 30, "{}", planes[0].data(), planes[1].data(),
+                                      planes[2].data(), planes[3].data(), 4096);
+        auto r = TableReader::open(path);
+        REQUIRE(r);
+        std::vector<uint8_t> back(logical.size());
+        r->read_range(0, back.size(), back.data());
+        INFO("plane_size " << ps);
+        CHECK(back == logical);
+    }
+    fs::remove_all(dir);
+}
+
+TEST_CASE("write_compressed writes byte-identical files for every thread count") {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "hm_parallel_write_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    Material mat = Material::parse("KQvk").value();
+    // 4 * 300001 bytes at 4096-byte blocks: 293 blocks, several batches at
+    // low thread counts, a partial last block and blocks across planes.
+    const uint64_t ps = 300001;
+    std::vector<uint8_t> planes[4];
+    std::mt19937 rng(11);
+    for (int k = 0; k < 4; ++k) {
+        planes[k].resize(ps);
+        for (uint64_t i = 0; i < ps; ++i)
+            planes[k][i] = (rng() % 100 < 80) ? uint8_t(k == 0 ? DTM_INVALID : 0) : uint8_t(rng() % 40);
+    }
+    auto bytes_of = [](const std::string& path) {
+        std::ifstream in(path, std::ios::binary);
+        return std::vector<uint8_t>(std::istreambuf_iterator<char>(in), {});
+    };
+    std::vector<uint8_t> reference;
+    for (int threads : {1, 2, 7, 32}) {
+        std::string path = (dir / ("t" + std::to_string(threads) + ".hm")).string();
+        TableWriter::write_compressed(path, mat, ps, 30, R"({"material":"KQvk"})", planes[0].data(),
+                                      planes[1].data(), planes[2].data(), planes[3].data(), 4096,
+                                      kDefaultZstdLevel, threads);
+        auto bytes = bytes_of(path);
+        INFO("threads " << threads);
+        REQUIRE(!bytes.empty());
+        if (threads == 1) reference = bytes;
+        else CHECK(bytes == reference);
+        auto r = TableReader::open(path);
+        REQUIRE(r);
+        for (uint64_t i = 0; i < ps; i += 997) CHECK(r->get(Color::Black, i).dtm == planes[1][i]);
+    }
     fs::remove_all(dir);
 }

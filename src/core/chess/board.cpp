@@ -22,19 +22,6 @@ std::string sq_name(int sq) {
     return s;
 }
 
-// --- Move flag helpers (surge MoveFlags encoding, verified against libsurge.h) ---
-bool Move::is_capture() const { return flags & 0b1000; }
-bool Move::is_double_push() const { return flags == 0b0001; }
-bool Move::is_ep() const { return flags == 0b1010; }  // EN_PASSANT
-std::optional<PieceType> Move::promotion() const {
-    if ((flags & 0b0100) == 0) return std::nullopt;  // PR_*/PC_* have bit 2 set
-    switch (flags & 0b0011) {
-        case 0: return PieceType::Knight;
-        case 1: return PieceType::Bishop;
-        case 2: return PieceType::Rook;
-        default: return PieceType::Queen;
-    }
-}
 std::string Move::uci() const {
     std::string s = sq_name(from) + sq_name(to);
     if (auto pr = promotion()) {
@@ -70,6 +57,10 @@ static std::optional<Piece> from_surge(int sp) {
 
 struct Board::Impl {
     Position pos;
+    // Output space for generate_legals. surge's MoveList holds the same array,
+    // but its ::Move elements zero themselves on construction, and clearing
+    // 218 of them for every listing was a fifth of legal_moves' time.
+    ::Move scratch[218];
 };
 
 // Position's (compiler-generated) copy constructor copy-constructs its
@@ -129,17 +120,39 @@ std::optional<Board> Board::from_fen(const std::string& fen) {
 }
 
 void Board::reset(const std::vector<PlacedPiece>& pp, Color stm, int ep) {
-    // Position::set_position() does not clear prior state, so fully reconstruct
-    // in place before placing pieces (this is what lets us reuse the allocation).
-    impl_->pos.~Position();
-    new (&impl_->pos) Position();
+    // Leaves the Position exactly as a fresh Position() followed by
+    // set_position(pp, stm, "", ep) would, without paying for either: the
+    // constructor initialises all 256 history entries, and set_position takes
+    // its vector and string by value and parses castling via istringstream.
+    // Only history[0..ply] is ever read (play() writes history[ply+1] before
+    // use), and the hash changes only in put_piece/remove_piece, so removing
+    // every piece returns it to 0. A Position left mid-line (ply != 0) cannot
+    // rewind its private ply counter, so it is rebuilt as before.
+    Position& pos = impl_->pos;
+    if (pos.ply() != 0) {
+        pos.~Position();
+        new (&pos) Position();
+    } else {
+        Bitboard occupied = pos.all_pieces<WHITE>() | pos.all_pieces<BLACK>();
+        while (occupied) pos.remove_piece(pop_lsb(&occupied));
+        pos.history[0] = UndoInfo();
+        pos.checkers = 0;
+        pos.pinned = 0;
+        pos.halfmove = 0;
+        pos.fullmove = 1;
+    }
+    for (auto& p : pp) pos.put_piece(static_cast<::Piece>(to_surge(p.piece)), static_cast<Square>(p.square));
 
-    std::vector<std::pair<::Piece, Square>> pl;
-    pl.reserve(pp.size());
-    for (auto& p : pp) pl.emplace_back(static_cast<::Piece>(to_surge(p.piece)), static_cast<Square>(p.square));
-
-    Position::set_position(pl, stm == Color::White ? WHITE : BLACK, "",
-                            ep < 0 ? NO_SQUARE : static_cast<Square>(ep), impl_->pos);
+    const ::Color side = stm == Color::White ? WHITE : BLACK;
+    const Square epsq = ep < 0 ? NO_SQUARE : static_cast<Square>(ep);
+    if (pos.turn() != side) {
+        // The side to move is private; set_position is the only setter. An
+        // empty piece list keeps this to the side/ep/castling fields.
+        Position::set_position({}, side, "", epsq, pos);
+    } else {
+        pos.history[0].epsq = epsq;
+        pos.history[0].entry = ALL_CASTLING_MASK;  // what set_position's empty castling string yields
+    }
 }
 
 Board Board::from_pieces(const std::vector<PlacedPiece>& pp, Color stm, int ep_square) {
@@ -159,12 +172,48 @@ int Board::ep_square() const {
 
 std::vector<PlacedPiece> Board::pieces() const {
     std::vector<PlacedPiece> out;
-    for (int sq = 0; sq < 64; ++sq) {
-        auto sp = impl_->pos.at(static_cast<Square>(sq));
-        if (sp == NO_PIECE) continue;
-        if (auto hp = from_surge(static_cast<int>(sp))) out.push_back(PlacedPiece{*hp, static_cast<uint8_t>(sq)});
-    }
+    pieces(out);
     return out;
+}
+
+void Board::pieces(std::vector<PlacedPiece>& out) const {
+    out.clear();
+    const Position& pos = impl_->pos;
+    Bitboard occupied = pos.all_pieces<WHITE>() | pos.all_pieces<BLACK>();
+    while (occupied) {
+        Square sq = bsf(occupied);
+        occupied &= occupied - 1;
+        auto sp = pos.at(sq);
+        if (sp == NO_PIECE) continue;
+        if (auto hp = from_surge(static_cast<int>(sp)))
+            out.push_back(PlacedPiece{*hp, static_cast<uint8_t>(sq)});
+    }
+}
+
+void Board::pieces(std::vector<PlacedPiece>& out, std::array<uint64_t, 2>& counts) const {
+    out.clear();
+    const Position& pos = impl_->pos;
+    // Packed byte lanes in two scalars, so they stay in registers: counts kept
+    // in memory (bytes, or an array indexed by color) stall on store
+    // forwarding when read back as wider words. At most 64 pieces exist, so
+    // no lane carries into the next.
+    uint64_t white = 0, black = 0;
+    Bitboard occupied = pos.all_pieces<WHITE>() | pos.all_pieces<BLACK>();
+    while (occupied) {
+        Square sq = bsf(occupied);
+        occupied &= occupied - 1;
+        auto sp = pos.at(sq);
+        if (sp == NO_PIECE) continue;
+        if (auto hp = from_surge(static_cast<int>(sp))) {
+            out.push_back(PlacedPiece{*hp, static_cast<uint8_t>(sq)});
+            uint64_t lane = 1ull << (8 * (int)hp->type);
+            bool is_white = hp->color == Color::White;
+            white += is_white ? lane : 0;
+            black += is_white ? 0 : lane;
+        }
+    }
+    counts[0] = white;
+    counts[1] = black;
 }
 
 bool Board::in_check() const {
@@ -183,40 +232,47 @@ bool Board::opponent_in_check() const {
 
 std::vector<Move> Board::legal_moves() const {
     std::vector<Move> out;
+    legal_moves(out);
+    return out;
+}
+
+void Board::legal_moves(std::vector<Move>& out) const {
+    MoveBuffer buf;
+    legal_moves(buf);
+    out.assign(buf.begin(), buf.end());
+}
+
+void Board::legal_moves(MoveBuffer& out) const {
     // unique_ptr::operator->() const still yields a non-const pointee, so no
     // const_cast is needed to get a mutable Position& from a const method.
     Position& p = impl_->pos;
-    auto conv = [&](auto& list) {
-        for (::Move sm : list) {
-            uint8_t from = (uint8_t)sm.from(), to = (uint8_t)sm.to(), flags = (uint8_t)sm.flags();
-            // Workaround for a ChessMG/surge defect: when the side to move is in check
-            // from a knight (or, via case fallthrough, the pawn that just double-pushed),
-            // surge's single-check branch answers with "capture the checker" moves that
-            // are unconditionally flagged plain CAPTURE -- even when the capturing piece
-            // is a pawn landing on its own promotion rank. That silently drops the
-            // promotion, so play() would leave an actual pawn sitting on rank 1/8 (an
-            // impossible position). Recover the four promotion-capture variants surge's
-            // ordinary (not-in-check) pawn code would have produced for the same capture.
-            if (flags == CAPTURE) {
-                auto sp = p.at(static_cast<Square>(from));
-                if (sp != NO_PIECE && type_of(static_cast<::Piece>(sp)) == PAWN &&
-                    (sq_rank(to) == 0 || sq_rank(to) == 7)) {
-                    for (MoveFlags pf : {PC_KNIGHT, PC_BISHOP, PC_ROOK, PC_QUEEN})
-                        out.push_back(Move{from, to, (uint8_t)pf});
-                    continue;
-                }
+    ::Move* const first = impl_->scratch;
+    ::Move* const last =
+        p.turn() == WHITE ? p.generate_legals<WHITE>(first) : p.generate_legals<BLACK>(first);
+    Move* dst = out.moves.data();
+    for (const ::Move* it = first; it != last; ++it) {
+        const ::Move sm = *it;
+        uint8_t from = (uint8_t)sm.from(), to = (uint8_t)sm.to(), flags = (uint8_t)sm.flags();
+        // Workaround for a ChessMG/surge defect: when the side to move is in check
+        // from a knight (or, via case fallthrough, the pawn that just double-pushed),
+        // surge's single-check branch answers with "capture the checker" moves that
+        // are unconditionally flagged plain CAPTURE -- even when the capturing piece
+        // is a pawn landing on its own promotion rank. That silently drops the
+        // promotion, so play() would leave an actual pawn sitting on rank 1/8 (an
+        // impossible position). Recover the four promotion-capture variants surge's
+        // ordinary (not-in-check) pawn code would have produced for the same capture.
+        if (flags == CAPTURE) {
+            auto sp = p.at(static_cast<Square>(from));
+            if (sp != NO_PIECE && type_of(static_cast<::Piece>(sp)) == PAWN &&
+                (sq_rank(to) == 0 || sq_rank(to) == 7)) {
+                for (MoveFlags pf : {PC_KNIGHT, PC_BISHOP, PC_ROOK, PC_QUEEN})
+                    *dst++ = Move{from, to, (uint8_t)pf};
+                continue;
             }
-            out.push_back(Move{from, to, flags});
         }
-    };
-    if (p.turn() == WHITE) {
-        MoveList<WHITE> l(p);
-        conv(l);
-    } else {
-        MoveList<BLACK> l(p);
-        conv(l);
+        *dst++ = Move{from, to, flags};
     }
-    return out;
+    out.size = static_cast<size_t>(dst - out.moves.data());
 }
 
 void Board::make(const Move& m) {

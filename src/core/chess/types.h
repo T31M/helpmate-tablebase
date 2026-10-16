@@ -36,12 +36,18 @@ inline int sq_file(int sq) { return sq & 7; }
 inline int sq_rank(int sq) { return sq >> 3; }
 std::string sq_name(int sq);  // "e4"
 
-struct Move {  // flags byte uses ChessMG/surge encoding, opaque outside board.cpp
+struct Move {  // flags byte uses ChessMG/surge encoding (MoveFlags in libsurge.h)
     uint8_t from, to, flags;
-    bool is_capture() const;
-    bool is_double_push() const;
-    bool is_ep() const;
-    std::optional<PieceType> promotion() const;
+    // Inline: the generator tests these for every move it scans.
+    bool is_capture() const { return flags & 0b1000; }
+    bool is_double_push() const { return flags == 0b0001; }
+    bool is_ep() const { return flags == 0b1010; }  // EN_PASSANT
+    std::optional<PieceType> promotion() const {
+        if ((flags & 0b0100) == 0) return std::nullopt;  // PR_*/PC_* have bit 2 set
+        constexpr PieceType kByLowBits[4] = {PieceType::Knight, PieceType::Bishop, PieceType::Rook,
+                                             PieceType::Queen};
+        return kByLowBits[flags & 0b0011];
+    }
     std::string uci() const;  // "e2e4", "e7e8q"
 };
 

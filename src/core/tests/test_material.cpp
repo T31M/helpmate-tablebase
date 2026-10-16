@@ -51,3 +51,15 @@ TEST_CASE("mating_side_is_bare_king identifies materials white can never mate wi
     CHECK_FALSE(bare("KBvkqqr"));
     CHECK_FALSE(bare("KPvk"));  // a white pawn can promote
 }
+TEST_CASE("packed counts round-trip and match per-type counts") {
+    for (const char* name : {"Kvk", "KQvk", "KRBvkq", "KPPvkpp", "KQRBNPvkqrbnp", "KBBBvk"}) {
+        Material m = *Material::parse(name);
+        auto c = m.counts();
+        for (int t = 0; t < 6; ++t) {
+            CHECK((uint8_t)(c[0] >> (8 * t)) == m.white[t]);
+            CHECK((uint8_t)(c[1] >> (8 * t)) == m.black[t]);
+        }
+        CHECK(Material::from_counts(c) == m);
+    }
+    CHECK(Material::parse("KRvk")->counts() != Material::parse("KBvk")->counts());
+}

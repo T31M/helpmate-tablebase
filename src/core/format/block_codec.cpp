@@ -27,31 +27,46 @@ uint64_t block_count(uint64_t logical_size, uint32_t block_size) {
 
 size_t max_compressed_size(size_t n) { return ZSTD_compressBound(n); }
 
-std::vector<uint8_t> compress_block(const uint8_t* src, size_t n, int level) {
-    std::vector<uint8_t> out(ZSTD_compressBound(n));
+struct BlockCompressor::Ctx {
+    ZstdCCtxPtr cctx;
+};
 
+BlockCompressor::BlockCompressor(int level) : ctx_(new Ctx{ZstdCCtxPtr(ZSTD_createCCtx())}) {
+    if (!ctx_->cctx) {
+        delete ctx_;
+        throw std::runtime_error("zstd: could not create compression context");
+    }
     // A tablebase that silently returns a wrong DTM is worse than one that
     // fails loudly: without this flag zstd only catches structural damage, and
     // a measured majority of single-bit flips on a realistic block decoded to
     // wrong-but-valid data. Costs 4 bytes per block -- 0.006% at the 64 KB
     // default. ZSTD_compress() (the simple API) cannot set this, hence the
-    // context API here.
-    ZstdCCtxPtr ctx(ZSTD_createCCtx());
-    if (!ctx) throw std::runtime_error("zstd: could not create compression context");
+    // context API here. Both parameters are sticky: every later frame from
+    // this context uses them.
+    size_t rc = ZSTD_CCtx_setParameter(ctx_->cctx.get(), ZSTD_c_compressionLevel, level);
+    if (!ZSTD_isError(rc)) rc = ZSTD_CCtx_setParameter(ctx_->cctx.get(), ZSTD_c_checksumFlag, 1);
+    if (ZSTD_isError(rc)) {
+        std::string why = ZSTD_getErrorName(rc);
+        delete ctx_;
+        throw std::runtime_error("zstd: could not set compression parameters: " + why);
+    }
+}
 
-    size_t rc = ZSTD_CCtx_setParameter(ctx.get(), ZSTD_c_compressionLevel, level);
-    if (ZSTD_isError(rc))
-        throw std::runtime_error(std::string("zstd: could not set compression level: ") +
-                                 ZSTD_getErrorName(rc));
+BlockCompressor::~BlockCompressor() { delete ctx_; }
 
-    rc = ZSTD_CCtx_setParameter(ctx.get(), ZSTD_c_checksumFlag, 1);
-    if (ZSTD_isError(rc))
-        throw std::runtime_error(std::string("zstd: could not enable checksum: ") + ZSTD_getErrorName(rc));
-
-    size_t written = ZSTD_compress2(ctx.get(), out.data(), out.size(), src, n);
+void BlockCompressor::compress(const uint8_t* src, size_t n, std::vector<uint8_t>& out) {
+    out.resize(ZSTD_compressBound(n));
+    // Each ZSTD_compress2 call is a complete, independent frame: no history
+    // carries over from the previous block.
+    size_t written = ZSTD_compress2(ctx_->cctx.get(), out.data(), out.size(), src, n);
     if (ZSTD_isError(written))
         throw std::runtime_error(std::string("zstd compress failed: ") + ZSTD_getErrorName(written));
     out.resize(written);
+}
+
+std::vector<uint8_t> compress_block(const uint8_t* src, size_t n, int level) {
+    std::vector<uint8_t> out;
+    BlockCompressor(level).compress(src, n, out);
     return out;
 }
 
