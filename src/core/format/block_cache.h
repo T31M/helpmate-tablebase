@@ -68,11 +68,18 @@ private:
     std::shared_ptr<const Block> acquire(uint64_t index, size_t len,
                                          const std::function<void(uint8_t*, size_t)>& fill);
 
+    // Buffers of evicted entries that nothing else holds any more, reused by
+    // the next misses of the shard instead of allocating (and zero-filling) a
+    // fresh block each time. Bounded, so a shard holds at most cap + kMaxSpare
+    // blocks.
+    static constexpr size_t kMaxSpare = 2;
+
     struct alignas(64) Shard {
         size_t cap = 0;
         mutable std::mutex mu;
         std::list<Entry> lru;  // front = most recent within this shard
         std::unordered_map<uint64_t, std::list<Entry>::iterator> map;
+        std::vector<std::shared_ptr<Block>> spare;
         size_t fills = 0;
         size_t hits = 0;
     };

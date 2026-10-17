@@ -132,6 +132,28 @@ TEST_CASE("evicting past capacity still returns correct bytes") {
     CHECK(c.fills() == 4);
 }
 
+TEST_CASE("a reused evicted buffer never shows an older block's bytes") {
+    // Capacity 2 and many distinct blocks: from the third miss on, each fill
+    // lands in the buffer of an evicted block. Lengths vary, so a short block
+    // reuses a buffer that held a longer one.
+    BlockCache c(2, 64);
+    auto len_of = [](uint64_t index) { return size_t(1 + (index * 37) % 64); };
+    auto value = [](uint64_t index, size_t i) { return uint8_t(index * 31 + i); };
+    std::vector<uint8_t> got(64);
+    for (int round = 0; round < 3; ++round) {
+        for (uint64_t index = 0; index < 40; ++index) {
+            const size_t len = len_of(index);
+            c.read_range(index, 0, len, len, got.data(), [&](uint8_t* dst, size_t n) {
+                REQUIRE(n == len);
+                for (size_t i = 0; i < n; ++i) dst[i] = value(index, i);
+            });
+            for (size_t i = 0; i < len; ++i) REQUIRE(got[i] == value(index, i));
+        }
+    }
+    CHECK(c.fills() == 3 * 40);
+    CHECK(c.hits() == 0);
+}
+
 TEST_CASE("a short final block is cached at its own length") {
     BlockCache c(2, 1024);
     auto fill = [](uint8_t* dst, size_t len) { std::fill(dst, dst + len, 0x5A); };

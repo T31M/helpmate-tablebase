@@ -197,6 +197,9 @@ bumps may change behavior).
 - `mine --starts N` rejects a candidate with fewer than N optimal first moves
   after one ply of lookups, before enumerating its lines: the same scan is
   another 2.5x faster.
+- Reading a compressed table reuses the buffers of evicted blocks and one zstd
+  context per thread, instead of allocating, zero-filling and freeing both on
+  every block-cache miss.
 
 ## [0.20.0] - 2026-09-26
 
