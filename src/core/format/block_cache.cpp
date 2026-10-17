@@ -49,7 +49,17 @@ std::shared_ptr<const BlockCache::Block> BlockCache::block(
 
 std::shared_ptr<const BlockCache::Block> BlockCache::acquire(
     uint64_t index, size_t len, const std::function<void(uint8_t*, size_t)>& fill) {
-    Shard& shard = shards_[index % shard_count_];
+    // The shard comes from a multiplicative hash of the index, not from
+    // index % shard_count_: block indices that a lookup pattern visits
+    // together often differ by multiples of the shard count (mine's solution
+    // search steps through a six-piece index in strides of 64^k cells), and
+    // with the modulus they all fell into one shard of capacity / 32 blocks.
+    // On `mine KBvkqrn --dtm 14 --count 2 --starts 2 --ends 2 --threads 16`
+    // that cost 15% more CPU and decompression (31.3 s against 24.4 s).
+    // The top bits of the product are the well-mixed ones; scaling them into
+    // [0, shard_count_) also works when the count is not a power of two.
+    const uint64_t mixed = index * 0x9E3779B97F4A7C15ull;
+    Shard& shard = shards_[static_cast<size_t>((static_cast<unsigned __int128>(mixed) * shard_count_) >> 64)];
 
     std::shared_ptr<Block> local;
     {

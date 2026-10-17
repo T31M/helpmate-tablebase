@@ -154,6 +154,22 @@ TEST_CASE("a reused evicted buffer never shows an older block's bytes") {
     CHECK(c.hits() == 0);
 }
 
+TEST_CASE("block indices in strides of the shard count still share the whole capacity") {
+    // 64 blocks fit a 256-block cache (32 shards of 8), whatever their
+    // stride: a second pass must only hit. With index % 32 sharding, every
+    // stride that is a multiple of 32 put all 64 blocks into one shard of 8,
+    // and the second pass refilled every block.
+    auto fill = [](uint8_t* dst, size_t len) { std::fill(dst, dst + len, uint8_t(7)); };
+    for (uint64_t stride : {1, 32, 64, 4096}) {
+        INFO("stride " << stride);
+        BlockCache c(256, 16);
+        for (int round = 0; round < 2; ++round)
+            for (uint64_t i = 0; i < 64; ++i) REQUIRE(c.byte_at(i * stride, 0, 16, fill) == 7);
+        CHECK(c.fills() == 64);
+        CHECK(c.hits() == 64);
+    }
+}
+
 TEST_CASE("a short final block is cached at its own length") {
     BlockCache c(2, 1024);
     auto fill = [](uint8_t* dst, size_t len) { std::fill(dst, dst + len, 0x5A); };
