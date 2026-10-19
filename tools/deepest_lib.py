@@ -194,10 +194,11 @@ def piece_defs(only: tuple[str, ...] | None = None) -> str:
     return "".join(_piece_defs[i] for i in (only or PIECE_IDS))
 
 
-def svg_diagram(fen: str, width: int = 200) -> str:
+def svg_diagram(fen: str, width: int = 200, hatched: bool = False) -> str:
     """A self-contained SVG diagram of `fen`: light/dark squares, a frame,
     and one <use> of a sprite piece per man. No text, no fonts, so it renders
-    the same everywhere, GitHub's image proxy included."""
+    the same everywhere, GitHub's image proxy included. `hatched` draws the
+    dark squares as diagonal hatching, the way printed problem diagrams do."""
     c = SPRITE_CELL
     size = 8 * c
     out = [
@@ -207,10 +208,16 @@ def svg_diagram(fen: str, width: int = 200) -> str:
         f"<defs>{piece_defs(tuple(dict.fromkeys(('w' if ch.isupper() else 'b') + ch.lower() for _, _, ch in squares(fen))))}</defs>",
         f'<rect x="0" y="0" width="{size}" height="{size}" fill="#ffffff"/>',
     ]
+    dark = "#d2d2d2"
+    if hatched:
+        out.insert(3, '<defs><pattern id="hatch" patternUnits="userSpaceOnUse" width="4" height="4" '
+                      'patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" '
+                      'stroke="#000" stroke-width="1.1"/></pattern></defs>')
+        dark = "url(#hatch)"
     for r in range(8):
         for f in range(8):
             if (r + f) % 2:
-                out.append(f'<rect x="{f * c}" y="{r * c}" width="{c}" height="{c}" fill="#d2d2d2"/>')
+                out.append(f'<rect x="{f * c}" y="{r * c}" width="{c}" height="{c}" fill="{dark}"/>')
     for r, f, ch in squares(fen):
         pid = ("w" if ch.isupper() else "b") + ch.lower()
         out.append(f'<use xlink:href="#{pid}" href="#{pid}" x="{f * c}" y="{r * c}"/>')
