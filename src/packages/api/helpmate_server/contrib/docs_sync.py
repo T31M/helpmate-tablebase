@@ -83,8 +83,14 @@ class CorpusFacts:
 PR_URL = "https://huggingface.co/datasets/osick/helpmate-tables/discussions"
 
 
+def _folded(count: int, noun: str, body: str) -> str:
+    """A table cell that shows only "N nouns" until opened: a contributor with
+    two hundred tables would otherwise fill the whole page with one row."""
+    return f"<details><summary>{count} {noun}{'' if count == 1 else 's'}</summary>{body}</details>"
+
+
 def render_contributors(reg, statuses: dict) -> str:
-    rows = ["", "| contributor | tables | reproduced | notes |", "| --- | --- | --- | --- |"]
+    rows = ["", "| contributor | tables | reproduced | dataset PRs | notes |", "| --- | --- | --- | --- | --- |"]
     for key, c in sorted(reg.contributors.items(), key=lambda kv: -len(reg.tables_of(kv[0]))):
         mats = [m for m in reg.tables_of(key) if statuses.get(m) and statuses[m].state == "done"]
         if not mats:
@@ -93,9 +99,10 @@ def render_contributors(reg, statuses: dict) -> str:
                       if p["contributor"] == key and p["hf_pr"] is not None})
         name = "anonymous" if c.anonymous else (
             f"[**{c.display}**]({HF_USER}{c.hf})" if c.hf else f"**{c.display}**")
-        links = ", ".join(f"[PR #{p}]({PR_URL}/{p})" for p in prs)
+        links = ", ".join(f'<a href="{PR_URL}/{p}">#{p}</a>' for p in prs)
         repro = len([m for m in mats if len(reg.producers_of(m)) > 1])
-        rows.append(f"| {name} | {len(mats)}: {', '.join(mats)} | {repro} | {links}: {c.note} |")
+        rows.append(f"| {name} | {_folded(len(mats), 'table', ', '.join(mats))} | {repro} "
+                    f"| {_folded(len(prs), 'PR', links)} | {c.note} |")
     return "\n".join(rows) + "\n"
 
 
