@@ -92,8 +92,8 @@ def test_contributor_table_lists_t31m():
     st, reg = _statuses(set(reg.tables))
     table = render_contributors(reg, st)
     n = len([m for m in reg.tables_of("T31M") if st[m].state == "done"])   # grows as T31M contributes
-    assert "T31M" in table and f"| {n}: " in table and "KRBvkqq" in table
-    assert "PR #1" in table and "h#17" in table
+    assert "T31M" in table and f"<summary>{n} tables</summary>" in table and "KRBvkqq" in table
+    assert '/discussions/1">#1</a>' in table and "192-thread" in table
 
 
 def test_sync_rewrites_spans_writes_files_and_closes_finished_claims(tmp_path):
@@ -194,11 +194,15 @@ def test_credit_table_counts_every_produced_table_and_reproductions(tmp_path):
                                "producers": [prod("maintainer", None), prod("T31M", 22)]}}})
     st = _statuses_for(reg, {"KQvkqqq", "KRBvkqq"})
     table = render_contributors(reg, st)
-    assert "| contributor | tables | reproduced | notes |" in table
+    assert "| contributor | tables | reproduced | dataset PRs | notes |" in table
     rows = {line.split("|")[1].strip(): line for line in table.splitlines() if line.startswith("| [")}
     t31m = next(v for k, v in rows.items() if "T31M" in k)
-    assert "| 2: KQvkqqq, KRBvkqq | 2 |" in t31m and "PR #20" in t31m and "PR #22" in t31m
-    assert "| 1: KQvkqqq | 1 |" in next(v for k, v in rows.items() if "popeye37" in k)
+    # long lists fold into <details>, so a contributor with 200 tables stays one short row
+    assert "| <details><summary>2 tables</summary>KQvkqqq, KRBvkqq</details> | 2 |" in t31m
+    assert "<summary>2 PRs</summary>" in t31m and ">#20</a>" in t31m and ">#22</a>" in t31m
+    popeye = next(v for k, v in rows.items() if "popeye37" in k)
+    assert "<summary>1 table</summary>KQvkqqq</details> | 1 |" in popeye
+    assert "<summary>1 PR</summary>" in popeye and popeye.rstrip().endswith("|  |")  # no note, no stray ':'
     assert "maintainer" not in table
     assert [p["login"] for p in all_contributors_rc(reg, _Gh())["contributors"]] == ["T31M", "popeye37"]
 

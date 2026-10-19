@@ -369,6 +369,15 @@ def test_svg_diagram_places_one_use_per_man_and_no_text():
     assert svg.startswith("<svg ") and svg.rstrip().endswith("</svg>")
 
 
+def test_svg_diagram_hatched_draws_dark_squares_as_print_hatching():
+    plain, hatched = lib.svg_diagram(SAMPLE_FEN), lib.svg_diagram(SAMPLE_FEN, hatched=True)
+    assert "<pattern " in hatched and 'fill="url(#hatch)"' in hatched
+    assert hatched.count('fill="url(#hatch)"') == 32 and "#d2d2d2" not in hatched
+    assert "<pattern " not in plain and plain.count("#d2d2d2") == 32
+    assert hatched.count("<use ") == plain.count("<use ")
+    assert "<text" not in hatched
+
+
 def test_svg_defs_carry_all_twelve_pieces():
     defs = lib.piece_defs()
     for pid in lib.PIECE_IDS:
