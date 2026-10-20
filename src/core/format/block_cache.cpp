@@ -61,7 +61,6 @@ std::shared_ptr<const BlockCache::Block> BlockCache::acquire(
     const uint64_t mixed = index * 0x9E3779B97F4A7C15ull;
     Shard& shard = shards_[static_cast<size_t>((static_cast<unsigned __int128>(mixed) * shard_count_) >> 64)];
 
-    std::shared_ptr<Block> local;
     {
         std::lock_guard<std::mutex> lock(shard.mu);
         auto it = shard.map.find(index);
@@ -70,19 +69,17 @@ std::shared_ptr<const BlockCache::Block> BlockCache::acquire(
             ++shard.hits;
             return shard.lru.front().data;
         }
-        if (!shard.spare.empty()) {
-            local = std::move(shard.spare.back());
-            shard.spare.pop_back();
-        }
     }
 
     // Miss: decompress into a local buffer with no lock held, so a slow fill
     // (up to a 64 KB decompression) never blocks another thread's probe.
     // Another thread may race us and decompress the same block too -- that
-    // is fine. A reused buffer is only resized: fill() writes all `len`
-    // bytes or throws.
-    if (local) local->resize(len);
-    else local = std::make_shared<Block>(len);
+    // is fine. Not zero-filled (see Block): fill() writes all `len` bytes or
+    // throws. Evicted buffers are not reused: a thread's block slot or a
+    // block() caller may still be reading one, and the shared_ptr count
+    // cannot prove that it has finished (use_count() is a relaxed load, so
+    // reusing on a count of 1 raced with that read).
+    auto local = std::make_shared<Block>(len);
     fill(local->data(), len);
 
     std::lock_guard<std::mutex> lock(shard.mu);
@@ -96,12 +93,6 @@ std::shared_ptr<const BlockCache::Block> BlockCache::acquire(
     }
     if (shard.lru.size() >= shard.cap) {
         shard.map.erase(shard.lru.back().index);
-        // Reusable only if the cache holds the last reference: a thread's
-        // block slot or a block() caller may still read it. Every new
-        // reference is taken under this lock, so the count cannot grow here.
-        auto& victim = shard.lru.back().data;
-        if (victim.use_count() == 1 && shard.spare.size() < kMaxSpare)
-            shard.spare.push_back(std::const_pointer_cast<Block>(std::move(victim)));
         shard.lru.pop_back();
     }
     shard.lru.push_front(Entry{index, std::move(local)});

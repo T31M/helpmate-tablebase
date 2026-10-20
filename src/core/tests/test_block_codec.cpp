@@ -132,10 +132,10 @@ TEST_CASE("evicting past capacity still returns correct bytes") {
     CHECK(c.fills() == 4);
 }
 
-TEST_CASE("a reused evicted buffer never shows an older block's bytes") {
-    // Capacity 2 and many distinct blocks: from the third miss on, each fill
-    // lands in the buffer of an evicted block. Lengths vary, so a short block
-    // reuses a buffer that held a longer one.
+TEST_CASE("a refilled block never shows an older block's bytes") {
+    // Capacity 2 and many distinct blocks: from the third miss on, every fill
+    // evicts a block. New blocks are not zero-filled, and lengths vary, so a
+    // short block may land in memory that held a longer one.
     BlockCache c(2, 64);
     auto len_of = [](uint64_t index) { return size_t(1 + (index * 37) % 64); };
     auto value = [](uint64_t index, size_t i) { return uint8_t(index * 31 + i); };
