@@ -87,7 +87,16 @@ SolutionShape shape_of(int count, const std::vector<std::vector<std::string>>& l
 // concurrently from multiple threads.
 class Tablebase {
 public:
-    explicit Tablebase(std::string dir);
+    // `cache_bytes` > 0 puts every table this Tablebase opens on one shared
+    // block cache of that many bytes (decompressed blocks, LRU across all
+    // tables) instead of each table's own cache of up to 64 MiB. It makes the
+    // block-cache memory one fixed number, however many tables a query
+    // touches. 0 keeps the per-table caches.
+    explicit Tablebase(std::string dir, size_t cache_bytes = 0);
+    // What this Tablebase was opened with, so a caller can open more of the
+    // same kind (one per worker thread).
+    const std::string& dir() const { return dir_; }
+    size_t cache_bytes() const { return cache_bytes_; }
 
     struct Probe { int dtm; int count; bool flipped; };  // flipped: colors were swapped to match a slice
 
@@ -113,9 +122,25 @@ public:
     // `skipped_saturated` if non-null; existing callers that omit it are
     // unaffected. Pass it for theme-only queries too, or those positions are
     // dropped with no tally.
-    void mine(const Material& m, const MineFilter& f,
-              const std::function<bool(const std::string&)>& cb,
-              uint64_t* skipped_saturated = nullptr) const;
+    //
+    // `threads` > 1 scans the plane in segments on that many workers, each with
+    // its own Tablebase (own readers and block caches, so no lock is shared).
+    // With a shared cache (cache_bytes > 0), each worker's Tablebase gets an
+    // equal share of it, so the total block-cache memory stays cache_bytes.
+    // `cb` still runs only on the calling thread, in cell order, and sees exactly
+    // the FENs -- and `skipped_saturated` exactly the tally -- that one thread
+    // would give it.
+    //
+    // `prepare`, if given, turns each hit's FEN into what `cb` receives, and
+    // runs where the hit was found: on the worker, with the worker's own
+    // Tablebase (on the calling thread with *this when threads <= 1). It lets
+    // per-hit work (probing, enriching, formatting a --jsonl record) run in
+    // parallel, next to the blocks the scan just decompressed. It must be
+    // safe to call concurrently, and may run for a few hits past the one at
+    // which `cb` stops the scan; their results are dropped.
+    using Prepare = std::function<std::string(const Tablebase& tb, const std::string& fen)>;
+    void mine(const Material& m, const MineFilter& f, const std::function<bool(const std::string&)>& cb,
+              uint64_t* skipped_saturated = nullptr, int threads = 1, const Prepare& prepare = nullptr) const;
     // Theme names this position shows. CLI, bindings and API all route here,
     // so they cannot drift apart; the ThemeInput itself is built in exactly
     // one place, with_theme_input (private, below), shared with shows_theme.
@@ -132,18 +157,40 @@ public:
 
 private:
     struct Slice { TableReader reader; SliceIndex index; };
+    // The resolved, read-only part of one mine() query, shared by its workers.
+    struct MineScan;
+    // mine() over cells [begin, end) of the query's slice; false when `cb` stopped it.
+    bool mine_range(const MineScan& q, uint64_t begin, uint64_t end,
+                    const std::function<bool(const std::string&)>& cb, uint64_t* skipped_saturated) const;
     const Slice* load(const Material& m) const;
     ValuePair value_of(Board& b) const;
-    void collect_lines(Board& b, std::vector<std::string>& path,
-                        std::vector<std::vector<std::string>>& out, int max) const;
+    // The slices one search has already looked up, by material. A search
+    // visits a handful of materials, so a linear scan without a lock beats
+    // load()'s mutex and name-keyed map on every position. The pointers stay
+    // valid: cache_ never drops an entry while this Tablebase lives.
+    struct SliceMemo {
+        std::vector<std::pair<Material, const Slice*>> slices;
+    };
+    // value_of(b).dtm without reading any count byte; the line searches use
+    // only the DTM.
+    uint8_t dtm_of(Board& b, SliceMemo& memo) const;
+    void collect_lines(Board& b, std::vector<std::string>& path, std::vector<std::vector<std::string>>& out,
+                       int max, SliceMemo& memo) const;
     void collect_solutions(Board& b, std::vector<Ply>& path, std::vector<Solution>& out, const Board& start,
-                           int max) const;
+                           int max, SliceMemo& memo) const;
+    // lines() / solutions() on a caller's memo. Not overloads of the public
+    // names: a pointer to an overloaded member (&Tablebase::lines, as the
+    // Python bindings take it) would be ambiguous.
+    std::vector<std::vector<std::string>> lines_in(const std::string& fen, int max, SliceMemo& memo) const;
+    std::vector<Solution> solutions_in(const std::string& fen, int max, SliceMemo& memo) const;
     // THE one place a ThemeInput is built (themes_of and shows_theme both
     // route here). `use` runs while the input's referents are alive.
     void with_theme_input(const std::string& fen, int max,
                           const std::function<void(const themes::ThemeInput&)>& use) const;
 
     std::string dir_;
+    size_t cache_bytes_ = 0;
+    std::shared_ptr<BlockCache> shared_cache_;  // null unless cache_bytes_ > 0
     mutable std::mutex mu_;
     mutable std::map<std::string, std::unique_ptr<Slice>> cache_;
 };

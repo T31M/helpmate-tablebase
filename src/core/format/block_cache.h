@@ -5,7 +5,9 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace hm {
@@ -20,7 +22,29 @@ namespace hm {
 // the cache evicts it.
 class BlockCache {
 public:
-    using Block = std::vector<uint8_t>;
+    // Allocates without value-initializing: a new block is not zero-filled,
+    // because fill() writes every one of its bytes (or throws) before anyone
+    // reads it. On a mine scan that misses millions of times, the zero fill
+    // was 6% of the profile.
+    template <class T>
+    struct NoInitAllocator : std::allocator<T> {
+        template <class U>
+        struct rebind {
+            using other = NoInitAllocator<U>;
+        };
+        NoInitAllocator() = default;
+        template <class U>
+        NoInitAllocator(const NoInitAllocator<U>&) noexcept {}
+        template <class U>
+        void construct(U* p) noexcept(std::is_nothrow_default_constructible_v<U>) {
+            ::new (static_cast<void*>(p)) U;
+        }
+        template <class U, class... Args>
+        void construct(U* p, Args&&... args) {
+            ::new (static_cast<void*>(p)) U(std::forward<Args>(args)...);
+        }
+    };
+    using Block = std::vector<uint8_t, NoInitAllocator<uint8_t>>;
 
     BlockCache(size_t capacity_blocks, uint32_t block_size);
 
@@ -56,6 +80,7 @@ public:
     size_t fills() const;
     size_t hits() const;
     size_t capacity() const { return cap_; }
+    uint32_t block_size() const { return block_size_; }
 
 private:
     struct Entry {

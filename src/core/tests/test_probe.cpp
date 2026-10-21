@@ -346,3 +346,178 @@ TEST_CASE("a king capture is reported as valueless, not thrown") {
     CHECK(it->dtm == -1);
     CHECK_FALSE(it->optimal);
 }
+
+TEST_CASE("mine gives the single-threaded FENs and tally on any thread count") {
+    Tablebase tb(gen_dir());
+    struct Query {
+        const char* material;
+        MineFilter f;
+    };
+    // A plain filter, a shape filter, a solutions theme that skips saturated
+    // cells (KQvk dtm 8), a sibling-plane theme, and pawn material.
+    const std::vector<Query> queries = {
+        {"KQvk", MineFilter{.dtm = 2}},
+        {"KQvk", MineFilter{.dtm = 4, .starts = 1, .ends = 1}},
+        {"KQvk", MineFilter{.dtm = 8, .themes = {"mirror"}}},
+        {"KQvk", MineFilter{.dtm = 8, .themes = {"set-play"}}},
+        {"KPvk", MineFilter{.dtm = 5}},
+    };
+    auto run = [&](const Query& q, int threads, int cap) {
+        std::vector<std::string> out;
+        uint64_t skipped = 0;
+        tb.mine(
+            *Material::parse(q.material), q.f,
+            [&](const std::string& fen) {
+                if ((int)out.size() >= cap) return false;
+                out.push_back(fen);
+                return (int)out.size() < cap;
+            },
+            &skipped, threads);
+        return std::make_pair(out, skipped);
+    };
+    for (const auto& q : queries) {
+        auto full = run(q, 1, 1 << 30);
+        REQUIRE_FALSE(full.first.empty());
+        // A stop before the first FEN, inside the scan, and after the end.
+        for (int cap : {0, 1, 7, (int)full.first.size() / 2 + 1, 1 << 30}) {
+            auto one = run(q, 1, cap);
+            for (int threads : {2, 3, 8}) {
+                INFO(q.material << " dtm " << q.f.dtm << " threads " << threads << " cap " << cap);
+                auto many = run(q, threads, cap);
+                CHECK(many.first == one.first);
+                CHECK(many.second == one.second);
+            }
+        }
+    }
+}
+
+TEST_CASE("multi-threaded mine reports a missing table as one thread does") {
+    Tablebase tb(gen_dir());
+    MineFilter f{.dtm = 2};
+    for (int threads : {1, 4})
+        CHECK_THROWS_AS(
+            tb.mine(
+                *Material::parse("KRBvk"), f, [](const std::string&) { return true; }, nullptr, threads),
+            MissingTableError);
+}
+
+TEST_CASE("mine --starts selects exactly what solution_shape says") {
+    // The scan rejects a candidate early when it has fewer optimal root moves
+    // than --starts; the selection must still equal the full enumeration's.
+    Tablebase tb(gen_dir());
+    for (const auto& [material, dtm] :
+         std::vector<std::pair<std::string, int>>{{"KQvk", 2}, {"KQvk", 4}, {"KPvk", 3}, {"KPvk", 5}}) {
+        auto m = *Material::parse(material);
+        std::vector<std::string> all;
+        tb.mine(m, MineFilter{.dtm = dtm}, [&](const std::string& f) {
+            all.push_back(f);
+            return true;
+        });
+        REQUIRE_FALSE(all.empty());
+        std::vector<SolutionShape> shapes;
+        for (const auto& f : all) shapes.push_back(tb.solution_shape(f));
+        for (int starts : {1, 2, 3}) {
+            for (int ends : {-1, 1, 2}) {
+                INFO(material << " dtm " << dtm << " starts " << starts << " ends " << ends);
+                std::vector<std::string> want;
+                for (size_t i = 0; i < all.size(); ++i) {
+                    const auto& sh = shapes[i];
+                    if (sh.exhaustive && sh.starts == starts && (ends < 0 || sh.ends == ends))
+                        want.push_back(all[i]);
+                }
+                std::vector<std::string> got;
+                uint64_t skipped = 0;
+                tb.mine(
+                    m, MineFilter{.dtm = dtm, .starts = starts, .ends = ends},
+                    [&](const std::string& f) {
+                        got.push_back(f);
+                        return true;
+                    },
+                    &skipped);
+                CHECK(got == want);
+            }
+        }
+    }
+}
+
+TEST_CASE("mine on compressed tables with one small shared cache matches the raw tables") {
+    // Compressed copies of the same materials; a shared cache of one 64 KiB
+    // block makes every table switch evict, at 1 and 4 threads.
+    static std::string zdir = [] {
+        namespace fs = std::filesystem;
+        auto d = fs::temp_directory_path() / "hm_probe_z";
+        fs::remove_all(d);
+        fs::create_directories(d);
+        for (const auto& e : fs::directory_iterator(gen_dir())) {
+            if (e.path().extension() != ".hm") continue;
+            auto src = TableReader::open(e.path().string());
+            REQUIRE(src.has_value());
+            if (src->all_unsolvable()) fs::copy_file(e.path(), d / e.path().filename());
+            else TableWriter::compress_existing((d / e.path().filename()).string(), *src);
+        }
+        return d.string();
+    }();
+    Tablebase raw(gen_dir());
+    Tablebase shared(zdir, kDefaultBlockSize);
+    const std::vector<std::pair<std::string, MineFilter>> queries = {
+        {"KQvk", MineFilter{.dtm = 4, .starts = 1, .ends = 1}},
+        {"KQvk", MineFilter{.dtm = 4, .themes = {"mirror"}}},
+        {"KPvk", MineFilter{.dtm = 5, .starts = 2}},
+    };
+    auto run = [](const Tablebase& tb, const std::pair<std::string, MineFilter>& q, int threads) {
+        std::vector<std::string> out;
+        uint64_t skipped = 0;
+        tb.mine(
+            *Material::parse(q.first), q.second,
+            [&](const std::string& f) {
+                out.push_back(f);
+                return true;
+            },
+            &skipped, threads);
+        return std::make_pair(out, skipped);
+    };
+    for (const auto& q : queries) {
+        INFO(q.first << " dtm " << q.second.dtm);
+        auto want = run(raw, q, 1);
+        REQUIRE_FALSE(want.first.empty());
+        for (int threads : {1, 4}) CHECK(run(shared, q, threads) == want);
+    }
+    CHECK(shared.probe("8/7k/5K2/8/8/8/8/6Q1 b - - 0 1")->count == 4);
+}
+
+TEST_CASE("mine's prepare hook gives the single-threaded results on any thread count") {
+    Tablebase tb(gen_dir());
+    const Material m = *Material::parse("KQvk");
+    const MineFilter f{.dtm = 4};
+    auto run = [&](int threads, int cap, bool* saw_other_tb) {
+        std::vector<std::string> out;
+        uint64_t skipped = 0;
+        tb.mine(
+            m, f,
+            [&](const std::string& s) {
+                if ((int)out.size() >= cap) return false;
+                out.push_back(s);
+                return (int)out.size() < cap;
+            },
+            &skipped, threads,
+            [&](const Tablebase& wtb, const std::string& fen) {
+                if (&wtb != &tb && saw_other_tb) *saw_other_tb = true;
+                auto p = wtb.probe(fen);
+                return fen + "|" + std::to_string(p ? p->count : -1);
+            });
+        return out;
+    };
+    bool other = false;
+    auto full = run(1, 1 << 30, &other);
+    REQUIRE(full.size() > 100);
+    CHECK_FALSE(other);  // one thread: prepare runs with *this
+    for (int cap : {0, 1, 7, (int)full.size() / 2, 1 << 30}) {
+        auto one = run(1, cap, nullptr);
+        for (int threads : {2, 3, 8}) {
+            INFO("threads " << threads << " cap " << cap);
+            bool worker = false;
+            CHECK(run(threads, cap, &worker) == one);
+            if (cap > 0) CHECK(worker);  // several threads: each worker's own Tablebase
+        }
+    }
+}

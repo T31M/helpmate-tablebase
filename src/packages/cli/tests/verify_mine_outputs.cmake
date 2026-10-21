@@ -166,4 +166,20 @@ if(NOT rc EQUAL 3 OR NOT "${last_err}" MATCHES "--json and --jsonl")
   message(FATAL_ERROR "--json --jsonl: expected exit 3 naming both flags, got ${rc}: ${last_err}")
 endif()
 
-message(STATUS "mine output modes verified (--max infinity/inf, --json, --jsonl, --themes, --solutions)")
+# 8. --threads does not change any output: --jsonl annotates on the scan
+# workers, --json on the set's workers, and a --max stop must cut both at the
+# same record as one thread.
+foreach(fmt --jsonl --json)
+  foreach(max infinity 7 0)
+    run_helpmate(one rc1 mine KQvk --dtm 4 --max ${max} ${fmt} --themes --solutions --threads 1 --tables "${TABLES}")
+    run_helpmate(four rc4 mine KQvk --dtm 4 --max ${max} ${fmt} --themes --solutions --threads 4 --tables "${TABLES}")
+    if(NOT rc1 EQUAL 0 OR NOT rc4 EQUAL 0)
+      message(FATAL_ERROR "${fmt} --max ${max}: failed (${rc1}/${rc4}): ${last_err}")
+    endif()
+    if(NOT "${one}" STREQUAL "${four}")
+      message(FATAL_ERROR "${fmt} --max ${max}: --threads 4 output differs from --threads 1")
+    endif()
+  endforeach()
+endforeach()
+
+message(STATUS "mine output modes verified (--max infinity/inf, --json, --jsonl, --themes, --solutions, --threads)")

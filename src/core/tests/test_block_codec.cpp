@@ -132,6 +132,44 @@ TEST_CASE("evicting past capacity still returns correct bytes") {
     CHECK(c.fills() == 4);
 }
 
+TEST_CASE("a refilled block never shows an older block's bytes") {
+    // Capacity 2 and many distinct blocks: from the third miss on, every fill
+    // evicts a block. New blocks are not zero-filled, and lengths vary, so a
+    // short block may land in memory that held a longer one.
+    BlockCache c(2, 64);
+    auto len_of = [](uint64_t index) { return size_t(1 + (index * 37) % 64); };
+    auto value = [](uint64_t index, size_t i) { return uint8_t(index * 31 + i); };
+    std::vector<uint8_t> got(64);
+    for (int round = 0; round < 3; ++round) {
+        for (uint64_t index = 0; index < 40; ++index) {
+            const size_t len = len_of(index);
+            c.read_range(index, 0, len, len, got.data(), [&](uint8_t* dst, size_t n) {
+                REQUIRE(n == len);
+                for (size_t i = 0; i < n; ++i) dst[i] = value(index, i);
+            });
+            for (size_t i = 0; i < len; ++i) REQUIRE(got[i] == value(index, i));
+        }
+    }
+    CHECK(c.fills() == 3 * 40);
+    CHECK(c.hits() == 0);
+}
+
+TEST_CASE("block indices in strides of the shard count still share the whole capacity") {
+    // 64 blocks fit a 256-block cache (32 shards of 8), whatever their
+    // stride: a second pass must only hit. With index % 32 sharding, every
+    // stride that is a multiple of 32 put all 64 blocks into one shard of 8,
+    // and the second pass refilled every block.
+    auto fill = [](uint8_t* dst, size_t len) { std::fill(dst, dst + len, uint8_t(7)); };
+    for (uint64_t stride : {1, 32, 64, 4096}) {
+        INFO("stride " << stride);
+        BlockCache c(256, 16);
+        for (int round = 0; round < 2; ++round)
+            for (uint64_t i = 0; i < 64; ++i) REQUIRE(c.byte_at(i * stride, 0, 16, fill) == 7);
+        CHECK(c.fills() == 64);
+        CHECK(c.hits() == 64);
+    }
+}
+
 TEST_CASE("a short final block is cached at its own length") {
     BlockCache c(2, 1024);
     auto fill = [](uint8_t* dst, size_t len) { std::fill(dst, dst + len, 0x5A); };

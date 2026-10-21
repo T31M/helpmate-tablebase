@@ -1,7 +1,11 @@
 #include "probe/tablebase.h"
 
 #include <algorithm>
+#include <atomic>
+#include <condition_variable>
+#include <exception>
 #include <set>
+#include <thread>
 #include <utility>
 
 #include "chess/san.h"
@@ -25,7 +29,12 @@ Board flip_colors(const Board& b) {
 }
 }  // namespace
 
-Tablebase::Tablebase(std::string dir) : dir_(std::move(dir)) {}
+Tablebase::Tablebase(std::string dir, size_t cache_bytes)
+    : dir_(std::move(dir)),
+      cache_bytes_(cache_bytes),
+      shared_cache_(cache_bytes ? std::make_shared<BlockCache>(
+                                      std::max<size_t>(1, cache_bytes / kDefaultBlockSize), kDefaultBlockSize)
+                                : nullptr) {}
 
 const Tablebase::Slice* Tablebase::load(const Material& m) const {
     std::lock_guard lk(mu_);
@@ -33,7 +42,7 @@ const Tablebase::Slice* Tablebase::load(const Material& m) const {
     if (it != cache_.end()) return it->second.get();
     std::string path = dir_ + "/" + m.name() + ".hm";
     TableReader::OpenError oerr = TableReader::OpenError::None;
-    auto r = TableReader::open(path, &oerr);
+    auto r = TableReader::open(path, &oerr, shared_cache_);
     if (!r && oerr == TableReader::OpenError::UnsupportedVersion)
         throw UnsupportedTableVersionError("table " + path + " was written by a newer helpmate"
                                            " (unsupported table format version); upgrade this build");
@@ -65,6 +74,25 @@ ValuePair Tablebase::value_of(Board& b) const {
         return s->reader.get(x.stm(), *cell);
     };
     return eval_board(b, lookup);
+}
+
+uint8_t Tablebase::dtm_of(Board& b, SliceMemo& memo) const {
+    // eval_board takes the minimum over DTMs only, so a lookup with count 0
+    // gives the same DTM as value_of; the count it returns is meaningless.
+    auto lookup = [this, &memo](Board& x) -> ValuePair {
+        const std::vector<PlacedPiece> pieces = x.pieces();
+        const Material m = Material::of(pieces);
+        const Slice* s = nullptr;
+        auto it =
+            std::find_if(memo.slices.begin(), memo.slices.end(), [&](const auto& e) { return e.first == m; });
+        if (it != memo.slices.end()) s = it->second;
+        else memo.slices.emplace_back(m, s = load(m));  // a miss is remembered too, as load() does
+        if (!s) throw MissingTableError("no table for " + m.name());
+        auto cell = s->index.encode(pieces);
+        if (!cell) throw MissingTableError("position not encodable in table for " + m.name());
+        return {s->reader.get_dtm(x.stm(), *cell), 0};
+    };
+    return eval_board(b, lookup).dtm;
 }
 
 std::optional<Tablebase::Probe> Tablebase::probe(const std::string& fen) const {
@@ -99,47 +127,56 @@ std::optional<Tablebase::Probe> Tablebase::probe(const std::string& fen) const {
 }
 
 void Tablebase::collect_lines(Board& b, std::vector<std::string>& path,
-                               std::vector<std::vector<std::string>>& out, int max) const {
+                              std::vector<std::vector<std::string>>& out, int max, SliceMemo& memo) const {
     if ((int)out.size() >= max) return;
-    ValuePair v = value_of(b);
-    if (v.dtm == 0) { out.push_back(path); return; }
+    uint8_t dtm = dtm_of(b, memo);
+    if (dtm == 0) {
+        out.push_back(path);
+        return;
+    }
     for (const Move& m : b.legal_moves()) {
         if ((int)out.size() >= max) return;
         b.make(m);
-        ValuePair nv = value_of(b);
-        bool on_optimal = nv.dtm <= DTM_MAX && (int)nv.dtm == (int)v.dtm - 1;
+        uint8_t ndtm = dtm_of(b, memo);
+        bool on_optimal = ndtm <= DTM_MAX && (int)ndtm == (int)dtm - 1;
         b.unmake(m);
         if (!on_optimal) continue;
         path.push_back(san(b, m));  // b is still pre-move here; san() restores it too
         b.make(m);
-        collect_lines(b, path, out, max);
+        collect_lines(b, path, out, max, memo);
         b.unmake(m);
         path.pop_back();
     }
 }
 
 std::vector<std::vector<std::string>> Tablebase::lines(const std::string& fen, int max) const {
+    SliceMemo memo;
+    return lines_in(fen, max, memo);
+}
+
+std::vector<std::vector<std::string>> Tablebase::lines_in(const std::string& fen, int max,
+                                                          SliceMemo& memo) const {
     auto b = Board::from_fen(fen);
     if (!b) throw std::invalid_argument("bad FEN (or castling rights): " + fen);
     std::vector<std::vector<std::string>> out;
     std::vector<std::string> path;
-    collect_lines(*b, path, out, max);
+    collect_lines(*b, path, out, max, memo);
     return out;
 }
 
 void Tablebase::collect_solutions(Board& b, std::vector<Ply>& path, std::vector<Solution>& out,
-                                  const Board& start, int max) const {
+                                  const Board& start, int max, SliceMemo& memo) const {
     if ((int)out.size() >= max) return;
-    ValuePair v = value_of(b);
-    if (v.dtm == 0) {
+    uint8_t dtm = dtm_of(b, memo);
+    if (dtm == 0) {
         out.push_back(Solution{start, path});
         return;
     }
     for (const Move& m : b.legal_moves()) {
         if ((int)out.size() >= max) return;
         b.make(m);
-        ValuePair nv = value_of(b);
-        bool on_optimal = nv.dtm <= DTM_MAX && (int)nv.dtm == (int)v.dtm - 1;
+        uint8_t ndtm = dtm_of(b, memo);
+        bool on_optimal = ndtm <= DTM_MAX && (int)ndtm == (int)dtm - 1;
         b.unmake(m);
         if (!on_optimal) continue;
 
@@ -160,19 +197,24 @@ void Tablebase::collect_solutions(Board& b, std::vector<Ply>& path, std::vector<
         p.is_check = b.in_check();
         p.after = b;
         path.push_back(std::move(p));
-        collect_solutions(b, path, out, start, max);
+        collect_solutions(b, path, out, start, max, memo);
         path.pop_back();
         b.unmake(m);
     }
 }
 
 std::vector<Solution> Tablebase::solutions(const std::string& fen, int max) const {
+    SliceMemo memo;
+    return solutions_in(fen, max, memo);
+}
+
+std::vector<Solution> Tablebase::solutions_in(const std::string& fen, int max, SliceMemo& memo) const {
     auto b = Board::from_fen(fen);
     if (!b) throw std::invalid_argument("bad FEN (or castling rights): " + fen);
     Board start = *b;
     std::vector<Solution> out;
     std::vector<Ply> path;
-    collect_solutions(*b, path, out, start, max);
+    collect_solutions(*b, path, out, start, max, memo);
     return out;
 }
 
@@ -240,9 +282,21 @@ SolutionShape Tablebase::solution_shape(const std::string& fen) const {
     return shape_of(p->count, lines(fen, p->count));
 }
 
+struct Tablebase::MineScan {
+    Material m;
+    Color stm;
+    Color other_stm;
+    MineFilter f;
+    std::vector<themes::ResolvedTheme> dets;
+    themes::Needs need;
+    bool want_shape;
+    bool want_solutions;
+    bool want_plane;
+};
+
 void Tablebase::mine(const Material& m, const MineFilter& f,
-                      const std::function<bool(const std::string&)>& cb,
-                      uint64_t* skipped_saturated) const {
+                     const std::function<bool(const std::string&)>& cb, uint64_t* skipped_saturated,
+                     int threads, const Prepare& prepare) const {
     const Slice* s = load(m);
     if (!s) throw MissingTableError("no table for " + m.name());
     Color stm = (f.dtm % 2) ? Color::White : Color::Black;  // parity invariant: wtm dtm odd, btm dtm even
@@ -265,6 +319,140 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
     // positions too, at the cost of one decode plus one Board construction per
     // candidate -- measured at 26s over a 31.5M-candidate query.
     const bool want_solutions = want_shape || (!dets.empty() && need == themes::Needs::Solutions);
+    const bool want_plane = !dets.empty() && need >= themes::Needs::Plane;
+    const MineScan q{m,
+                     stm,
+                     stm == Color::White ? Color::Black : Color::White,
+                     f,
+                     std::move(dets),
+                     need,
+                     want_shape,
+                     want_solutions,
+                     want_plane};
+
+    const uint64_t plane_cells = s->index.size();
+    // About 16 segments per worker, so a slow segment (one dense in
+    // candidates) does not leave the other workers idle at the end, within
+    // [4096, 2^20] cells: large enough that claiming one is cheap, small
+    // enough that a --max stop does not wait long for workers to finish.
+    const uint64_t kSegment = std::clamp<uint64_t>(plane_cells / (16 * (uint64_t)std::max(threads, 1)),
+                                                   uint64_t{1} << 12, uint64_t{1} << 20);
+    const uint64_t segments = (plane_cells + kSegment - 1) / kSegment;
+    if (threads <= 1 || segments <= 1) {
+        if (!prepare) mine_range(q, 0, plane_cells, cb, skipped_saturated);
+        else
+            mine_range(
+                q, 0, plane_cells, [&](const std::string& fen) { return cb(prepare(*this, fen)); },
+                skipped_saturated);
+        return;
+    }
+
+    // Workers claim segments in order and park each result in a ring slot;
+    // this thread hands the results to `cb` in segment order, so the caller
+    // sees the single-threaded sequence. A worker never claims more than
+    // `window` segments past the last one handed out, which bounds the
+    // buffered FENs no matter how slow `cb` is.
+    struct Segment {
+        bool done = false;
+        // Each hit with the saturated skips before it in its segment, so a
+        // stop at that hit leaves the same tally one thread would.
+        std::vector<std::pair<std::string, uint64_t>> hits;
+        uint64_t skipped = 0;
+        std::exception_ptr error;
+    };
+    const uint64_t workers = std::min<uint64_t>((uint64_t)threads, segments);
+    const uint64_t window = 4 * workers;
+    std::vector<Segment> ring(window);
+    std::mutex mu;
+    std::condition_variable cv;
+    uint64_t next = 0;     // first unclaimed segment
+    uint64_t emitted = 0;  // segments handed to cb so far
+    std::atomic<bool> stop{false};
+
+    auto work = [&] {
+        // Its own Tablebase: own readers, own block caches, no shared lock.
+        Tablebase own(dir_, cache_bytes_ ? std::max<size_t>(cache_bytes_ / workers, kDefaultBlockSize) : 0);
+        for (;;) {
+            uint64_t k;
+            {
+                std::unique_lock lk(mu);
+                cv.wait(lk, [&] { return stop.load() || next >= segments || next < emitted + window; });
+                if (stop.load() || next >= segments) return;
+                k = next++;
+            }
+            Segment seg;
+            try {
+                const uint64_t begin = k * kSegment;
+                own.mine_range(
+                    q, begin, std::min(plane_cells, begin + kSegment),
+                    [&](const std::string& fen) {
+                        seg.hits.emplace_back(prepare ? prepare(own, fen) : fen, seg.skipped);
+                        return !stop.load();
+                    },
+                    &seg.skipped);
+            } catch (...) { seg.error = std::current_exception(); }
+            seg.done = true;
+            {
+                std::lock_guard lk(mu);
+                ring[k % window] = std::move(seg);
+            }
+            cv.notify_all();
+        }
+    };
+    std::vector<std::thread> pool;
+    auto finish = [&] {
+        {
+            std::lock_guard lk(mu);
+            stop = true;
+        }
+        cv.notify_all();
+        for (auto& th : pool) th.join();
+    };
+    const uint64_t tally0 = skipped_saturated ? *skipped_saturated : 0;
+    uint64_t tally = 0;  // saturated skips in the segments handed out so far
+    try {
+        for (uint64_t i = 0; i < workers; ++i) pool.emplace_back(work);
+        for (uint64_t k = 0; k < segments; ++k) {
+            Segment seg;
+            {
+                std::unique_lock lk(mu);
+                cv.wait(lk, [&] { return ring[k % window].done; });
+                seg = std::move(ring[k % window]);
+                ring[k % window] = Segment{};
+                ++emitted;
+            }
+            cv.notify_all();
+            for (const auto& [fen, before] : seg.hits) {
+                if (skipped_saturated) *skipped_saturated = tally0 + tally + before;
+                if (!cb(fen)) {
+                    finish();
+                    return;
+                }
+            }
+            tally += seg.skipped;
+            if (skipped_saturated) *skipped_saturated = tally0 + tally;
+            // A worker's error surfaces where one thread would have hit it:
+            // after every FEN before the failing cell.
+            if (seg.error) std::rethrow_exception(seg.error);
+        }
+    } catch (...) {
+        finish();
+        throw;
+    }
+    finish();
+}
+
+bool Tablebase::mine_range(const MineScan& q, uint64_t begin, uint64_t end,
+                           const std::function<bool(const std::string&)>& cb,
+                           uint64_t* skipped_saturated) const {
+    const Slice* s = load(q.m);
+    if (!s) throw MissingTableError("no table for " + q.m.name());
+    const MineFilter& f = q.f;
+    const Color stm = q.stm, other_stm = q.other_stm;
+    const auto& dets = q.dets;
+    const themes::Needs need = q.need;
+    const bool want_shape = q.want_shape, want_solutions = q.want_solutions, want_plane = q.want_plane;
+    SliceMemo memo;  // shared by every candidate's search in this range
     std::vector<PlacedPiece> pp;
     // Read the two planes in block-sized chunks instead of one cell at a time.
     // get() on a compressed table takes the block cache's mutex and memcpys a
@@ -272,22 +460,19 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
     // was the cost, measured at 14x raw on KRvkbn before this loop was chunked.
     // read_values() pays one lock and one memcpy per block touched.
     constexpr size_t kScanChunk = 1 << 16;
-    const uint64_t plane_cells = s->index.size();
     std::vector<uint8_t> dtm_buf(kScanChunk), cnt_buf(kScanChunk);
     // Third buffer for the sibling side-to-move plane, filled only when some
     // requested theme needs it (Needs::Plane). A cell index is independent of
     // side to move -- side to move selects the plane, not the index -- so the
     // sibling value for candidate cell c is the same cell c read from the
     // other plane, one extra read_values() call over the same chunk.
-    const Color other_stm = stm == Color::White ? Color::Black : Color::White;
-    const bool want_plane = !dets.empty() && need >= themes::Needs::Plane;
     std::vector<uint8_t> other_buf(want_plane ? kScanChunk : 0);
-    uint64_t chunk_base = 0;
+    uint64_t chunk_base = begin;
     size_t chunk_n = 0;
-    for (uint64_t c = 0; c < plane_cells; ++c) {
+    for (uint64_t c = begin; c < end; ++c) {
         if (c - chunk_base >= chunk_n) {
             chunk_base = c;
-            chunk_n = (size_t)std::min<uint64_t>(kScanChunk, plane_cells - c);
+            chunk_n = (size_t)std::min<uint64_t>(kScanChunk, end - c);
             s->reader.read_values(stm, chunk_base, chunk_n, dtm_buf.data(), cnt_buf.data());
             if (want_plane) s->reader.read_values(other_stm, chunk_base, chunk_n, other_buf.data(), nullptr);
         }
@@ -336,8 +521,24 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
             // Changing --ends's meaning as a side effect of adding themes is not
             // acceptable, so this goes through lines()/shape_of exactly like
             // v0.6.2 did, not through solutions().
+            //
+            // Every line starts with an optimal root move, and two different
+            // moves never share a SAN, so sh.starts is at most the number of
+            // optimal root moves -- also when lines() stops at v.count. One
+            // ply of DTM lookups rejects a candidate with too few of them
+            // before the full-depth enumeration.
+            if (f.starts > 0) {
+                int optimal = 0;
+                for (const Move& mv : b.legal_moves()) {
+                    b.make(mv);
+                    uint8_t d = dtm_of(b, memo);
+                    b.unmake(mv);
+                    if (d <= DTM_MAX && (int)d == (int)v.dtm - 1) ++optimal;
+                }
+                if (optimal < f.starts) continue;
+            }
             fen = b.fen();
-            SolutionShape sh = shape_of((int)v.count, lines(fen, (int)v.count));
+            SolutionShape sh = shape_of((int)v.count, lines_in(fen, (int)v.count, memo));
             if (f.starts >= 0 && sh.starts != f.starts) continue;
             if (f.ends >= 0 && sh.ends != f.ends) continue;
         }
@@ -345,7 +546,7 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
             std::vector<Solution> sols;
             if (need == themes::Needs::Solutions) {
                 if (fen.empty()) fen = b.fen();
-                sols = solutions(fen, (int)v.count);
+                sols = solutions_in(fen, (int)v.count, memo);
             }
             std::optional<ValuePair> other;
             if (want_plane) other = ValuePair{other_buf[c - chunk_base], 0};
@@ -361,8 +562,9 @@ void Tablebase::mine(const Material& m, const MineFilter& f,
             if (!all_present) continue;
         }
         if (fen.empty()) fen = b.fen();  // only reached by an actual match
-        if (!cb(fen)) return;
+        if (!cb(fen)) return false;
     }
+    return true;
 }
 
 void Tablebase::with_theme_input(const std::string& fen, int max,

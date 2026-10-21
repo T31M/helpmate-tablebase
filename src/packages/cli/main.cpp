@@ -9,6 +9,9 @@
 #include <set>
 #include <string>
 #include <vector>
+#ifdef __GLIBC__     // defined by any libc header above
+#include <malloc.h>  // mallopt(M_TOP_PAD) in cmd_mine
+#endif
 
 #include "format/table_file.h"
 #include "generator/generator.h"
@@ -35,6 +38,7 @@ void usage() {
                  "  helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N]\n"
                  "                           [--theme NAME]... [--themes] [--solutions] [--json|--jsonl]\n"
                  "                           [--interactive] [--max N|infinity] [--tables DIR]\n"
+                 "                           [--threads N] [--cache-mb N]\n"
                  "  helpmate themes\n"
                  "  helpmate compact <DIR> [--dry-run] [--compress] [--block-size N]\n"
                  "  helpmate --version\n"
@@ -75,7 +79,11 @@ void usage() {
                  "\n"
                  "Options:\n"
                  "  --tables DIR   table directory (default: \"tables\")\n"
-                 "  --threads N    worker threads for gen (default: 1)\n"
+                 "  --threads N    worker threads for gen and mine (default: 1); mine's\n"
+                 "                 output is identical for every N\n"
+                 "  --cache-mb N   mine: total memory for decompressed table blocks, shared\n"
+                 "                 by all tables and threads (default: up to 64 MiB per\n"
+                 "                 table and thread)\n"
                  "  --verbose      gen: per-slice lifecycle lines on stderr (closure\n"
                  "                 summary, generating/cached/done per slice); implies\n"
                  "                 --progress. stdout stays scriptable.\n"
@@ -530,7 +538,7 @@ void note_skipped(uint64_t skipped) {
 
 int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int dtm, int count, int maxn,
              int starts, int ends, bool starts_given, bool ends_given,
-             const std::vector<std::string>& theme_names, const MineOutput& out) {
+             const std::vector<std::string>& theme_names, const MineOutput& out, int threads, int cache_mb) {
     if (pos.empty()) {
         std::cerr << "error: mine needs a MATERIAL argument (e.g. KQvk)\n\n";
         usage();
@@ -581,7 +589,19 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
         std::cerr << "error: not a valid material string: \"" << pos[0] << "\"\n";
         return 3;
     }
-    Tablebase tb(tables);
+    // A mine scan's workers allocate their decompressed blocks (up to the
+    // whole --cache-mb budget) while they run. glibc grows each thread's heap
+    // a page range at a time with mprotect(), which serializes against the
+    // other threads' page faults: at 16 threads and --cache-mb 8192 that was
+    // 1.2 million voluntary context switches and 45 s instead of 23 s. Growing
+    // by a whole 64 MiB thread heap at once removes it; the reserve is only
+    // address space until a block is written into it.
+#ifdef __GLIBC__
+    mallopt(M_TOP_PAD, 64 << 20);
+#endif
+    // --cache-mb: one block-cache budget for the whole scan, split among
+    // the workers; without it each table keeps its own cache per worker.
+    Tablebase tb(tables, cache_mb > 0 ? static_cast<size_t>(cache_mb) << 20 : 0);
     MineFilter filter{.dtm = dtm, .count = count, .starts = starts, .ends = ends, .themes = theme_names};
     uint64_t skipped = 0;
     if (!out.wants_set()) {
@@ -595,11 +615,12 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
                 ++printed;
                 return printed < maxn;
             },
-            &skipped);
+            &skipped, threads);
         if (skipped) note_skipped(skipped);
         return 0;
     }
     MineSet set(tb, *m, filter, maxn);
+    set.set_threads(threads);  // enrichment (--themes/--solutions/--json, the shell) on the same workers
     MineSet::Facets facets{out.themes, out.solutions};
     if (out.jsonl && !out.interactive) {
         // JSON Lines streams: header, then each hit the moment the scan finds
@@ -608,18 +629,25 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
         // which is the whole point of the format on a --max infinity scan.
         std::cout << set.jsonl_header();
         size_t n = 0, unavailable = 0;
+        // Each hit is probed, enriched and formatted where the scan found it
+        // (on its worker, next to the blocks that worker just decompressed);
+        // this thread only writes the records in order. The first character
+        // says whether the hit could not be annotated, for the note below.
         if (maxn > 0)
             tb.mine(
                 *m, filter,
-                [&](const std::string& fen) {
-                    Hit h = set.make_hit(fen);
-                    set.enrich(h, facets);
-                    if (!h.unavailable.empty()) ++unavailable;
-                    std::cout << set.jsonl_record(h, facets);
+                [&](const std::string& prepared) {
+                    if (prepared[0] == '1') ++unavailable;
+                    std::cout.write(prepared.data() + 1, (std::streamsize)prepared.size() - 1);
                     ++n;
                     return (int)n < maxn;
                 },
-                &skipped);
+                &skipped, threads,
+                [&](const Tablebase& wtb, const std::string& fen) {
+                    Hit h = set.make_hit(wtb, fen);
+                    set.enrich(wtb, h, facets);
+                    return (h.unavailable.empty() ? "0" : "1") + set.jsonl_record(h, facets);
+                });
         set.set_skipped_saturated(skipped);
         std::cout << set.jsonl_footer(n);
         if (skipped) note_skipped(skipped);
@@ -637,7 +665,7 @@ int cmd_mine(const std::vector<std::string>& pos, const std::string& tables, int
                 set.add(fen);
                 return (int)set.size() < maxn;
             },
-            &skipped);
+            &skipped, threads);
     set.set_skipped_saturated(skipped);
     if (skipped) note_skipped(skipped);
     // Every 100 hits OR every second, per the spec, and worded exactly as the
@@ -970,6 +998,7 @@ int main(int argc, char** argv) {
     std::string tables = "tables";
     int threads = 1, dtm = -1, count = -1, maxn = 10, starts = -1, ends = -1;
     int block_size_kib = -1;  // -1 = not given: use kDefaultBlockSize
+    int cache_mb = -1;        // -1 = not given: per-table block caches
     bool all = false, verbose = false, progress = false, force_ram = false, compress = false;
     bool dry_run = false;
     bool starts_given = false, ends_given = false;
@@ -983,7 +1012,7 @@ int main(int argc, char** argv) {
     // the FEN's replacement).
     auto needs_value = [](const std::string& a) {
         return a == "--tables" || a == "--threads" || a == "--dtm" || a == "--count" || a == "--max" ||
-               a == "--starts" || a == "--ends" || a == "--block-size" || a == "--theme";
+               a == "--starts" || a == "--ends" || a == "--block-size" || a == "--theme" || a == "--cache-mb";
     };
     // Consumes the value following flag `a` (already known to exist) into
     // `target`; on malformed/out-of-range input prints one clear message +
@@ -1037,6 +1066,7 @@ int main(int argc, char** argv) {
         else if (a == "--compress") compress = true;
         else if (a == "--dry-run") dry_run = true;
         else if (a == "--block-size") set_int(a, i, block_size_kib);
+        else if (a == "--cache-mb") set_int(a, i, cache_mb);
         else if (a == "--theme") {
             // --theme (repeatable, value) is mine's per-theme filter; --themes
             // (boolean) is probe's "also print the themes shown". They read as
@@ -1107,6 +1137,11 @@ int main(int argc, char** argv) {
         return 3;
     }
 
+    if (cache_mb == 0 || cache_mb < -1) {
+        std::cerr << "error: --cache-mb must be a positive number of MiB, got " << cache_mb << "\n";
+        return 3;
+    }
+
     // --block-size is given in KiB (documented in --help): "64" means 64
     // KiB == 65536 bytes, matching how the size/miss-cost trade-off is
     // discussed everywhere else (docs/USAGE.md, kDefaultBlockSize's
@@ -1139,7 +1174,7 @@ int main(int argc, char** argv) {
         if (cmd == "stats") return cmd_stats(pos, tables);
         if (cmd == "mine")
             return cmd_mine(pos, tables, dtm, count, maxn, starts, ends, starts_given, ends_given,
-                            theme_names, mine_out);
+                            theme_names, mine_out, threads, cache_mb);
         if (cmd == "themes") return cmd_themes();
         if (cmd == "compact") return cmd_compact(pos, compress, dry_run, block_size);
         std::cerr << "error: unknown command \"" << cmd << "\"\n\n";

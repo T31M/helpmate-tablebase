@@ -15,6 +15,11 @@ struct ZstdCCtxDeleter {
 };
 using ZstdCCtxPtr = std::unique_ptr<ZSTD_CCtx, ZstdCCtxDeleter>;
 
+struct ZstdDCtxDeleter {
+    void operator()(ZSTD_DCtx* ctx) const noexcept { ZSTD_freeDCtx(ctx); }
+};
+using ZstdDCtxPtr = std::unique_ptr<ZSTD_DCtx, ZstdDCtxDeleter>;
+
 }  // namespace
 
 uint64_t block_count(uint64_t logical_size, uint32_t block_size) {
@@ -71,7 +76,14 @@ std::vector<uint8_t> compress_block(const uint8_t* src, size_t n, int level) {
 }
 
 void decompress_block(const uint8_t* src, size_t n, uint8_t* dst, size_t dst_capacity) {
-    size_t got = ZSTD_decompress(dst, dst_capacity, src, n);
+    // ZSTD_decompress() creates and frees a context on every call; a block
+    // cache miss is frequent enough (millions in one mine scan) for that to
+    // show up as malloc/free/memset in a profile. One context per thread is
+    // reused instead -- each call still decodes one whole frame from scratch,
+    // with the default checksum verification.
+    thread_local ZstdDCtxPtr ctx{ZSTD_createDCtx()};
+    if (!ctx) throw std::runtime_error("zstd decompress: cannot create a context");
+    size_t got = ZSTD_decompressDCtx(ctx.get(), dst, dst_capacity, src, n);
     if (ZSTD_isError(got))
         throw std::runtime_error(std::string("zstd decompress failed: ") + ZSTD_getErrorName(got));
     // A block that decompresses to a different length than the caller expects

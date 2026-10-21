@@ -9,6 +9,10 @@ bumps may change behavior).
 ## [Unreleased]
 
 ### Added
+- `helpmate mine --threads N`: scans the table on N workers, each with its own
+  readers and block caches; the output is identical for every N.
+- `helpmate mine --cache-mb N`: one fixed memory budget for decompressed table
+  blocks, shared by all tables and workers.
 - `helpmate-tables verify`: seven checks on a contributed table (PR contents,
   header and identity, zstd blocks, sidecar recomputed from the payload,
   deepest positions, local consistency with successors and sub-tables, and an
@@ -189,6 +193,15 @@ bumps may change behavior).
 - Corpus counts in README, CONTRIBUTING-TABLES, COOPERATIVE-TABLEBASE and the
   dataset card are generated (`helpmate-tables sync`).
 - `tools/verify_corpus.py` is a wrapper over the package's block check.
+- `mine --starts/--ends` and solution enumeration read only the DTM byte of
+  each position they visit, not the count byte in another block: a
+  KBvkqrn `--dtm 14 --count 2 --starts 2 --ends 2` scan is 2.2x faster.
+- `mine --starts N` rejects a candidate with fewer than N optimal first moves
+  after one ply of lookups, before enumerating its lines: the same scan is
+  another 2.5x faster.
+- Reading a compressed table reuses the buffers of evicted blocks and one zstd
+  context per thread, instead of allocating, zero-filling and freeing both on
+  every block-cache miss.
 
 ## [0.20.0] - 2026-09-26
 

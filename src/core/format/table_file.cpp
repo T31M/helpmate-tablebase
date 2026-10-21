@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
@@ -411,7 +412,8 @@ TableReader::TableReader(TableReader&& other) noexcept
       nblocks_(other.nblocks_),
       offsets_(other.offsets_),
       blocks_(other.blocks_),
-      cache_(std::move(other.cache_)) {
+      cache_(std::move(other.cache_)),
+      cache_key_(other.cache_key_) {
     other.reset();
 }
 
@@ -427,6 +429,7 @@ TableReader& TableReader::operator=(TableReader&& other) noexcept {
         offsets_ = other.offsets_;
         blocks_ = other.blocks_;
         cache_ = std::move(other.cache_);
+        cache_key_ = other.cache_key_;
         other.reset();
     }
     return *this;
@@ -446,6 +449,7 @@ void TableReader::reset() {
     offsets_ = nullptr;
     blocks_ = nullptr;
     cache_.reset();
+    cache_key_ = 0;
 }
 
 std::optional<TableReader> TableReader::open(const std::string& path) {
@@ -453,7 +457,8 @@ std::optional<TableReader> TableReader::open(const std::string& path) {
     return open(path, &ignored);
 }
 
-std::optional<TableReader> TableReader::open(const std::string& path, OpenError* err) {
+std::optional<TableReader> TableReader::open(const std::string& path, OpenError* err,
+                                             std::shared_ptr<BlockCache> shared_cache) {
     if (err) *err = OpenError::None;
     int fd = ::open(path.c_str(), O_RDONLY);
     if (fd < 0) {
@@ -612,11 +617,22 @@ std::optional<TableReader> TableReader::open(const std::string& path, OpenError*
         // loaded slices of min(kBlockCacheBytes, that slice's logical size).
         // The min() is what keeps a closure of small sub-slice tables from
         // each claiming the full budget.
-        constexpr size_t kBlockCacheBytes = 64 * 1024 * 1024;
-        const uint64_t logical_bytes = 4 * hdr->plane_size;
-        const size_t budget = static_cast<size_t>(std::min<uint64_t>(kBlockCacheBytes, logical_bytes));
-        size_t capacity = std::max<size_t>(1, budget / hdr->block_size);
-        r.cache_ = std::make_unique<BlockCache>(capacity, hdr->block_size);
+        //
+        // A shared cache (see open()'s declaration) replaces all of this: its
+        // owner chose one budget for every reader on it. Each reader gets its
+        // own 2^32-block key range, far above any table's block count.
+        if (shared_cache && shared_cache->block_size() == hdr->block_size &&
+            r.nblocks_ < (uint64_t{1} << 32)) {
+            static std::atomic<uint64_t> next_key{0};
+            r.cache_ = std::move(shared_cache);
+            r.cache_key_ = next_key.fetch_add(1) << 32;
+        } else {
+            constexpr size_t kBlockCacheBytes = 64 * 1024 * 1024;
+            const uint64_t logical_bytes = 4 * hdr->plane_size;
+            const size_t budget = static_cast<size_t>(std::min<uint64_t>(kBlockCacheBytes, logical_bytes));
+            size_t capacity = std::max<size_t>(1, budget / hdr->block_size);
+            r.cache_ = std::make_shared<BlockCache>(capacity, hdr->block_size);
+        }
     }
     return r;
 }
@@ -635,6 +651,16 @@ ValuePair TableReader::get(Color stm, uint64_t cell) const {
         return {pay[o], pay[2 * ps_ + o]};
     }
     return {byte_at(o), byte_at(2 * ps_ + o)};
+}
+
+uint8_t TableReader::get_dtm(Color stm, uint64_t cell) const {
+    if (cell >= ps_)
+        throw std::out_of_range("TableReader::get_dtm: cell " + std::to_string(cell) +
+                                " out of range (plane size " + std::to_string(ps_) + ")");
+    if (all_unsolvable()) return DTM_UNSOLVABLE;
+    uint64_t o = (stm == Color::Black ? ps_ : 0) + cell;
+    if (block_size_ == 0) return (base_ + sizeof(TableHeader) + json_len_)[o];
+    return byte_at(o);
 }
 
 void TableReader::read_values(Color stm, uint64_t first_cell, size_t n, uint8_t* dtm, uint8_t* cnt) const {
@@ -687,19 +713,22 @@ uint8_t TableReader::byte_at(uint64_t logical) const {
     constexpr int kSlotBits = 5;
     constexpr size_t kLocalBlocks = size_t{1} << kSlotBits;
     thread_local std::array<std::array<LocalBlock, kLocalBlocks>, 2> local;
+    // With a shared cache (see open()) several readers have the same cache
+    // id, so the slot names the block by the same key the cache uses.
     const uint64_t id = cache_->id();
+    const uint64_t key = cache_key_ + b;
     constexpr uint64_t kGolden = 0x9E3779B97F4A7C15ull;
-    LocalBlock& slot = local[logical >= 2 * ps_][((b + id * kGolden) * kGolden) >> (64 - kSlotBits)];
-    if (slot.cache_id == id && slot.index == b) return (*slot.data)[offset];
+    LocalBlock& slot = local[logical >= 2 * ps_][((key + id * kGolden) * kGolden) >> (64 - kSlotBits)];
+    if (slot.cache_id == id && slot.index == key) return (*slot.data)[offset];
 
     const size_t len = static_cast<size_t>(std::min<uint64_t>(block_size_, 4 * ps_ - begin));
     const uint64_t off_b = load_u64(offsets_ + b * sizeof(uint64_t));
     const uint64_t off_b1 = load_u64(offsets_ + (b + 1) * sizeof(uint64_t));
     const uint8_t* src = blocks_ + off_b;
     const size_t clen = static_cast<size_t>(off_b1 - off_b);
-    slot.data = cache_->block(b, len, [&](uint8_t* dst, size_t n) { decompress_block(src, clen, dst, n); });
+    slot.data = cache_->block(key, len, [&](uint8_t* dst, size_t n) { decompress_block(src, clen, dst, n); });
     slot.cache_id = id;
-    slot.index = b;
+    slot.index = key;
     return (*slot.data)[offset];
 }
 
@@ -737,7 +766,7 @@ void TableReader::read_range(uint64_t logical_offset, size_t len, uint8_t* dst) 
         const uint64_t off_b1 = load_u64(offsets_ + (b + 1) * sizeof(uint64_t));
         const uint8_t* src = blocks_ + off_b;
         const size_t clen = static_cast<size_t>(off_b1 - off_b);
-        cache_->read_range(b, offset_in_block, take, block_len, out,
+        cache_->read_range(cache_key_ + b, offset_in_block, take, block_len, out,
                            [&](uint8_t* d, size_t n) { decompress_block(src, clen, d, n); });
         out += take;
         pos += take;
