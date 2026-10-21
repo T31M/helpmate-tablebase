@@ -360,12 +360,13 @@
         moves, and assigns <span class="mono">dtm = d</span> to any cell with a
         successor already at <span class="mono">d − 1</span>. The passes stop
         when one of them assigns nothing.</p>
-        <p>A second sweep, in increasing dtm order, counts the optimal lines:
+        <p>The same step counts the optimal lines:
         <span class="mono">count(p) = Σ count(s)</span> over exactly the
-        successors that achieve the minimal dtm, saturating at 255.</p>
-        <p>Both sweeps parallelise across the index range. Pass <i>d</i> only
+        successors at <span class="mono">d − 1</span>, saturating at 255.</p>
+        <p>Every pass parallelises across the index range, in tiles the worker
+        threads take from a shared cursor. Pass <i>d</i> only
         writes cells that are still unresolved and only reads values strictly
-        below <i>d</i>, so two threads working on different chunks of the same
+        below <i>d</i>, so two threads working on different tiles of the same
         pass cannot race. Multithreaded output is <b>required to be
         byte-identical</b> to single-threaded output, and that is asserted by
         the test suite rather than assumed.</p>

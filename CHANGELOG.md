@@ -175,6 +175,16 @@ bumps may change behavior).
   empty.
 
 ### Fixed
+- CONTRIBUTING-TABLES told contributors to run `helpmate-tables pull` without
+  `--material`, which downloads the whole corpus (now 1.2 TiB, not the ~55 GiB
+  it said). It now pulls the tables of five pieces or fewer (~24 GiB) and
+  explains that a table with pawns also needs the six-piece tables its pawns
+  promote into, which `gen` otherwise builds first.
+- The docs, `helpmate --help` and the dashboard's Technique page no longer
+  describe a separate count sweep (#64 counts solutions during the passes)
+  or day-long six-piece runs, and USAGE documents the timestamped `gen`
+  progress lines, `mine --threads` annotation on the workers and the
+  `helpmate-tables` contribution commands.
 - `helpmate-tables accept` and `pages`: the docs PR is merged once the checks branch protection
   requires have passed; the informational coverage job (~50 minutes) keeps running on the PR
   but no longer holds up the merge.

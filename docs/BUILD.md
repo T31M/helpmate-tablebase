@@ -17,6 +17,7 @@ URLs to SSH.
 | Python | ≥ 3.9 | optional: the `helpmate` Python package (`pip install .`) |
 | gcovr + `gcov-13` | any recent gcovr | optional: `make coverage` |
 | pytest, python-chess ≥ 1.10 | — | optional: the Python test suite (installed by `pip install -e .[dev]`) |
+| zstandard ≥ 0.22, numpy ≥ 1.24, python-chess ≥ 1.10, pyarrow ≥ 14 | — | `helpmate-tables verify` and the corpus statistics (the `verify` extra of `helpmate-api`, installed by `make install`) |
 
 The build is developed and tested with GCC 13 on Linux. On distributions whose
 default `g++`/`cc` predate GCC 13 (e.g. openSUSE Leap, where this project was
@@ -96,8 +97,13 @@ three:
 make install
 # equivalent to:
 python -m pip install .
-python -m pip install ./src/packages/api ./src/packages/web
+python -m pip install './src/packages/api[verify]' ./src/packages/web
 ```
+
+The `verify` extra (zstandard, numpy, python-chess, pyarrow) is what
+`helpmate-tables verify` and the statistics (`stats-push`, `accept`) need;
+without it they stop with an error naming the missing package and the
+`pip install './src/packages/api[verify]'` that fixes it.
 
 ## Makefile targets
 
@@ -209,13 +215,14 @@ interpretation of the resulting numbers).
 
 ### `make clean`
 
-Removes `build/` and `build-cov/`.
+Removes `build/`, `build-cov/` and `build-booklet/`.
 
 ### `make install`
 
-`python -m pip install .` then `python -m pip install ./src/packages/api
-./src/packages/web` — all three distributions, in the order `helpmate-api`
-requires.
+`python -m pip install .` then `python -m pip install
+'./src/packages/api[verify]' ./src/packages/web` — all three distributions,
+in the order `helpmate-api` requires, with the `verify` extra that
+`helpmate-tables verify` needs.
 
 If this hangs with no output and no error, see "`pip install .` hangs with no
 output and no error at all" under [Troubleshooting](#troubleshooting) — it's
@@ -227,7 +234,7 @@ config.
 ### `make install-dev`
 
 Same three distributions, each installed with its `[dev]` extra
-(`.[dev]`, `./src/packages/api[dev]`, `./src/packages/web[dev]`), so
+(`.[dev]`, `./src/packages/api[dev,verify]`, `./src/packages/web[dev]`), so
 `make install-dev && make test-api` (or `test-web`, `test-bindings`,
 `test-repo`) has pytest/httpx/playwright available — plain `make install`
 installs no dev extras and those targets fail on a missing `pytest`. Subject
@@ -291,23 +298,23 @@ commands the CI jobs run:
   `VERSION` agrees with every `pyproject.toml` and `helpmate --version`).
 - `make test-all` — `test` (the C++/CLI ctest suite, which subsumes
   `test-core` and `test-cli` above) plus the four package-level targets
-  (`test-api`, `test-web`, `test-bindings`, `test-repo`) — six targets listed
-  above, four of them re-run here on top of `test`.
+  (`test-api`, `test-web`, `test-bindings`, `test-repo`) and `test-site` (see
+  [Static showcase](#static-showcase-site)).
 
 ### `make format-check` / `make format`
 
 `make format-check` runs `git clang-format --diff` against `BASE` (the merge
 base with `origin/main`, same as CI) and fails if any changed C++ line isn't
 formatted per `.clang-format`; `make format` applies the fix in place. This is
-enforced on **changed lines only**, never on the whole tree: measured on this
-codebase with clang-format 22.1.8 (`clang-format --style='{BasedOnStyle:
+enforced on **changed lines only**, never on the whole tree: measured at
+0.21.0 with clang-format 22.1.8 (`clang-format --style='{BasedOnStyle:
 Google}' --output-replacements-xml $(git ls-files 'src/**/*.cpp' 'src/**/*.h')
-| grep -c '<replacement '`), stock Google style (`ColumnLimit: 80`, the
-default) makes 4180 replacements across 4365 lines of existing C++. Adding
-just `ColumnLimit: 100` to that same stock style (`--style='{BasedOnStyle:
-Google, ColumnLimit: 100}'`) brings it down to 3715 — most of the difference
-is line-wrapping. The tuned `.clang-format` committed here still makes only
-971 (same command, no `--style` override needed since clang-format picks up
+| grep -c '<replacement '`, 78 files, 14,900 lines of C++), stock Google
+style (`ColumnLimit: 80`, the default) makes 12,868 replacements. Adding just
+`ColumnLimit: 100` to that same stock style (`--style='{BasedOnStyle:
+Google, ColumnLimit: 100}'`) brings it down to 11,493 — the difference is
+line-wrapping. The tuned `.clang-format` committed here still makes 494
+(same command, no `--style` override needed since clang-format picks up
 the committed file) — reformatting anywhere near that much of the most
 carefully reviewed code in one commit would be churn, not review. A PR is
 required to format the lines it touches; the rest of the tree converges as it
@@ -338,7 +345,7 @@ distributions that compiles anything — `helpmate-api` and `helpmate-web`
 C++ involved. Install all three, in dependency order, with `make install` or
 
 ```bash
-pip install . ./src/packages/api ./src/packages/web
+pip install . './src/packages/api[verify]' ./src/packages/web
 ```
 
 (`helpmate-api` depends on `helpmate`, and nothing is published to PyPI yet,
@@ -351,7 +358,7 @@ touching the system Python. The order is the only thing that matters:
 
 ```bash
 python3 -m venv ~/.venvs/helpmate && source ~/.venvs/helpmate/bin/activate
-make install        # pip install .  then  pip install ./src/packages/api ./src/packages/web
+make install        # pip install .  then  pip install './src/packages/api[verify]' ./src/packages/web
 ```
 
 `pipx` is a reasonable thing to reach for, because `helpmate-api` ships two
@@ -461,13 +468,19 @@ python3 tools/build_problems.py --tables ~/tb [--binary ./build/helpmate] \
 override it on the command line (`make site-data TABLES=/path/to/tables`)
 for a different corpus location.
 
-Needs a real corpus -- the full 302-table corpus is 576 GB on disk -- and
-takes 80 minutes, measured on this machine for the full 302-material corpus.
-The cost is front-loaded: the sixteen six-piece tables dominate it at
-roughly 150 seconds each, five-piece tables average about 14 seconds, and
-four-piece and smaller are negligible. Materials are processed alphabetically
-and six-piece names sort first, so the run looks alarmingly slow for its
-first half hour before it accelerates -- that is normal, not a hang.
+Needs a real corpus -- 592 tables, 1204.7 GiB block-compressed, as of 0.21.
+A full run took 80 minutes on this machine when the corpus had 302 tables:
+the sixteen six-piece tables dominated it at roughly 150 seconds each,
+five-piece tables averaged about 14 seconds, and four-piece and smaller were
+negligible. The corpus now holds 306 six-piece tables, and a full run at 592
+tables has not been timed. The script runs one `mine` at a time and does not
+pass `mine --threads`, so for new materials use `--material`, or
+`helpmate-tables pages --tables ~/tb --missing --jobs N`, which mines the
+missing pages in parallel jobs and ships them as a docs PR (see
+[CONTRIBUTING-TABLES.md](CONTRIBUTING-TABLES.md#for-the-maintainer)).
+Materials are processed alphabetically and six-piece names sort first, so a
+full run looks alarmingly slow at first before it accelerates -- that is
+normal, not a hang.
 
 Per material, two calls to `helpmate mine --jsonl --themes --solutions` find
 up to three deepest positions with a unique solution and up to three deepest
@@ -475,11 +488,11 @@ positions with exactly two solutions that differ in both their first and
 last move (a "strict dual"); the depths themselves come from the stats
 sidecar's `uniqueness` map and are exact, so nothing needs scanning to find
 them. Output: one document per material at `site/data/material/<NAME>.json`
-(302 of them, including the 68 markers -- material in which no helpmate
-exists) plus the two aggregate files `site/data/themes.json` and
-`site/data/index.json`. The last full run reported `wrote 302 materials, 24
-themes, 0 failure(s)`; the committed data is 4.5 MB (302 documents at 3.5 MB,
-`themes.json` 968 KB, `index.json` 36 KB).
+(592 of them as of 0.21, including the 140 markers -- material in which no
+helpmate exists) plus the two aggregate files `site/data/themes.json` and
+`site/data/index.json`. The last full run, at 302 materials, reported `wrote
+302 materials, 24 themes, 0 failure(s)`; the committed data is now 6.0 MB of
+material documents, `themes.json` 1.9 MB and `index.json` 73 KB.
 
 `--material NAME` (repeatable) scopes a run to specific materials. A scoped
 run merges into the two aggregate files rather than replacing them -- each
@@ -504,7 +517,7 @@ Reads only the JSON stage 1 committed -- no corpus, no network, and
 deliberately no third-party Python: `.github/workflows/pages.yml` builds the
 site with `actions/setup-node` and no pip step, so anything `render_site.py`
 imported beyond the standard library would simply not be there in CI. It
-writes `site/material/<NAME>.html` (one per material, including the 68
+writes `site/material/<NAME>.html` (one per material, including the
 markers) and `site/themes.html`, a corpus-wide index of every theme linking
 to every problem that shows it. Boards step through the `{san, uci, fen}`
 triples the JSON already carries, so these pages need no chess logic of
@@ -523,9 +536,17 @@ part of `make test-all` and the Pages CI gate.
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull
 request: the C++ Release build + fast suite + a gen/probe smoke test, the
-Python package install + pytest, and an informational gcovr coverage summary.
+Python package install + pytest, the dashboard and showcase browser tests,
+lint (ruff, `node --check`), mypy, the changed-lines C++ format check, and an
+informational gcovr coverage summary. Every job but the coverage summary is a
+required check (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 `.github/workflows/release.yml` runs on `v*` tags: build, fast tests, and a
-GitHub Release with a `helpmate-<tag>-linux-x86_64.tar.gz` binary tarball.
+GitHub Release with a `helpmate-<tag>-linux-x86_64.tar.gz` binary tarball,
+its `.sha256` and `docs/DEEPEST.pdf`. `pages.yml` builds the showcase and
+deploys it to GitHub Pages (on pushes that touch it, daily, and after each
+Claims run), `claims.yml` keeps the status comment on every claim issue
+current, and `stats-check.yml` checks daily, and after each Pages run, that
+the published statistics cover every table of the manifest.
 
 ## Troubleshooting
 

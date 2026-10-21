@@ -1,8 +1,11 @@
 # Contributing
 
+> Donating CPU time or tables rather than code? See
+> [CONTRIBUTING-TABLES.md](CONTRIBUTING-TABLES.md).
+
 `main` is protected: every pull request must pass six required checks before
-the merge button unlocks. A red check blocks the merge regardless of who
-requests it or how trivial the change looks.
+the merge button unlocks. A red check blocks the merge however trivial the
+change looks; only a repository admin can override it.
 
 ## The six required checks
 
@@ -14,7 +17,7 @@ exists to print a gcovr summary in the log, not to gate anything.
 | --- | --- |
 | `C++ build, fast tests, CLI smoke` | Configures and builds the C++ core in Release, runs the fast Catch2 suite (`~[slow]` — the exhaustive closures are excluded), then an end-to-end `gen`/`probe` smoke test against the real `helpmate` binary. |
 | `Python bindings` | Installs all three distributions (`helpmate`, `helpmate-api`, `helpmate-web`, in that dependency order) and runs the bindings, API, and repo-consistency test suites. |
-| `Dashboard (browser tests)` | Installs the three distributions plus Playwright's Chromium, runs the pure-JS helper tests (`make jstest`), then the Playwright UI suite against the dashboard. |
+| `Dashboard (browser tests)` | Installs the three distributions plus Playwright's Chromium, runs the pure-JS helper tests (`make jstest`), then the Playwright UI suite against the dashboard, then renders the showcase (`make site`) and runs its browser tests. |
 | `Lint (ruff, node --check)` | `make lint` — `ruff check .` plus a `node --check` syntax gate over every dashboard JS file (each is checked through a temp `.mjs` copy so Node's CJS/ESM auto-detection doesn't stop parsing early — see the Makefile's `lint` target for why). |
 | `Type check (mypy)` | `make typecheck` — `python -m mypy` over the Python sources, with the compiled `helpmate` extension covered by `ignore_missing_imports` rather than actually built (a C++ build would make a type-check job take ten minutes for no reason). |
 | `C++ format (changed lines)` | `make format-check BASE=<merge-base with the PR's base branch>` — `git clang-format` restricted to the lines the PR actually touches, not the whole tree. See below for why. |
@@ -28,7 +31,7 @@ make lint         # ruff + node --check
 make typecheck    # mypy
 make format-check # clang-format, changed lines only (see below)
 make test         # C++ build + fast ctest suite (the "cpp" job)
-make test-all     # everything: test + test-api + test-web + test-bindings + test-repo
+make test-all     # everything: test + test-api + test-web + test-bindings + test-repo + test-site
 ```
 
 `make test-all` is the local equivalent of the `Python bindings` and
@@ -51,12 +54,13 @@ re-enable one of these three, read the comment above `ignore = [...]` in
 
 ## Why C++ formatting only checks changed lines
 
-`clang-format` under a stock Google style would rewrite 3715 of the
-4365 lines in the C++ core — roughly one line in five of the most carefully
-reviewed code in the project. Even after tuning indent width, column limit,
-access-modifier offset, short-form allowances, and pointer alignment
-(`.clang-format`), it still touches 971 lines. Enforcing that as a single
-whole-tree reformat would produce one unreviewable commit, so instead
+`clang-format` under a stock Google style makes 12,868 replacements in the
+14,900 lines of C++ under `src/` (clang-format 22.1.8, measured at 0.21.0;
+the command is in [BUILD.md](BUILD.md#make-format-check--make-format)), in
+the most carefully reviewed code in the project. Even after tuning indent
+width, column limit, access-modifier offset, short-form allowances, and
+pointer alignment (`.clang-format`), it still makes 494. Enforcing that as a
+single whole-tree reformat would produce one unreviewable commit, so instead
 `make format-check` (and the CI job) diffs only the lines a change actually
 touches against the merge base, via `git clang-format --diff`. The tree
 converges toward the style as it's edited, not all at once.

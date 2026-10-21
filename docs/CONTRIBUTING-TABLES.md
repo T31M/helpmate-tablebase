@@ -6,11 +6,11 @@ The corpus is **complete through five pieces** — all 220 five-piece classes,
 plus everything below them. At six pieces there are **<!-- contrib:six-total -->715<!-- /contrib --> material classes**, and
 **<!-- contrib:six-done -->306<!-- /contrib --> are done**, of which <!-- contrib:six-empty -->75<!-- /contrib --> are proven empty (marker
 tables: no helpmate exists in that class, so there is nothing to compute). The
-<!-- contrib:six-open -->409<!-- /contrib --> still to go are roughly six hundred
-machine-days of work, and it is not going to come from one desk.
+<!-- contrib:six-open -->409<!-- /contrib --> still to go are more than one desk can do: the
+pawnless ones need a 32 GiB machine, the ones with pawns 64 to 96 GiB.
 
-If you have a machine with 32 GiB of RAM and a week where it would otherwise
-idle, you can produce something nobody has ever computed.
+If you have a machine with 32 GiB of RAM and a few hours where it would
+otherwise idle, you can compute one of the tables that are still open.
 
 > For contributing *code*, see [CONTRIBUTING.md](CONTRIBUTING.md) — that one
 > is about CI checks and pull requests against the source tree.
@@ -29,8 +29,11 @@ holds four bytes per cell resident:
 | 1 | <!-- contrib:six-open-p1 -->144<!-- /contrib --> | 84.7 GiB | 96 GiB |
 
 Start with the pawnless tier. It is the largest single group, it fits on
-ordinary hardware, and every table in it is 28.9 GiB raw — about 1–3 GiB once
-compressed. Expect roughly a day per table on four modern cores.
+ordinary hardware, and every table in it is 28.9 GiB raw — about 1–6 GiB once
+compressed. A pawnless table takes about 40 minutes on a 16-thread machine
+(KBvkqrb: 41 minutes, and 13.5 minutes on 32 threads, where it took 4 h 28 min
+before 0.21). Tables with pawns have up to three times the cells and have not
+been timed since 0.21; they also need other six-piece tables first (step 2).
 
 Seven pieces is not open: a 7-piece class needs about 2 TB resident and an
 out-of-core generator that does not exist yet.
@@ -38,29 +41,50 @@ out-of-core generator that does not exist yet.
 ## How to contribute one
 
 **1. Claim it first.** Open an issue with the **Claim a material** form
-([new claim](../../issues/new?template=claim.yml)) before you start. A day of
-CPU wasted on a duplicate helps nobody. List one material per line; patterns
+([new claim](https://github.com/osick/helpmate-tablebase/issues/new?template=claim.yml))
+before you start, so that two people do not compute the same table by
+accident (a deliberate reproduction is welcome, see
+[Duplicates and claims](#duplicates-and-claims)). Fill in the Hugging Face
+username your token belongs to: a claim whose form names another HF account
+does not speak for your pull request. List one material per line; patterns
 such as `KQvk???` are allowed. A bot keeps the status of every claim in one
 comment on your issue. To hand a material over, strike its name through
 (`~~KRRvkpp~~`). The
 [materials list](https://osick.github.io/helpmate-tablebase/#/materials) on
 the site, filterable, shows priority, state and contributor of every
 material. Priority P1 means one White piece besides the king: the longest,
-deepest problems, so start there. Claims lapse after three weeks of silence.
+deepest problems. Every P1 class is done, so start with P2. Claims lapse after
+three weeks of silence.
 
-**2. Pull the existing corpus first.** This is not optional — it is the
-difference between a day and a week. `gen` builds the full closure of
+**2. Pull the published sub-tables first.** `gen` builds the full closure of
 sub-slices reachable by captures and promotions, and leaves any table that
-already exists alone. Every sub-slice of a 6-piece class is 5 pieces or
-fewer, and all of those are already published:
+already exists alone; without the published sub-tables it regenerates the
+whole closure first. Every capture leads to five pieces or fewer, and all of
+those are published, about 24 GiB. **Do not run `pull` without `--material`:
+it downloads the whole corpus, 1.2 TiB.** Pull the tables of five pieces or
+fewer by name instead:
 
-**For more detailed setup instructions see [Setup](CONTRIBUTING-TABLES.md#Setup) at the bottom of the file**
+**For more detailed setup instructions see [Setup](#setup) at the bottom of the file**
 
 ```bash
 git clone https://github.com/osick/helpmate-tablebase
-cd helpmate-tablebase && make install       # builds the C++ core, installs the CLIs
-helpmate-tables pull --tables ./tables --repo osick/helpmate-tables   # ~55 GiB
+cd helpmate-tablebase
+python3 -m venv .venv && source .venv/bin/activate   # make install runs `python -m pip`
+make install                                          # builds the C++ core, installs the CLIs
+mkdir -p tables
+# every published table of five pieces or fewer, ~24 GiB
+mapfile -t M < <(python3 -c 'import json; [print(r["material"]) for r in json.load(open("site/data/materials.json")) if r["done"] and r["pieces"] <= 5]')
+helpmate-tables pull --tables ./tables --repo osick/helpmate-tables "${M[@]/#/--material=}"
 ```
+
+A promotion does not reduce the piece count, so a table with pawns also needs
+the six-piece tables its pawns promote into: KRPvkbb needs KQRvkbb, KRRvkbb,
+KRBvkbb and KRNvkbb. Pull the published ones with `--material` as well. `gen`
+builds any that are missing before the table itself, at their own cost: as of
+0.21 that is one to four tables for a one-pawn class, 9 to 24 for two pawns,
+and more for three or four. Claim those too and push them with your table.
+With `--verbose`, the first lines `gen` prints are the closure and the number
+of slices it will build; stop it with Ctrl-C if that is more than you claimed.
 
 (There is no PyPI release yet, so it is a source build — see
 [BUILD.md](BUILD.md) if `make install` gives you trouble.)
@@ -68,12 +92,12 @@ helpmate-tables pull --tables ./tables --repo osick/helpmate-tables   # ~55 GiB
 **3. Generate, writing compressed directly.** No separate conversion step:
 
 ```bash
-helpmate gen KBBBvkb --tables ./tables --threads 4 --compress --progress
+helpmate gen KBBBvkb --tables ./tables --threads $(nproc) --compress --progress
 ```
 
-Leave headroom: the generator checks available memory before allocating and
-refuses rather than inviting the OOM killer. Do not run it under `--force-ram`
-to get around that.
+`--threads` defaults to 1, so give it every core. Leave headroom: the
+generator checks available memory before allocating and refuses rather than
+inviting the OOM killer. Do not run it under `--force-ram` to get around that.
 
 **4. Sanity-check your own output** before submitting, with the same checks
 the maintainer runs:
@@ -83,8 +107,9 @@ pip install './src/packages/api[verify]'    # once; `make install` already does 
 helpmate-tables verify --tables ./tables --material KBBBvkb
 ```
 
-`--tables` must hold the table and every published sub-table it needs
-(`verify` exits with status 2 and names the missing one otherwise). It runs
+`--tables` must hold the table and every published sub-table it needs, for
+a table with pawns including the six-piece tables it promotes into (`verify`
+exits with status 2 and names the missing one otherwise). It runs
 checks V2 to V7 below; expect a few minutes for a pawnless six-piece table. A
 ❌ means do not submit: fix the cause (or regenerate) and run it again.
 `--report FILE` also writes the JSON report.
@@ -94,7 +119,7 @@ checks V2 to V7 below; expect a few minutes for a pawnless six-piece table. A
 so nothing transits anyone's laptop and review happens where the data lives:
 
 ```bash
-huggingface-cli login          # once; stores an HF token
+hf auth login                  # once; stores an HF token
 helpmate-tables push --tables ./tables --repo osick/helpmate-tables \
                      --material KBBBvkb --create-pr \
                      --claim 47 --github your-login
@@ -109,27 +134,34 @@ opened pull request: https://huggingface.co/datasets/osick/helpmate-tables/discu
 `--create-pr` sends the table and its sidecar as a **single** pull request,
 and deliberately does not touch `manifest.json` — the maintainer regenerates
 that after merging, and a PR that edited it would conflict with every other
-open PR. Push only the material you generated.
+open PR. Push only the material you generated: without `--material`, `push`
+proposes every table in `--tables`, the pulled corpus included. `--material`
+takes one name, so repeat it for a table and the promotion tables you
+generated with it (`--material KRPvkbb --material KQRvkbb`); they go into one
+pull request. Pass the claim that covers the material as `--claim`.
 
 ### Who you are, on two different sites
 
 The two halves of a contribution live on two services with **no shared
-identity**, and nothing links them automatically:
+identity**:
 
 | | how you authenticate | what it is used for |
 | --- | --- | --- |
-| **Hugging Face** | an API token — `huggingface-cli login`, or the `HF_TOKEN` environment variable | the dataset pull request. It is authored by whichever HF account owns the token. |
+| **Hugging Face** | an API token — `hf auth login`, or the `HF_TOKEN` environment variable | the dataset pull request. It is authored by whichever HF account owns the token. |
 | **GitHub** | your normal GitHub account | the claim issue, and code contributions |
 
 `helpmate-tables` never sees a GitHub credential, and GitHub never sees your
-HF token. So a maintainer looking at a pull request sees an HF username and
-has no way to connect it to the person who claimed the material.
+HF token. A pull request on the dataset shows only an HF username. Three
+things link it to you, in this order: the `GitHub:` line in its description,
+the contributor registry (`data/contributions.json`, which maps your HF
+account to your GitHub login once a delivery of yours has been accepted), and
+the claim that covers the material, unless its form names another HF account.
 
 **Closing the loop:** `--claim <issue>` (the number of your claim issue) and
 `--github <your login>` write both into the HF pull request description, so
-the maintainer can link the two accounts and credit you. Run
-`huggingface-cli whoami` if you are unsure which account your token belongs
-to — it is easy to be logged in as an old one.
+verify and accept credit you without guessing. Run `hf auth whoami` if you
+are unsure which account your token belongs to — it is easy to be logged in
+as an old one.
 
 ### Duplicates and claims
 
@@ -178,7 +210,9 @@ request with `--pr`. If V4 or V5 fails, V6 and V7 are skipped.
 
 - **V1 PR hygiene.** Only `<M>.hm` plus `<M>.stats.json` pairs with safe file
   names at the top level of the dataset, at least one of them; nothing deleted;
-  every material canonical; not already in the manifest; claim link present.
+  every material canonical. A material already in the manifest is labelled a
+  duplicate of the published table and goes on to V8. A missing claim link is
+  a warning, not a failure.
   The files are the difference between the pull request and the commit it
   branched from, so other changes landing on `main` meanwhile never count.
 - **V2 header.** Magic, block-compressed encoding, embedded material equals the
@@ -216,34 +250,36 @@ means regenerating it, which costs exactly what the donation saved. The
 honest position is that a contributed table is trusted on the basis of
 structural consistency, spot checks, and the contributor's reputation.
 
-One piece of tooling would change that, and it does not exist yet:
-
-**`helpmate verify <TABLE>`** — a command running the structural and
-statistical checks plus an oracle sample. The independent oracle
-(`src/core/generator/oracle.cpp`, a from-scratch cooperative
+What would move it closer is a deeper oracle. V7 stops at 3 plies because
+python-chess needs minutes per six-piece position at 5. A C++ oracle already
+exists (`src/core/generator/oracle.cpp`, a from-scratch cooperative
 iterative-deepening solver sharing only the move generator with the real
-generator) already exists and already re-solves sampled positions during
-generation, but it is reachable only from C++ tests. Exposing it would let
-contributors verify their own work before submitting, and let anyone audit a
-published table without regenerating it.
+generator), but it is reachable only from the C++ tests. Exposing it through
+the Python bindings would let V7 re-solve deep positions too, for contributed
+tables and for anyone auditing a published one.
 
 That is the single most valuable code contribution available to this project
-right now. If you would rather write C++ than burn a week of CPU, write that.
+right now. If you would rather write C++ than spend CPU time, write that.
 
 ## Determinism, and why it matters here
 
 Generation is required to be byte-identical whether run with one thread or
-many, and that is asserted by tests. So two people generating the same
-material on the same version should produce identical files. If you have
-spare capacity and no appetite for a fresh material, **regenerating an
-existing table and reporting whether the sha256 matches the manifest is a
-real contribution** — it converts a trusted table into a verified one.
+many, and that is asserted by tests; the faster generator of 0.21 writes the
+same tables and sidecars as the one before it. So two people generating the
+same material produce the same table. V8 compares the payload (the four
+planes), not the file, so block size and header metadata do not matter. If
+you have spare capacity and no appetite for a fresh material, **reproducing a
+published table is a real contribution** — it converts a trusted table into a
+verified one. Open a claim whose first line is `confirm:`, generate the table
+into a tables directory that does not hold the published copy (`gen` leaves an
+existing table alone), and push it like any other; V8 checks it against the
+published table, and you are credited as a producer.
 
 ## Credit
 
 Every merged table is credited by material and contributor in
-the [materials list](https://osick.github.io/helpmate-tablebase/#/materials), the README and the dataset card. If you would rather not be named, say so in
-the claim issue.
+the [materials list](https://osick.github.io/helpmate-tablebase/#/materials), the README and the dataset card. If you would rather not be named, tick
+*Do not name me in the credits* on the claim form.
 
 The first outside contribution came from **T31M**: fifteen tables, KRBvkqq
 through KRBvkpp (issue #41, dataset PR #1), computed on a 192-thread,
@@ -324,9 +360,9 @@ helpmate-tables accept 2 3 4 --tables ~/tb              # merge, manifest, credi
   it would upload. `helpmate-tables stats-push --check` compares the published
   `stats/materials.parquet` with the manifest (read-only, no token) and exits 1 when
   it is stale; the Stats check workflow runs it daily, so it fails until the first
-  `stats-push` after the release that introduced statistics: run
+  `stats-push` after 0.21.0, the release that introduced statistics: run
   `stats-push --tables ~/tb` right after merging it (after reinstalling the CLI).
-  Once, after the first release with statistics, open the dataset page and check
+  Once, after 0.21.0, open the dataset page and check
   that the viewer shows `materials` and `histogram`; `accept` keeps them current
   from then on. The site's `site/data/stats.json` is committed data, refreshed by
   `sync` and `accept`'s docs step.
@@ -342,7 +378,8 @@ python3 tools/deepest_showcase.py --tables ~/tb && make docs-deepest \
 
 ### Tablebase
 
-These instructions are examples using Ubuntu and should be easily applicable to other Linux distributions
+These instructions are examples using Ubuntu 24.04 and should be easily applicable to other Linux distributions
+(the build needs GCC 13 or newer; Ubuntu 22.04 ships GCC 11, see [BUILD.md](BUILD.md#prerequisites))
 **Note** this assumes a minimal fresh installation (e.g. AWS EC2 instance)
 
 ```bash
@@ -350,20 +387,25 @@ These instructions are examples using Ubuntu and should be easily applicable to 
 sudo apt update && sudo apt install python3-venv python3-dev build-essential libzstd-dev -y
 git clone https://github.com/osick/helpmate-tablebase && cd helpmate-tablebase
 python3 -m venv --prompt tablebase .venv && source .venv/bin/activate && make install && mkdir -p tables
-export HF_TOKEN=<if you want to> && helpmate-tables pull --tables ./tables --repo osick/helpmate-tables  # ~55 GiB
+# the tables of five pieces or fewer, ~24 GiB; `pull` without --material downloads all 1.2 TiB
+mapfile -t M < <(python3 -c 'import json; [print(r["material"]) for r in json.load(open("site/data/materials.json")) if r["done"] and r["pieces"] <= 5]')
+export HF_TOKEN=<if you want to> && helpmate-tables pull --tables ./tables --repo osick/helpmate-tables "${M[@]/#/--material=}"
 ```
 
 ### Huggingface
 
 Official documentation: https://huggingface.co/docs/huggingface_hub/guides/cli
 
+`make install` installs `huggingface_hub` (a dependency of `helpmate-api`),
+which ships the `hf` command since huggingface_hub 0.34; run
+`pip install -U huggingface_hub` in the venv if `hf` is missing. The older
+`huggingface-cli` no longer works in huggingface_hub 1.x.
+
 ```bash
-# install "hf" cli
-curl -LsSf https://hf.co/cli/install.sh | bash
 # should prompt / already login if HF_TOKEN is set
 hf auth login
 hf auth whoami
 # example push for table
 helpmate-tables push --tables ./tables --repo osick/helpmate-tables \
-                     --material KBBBvkb --create-pr
+                     --material KBBBvkb --create-pr --claim 47 --github your-login
 ```

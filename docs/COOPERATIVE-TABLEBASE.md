@@ -61,22 +61,26 @@ it by capture or promotion, in topological order, because the forward scan of
 `M` looks up capture and promotion successors in those tables. Then an init
 pass marks illegal cells and every Black-to-move checkmate as `dtm = 0`, and
 the fixed-point passes run: pass `d` visits every still-unresolved cell,
-generates its legal moves, and assigns `dtm = d` if any successor sits at
-`d − 1`. The passes stop when one assigns nothing. A second sweep in
-increasing `dtm` order computes the count, `count(p) = Σ count(s)` over
-exactly the successors that achieve the minimum, saturating at 255.
+generates its legal moves, and if any successor sits at `d − 1` assigns
+`dtm = d` and, in the same step, the count, `count(p) = Σ count(s)` over
+exactly the successors at `d − 1`, saturating at 255. The passes stop when one
+assigns nothing; there is no separate count sweep.
 
-Both sweeps parallelise over the index range. Pass `d` only writes cells that
-are still unresolved and only reads values below `d`, so chunks never race,
+Every pass parallelises over the index range, in tiles that the workers claim
+from a shared cursor. Pass `d` only writes cells that are still unresolved and
+only reads values below `d`, so tiles never race,
 and the test suite asserts that a run with N threads is byte-identical to a
 run with one. That determinism is not a nicety. It is what lets a stranger
 regenerate a table and compare a sha256 instead of trusting it.
 
 Generation holds four bytes per cell resident, so **peak RAM equals the raw
 file size**: 28.9 GiB for any pawnless six-piece class, up to 84.7 GiB with
-pawns. The last three six-piece classes each took between six and fourteen
-hours on ten threads of a desktop. Compression is applied on the way out and
-never during generation.
+pawns. Since T31M's generator work in 0.21 (PR #64, byte-identical output) a
+pawnless six-piece class takes about 40 minutes on a 16-thread machine
+(KBvkqrb: 41 min; 13.5 min on 32 threads, against 4 h 28 min at 32 threads
+before 0.21). Classes with pawns have up to three times the cells and have not
+been timed since 0.21. Compression is applied on the way out and never during
+generation.
 
 ## Storage
 
@@ -91,22 +95,23 @@ Real tables are block-compressed: the planes are cut into 64 KiB blocks and
 each block is a separate zstd frame with its content checksum enabled, so a
 probe decompresses one block into a bounded LRU cache and a flipped bit fails
 loudly instead of returning a plausible wrong DTM. The corpus compresses
-9.84×, from 494 GiB of planes to 50 GiB on disk. The five most recent
-six-piece tables ranged from 7.5× to 19×, which tracks how much of the class
-is illegal or unsolvable. Random access stays cheap enough that solution
-enumeration on a compressed table costs about 1.14× the raw table, and a full
-plane scan about 2.3×.
+10.2×, from 12.0 TiB of planes to <!-- contrib:gib -->1204.7<!-- /contrib --> GiB on disk. The six-piece
+tables range from 4.7× (KRBvkbp) to 57× (KPvknnn), which tracks how much of
+the class is illegal or unsolvable. Random access stays cheap enough that
+solution enumeration on a compressed table costs about 1.14× the raw table,
+and a full plane scan about 2.3×.
 
 ## What the data says
 
-Across the <!-- contrib:tables-real -->452<!-- /contrib --> tables that hold data there are <!-- contrib:cells-billion -->6578.1<!-- /contrib --> billion plane cells (marker tables are left out: they store a verdict, not cells). Just over half, 55.5 %, are illegal positions the dense index has to reserve room for, 1.4 % are legal but unsolvable, 43.1 % have a helpmate, and of those 6.4 % have a unique solution.
-The fifteen KRB six-piece tables are more than half of all cells,
-so they pull these shares their way: with the extra white pieces far more
-positions can be mated. Across the first 302 tables the figures were
+Across the <!-- contrib:tables-real -->452<!-- /contrib --> tables that hold data there are <!-- contrib:cells-billion -->6578.1<!-- /contrib --> billion plane cells (marker tables are left out: they store a verdict, not cells). Almost two thirds, 62.2 %, are illegal positions the dense index has to reserve room for, 0.4 % are legal but unsolvable, 37.4 % have a helpmate, and of those 3.2 % have a unique solution.
+The 115 six-piece tables with pawns are 71.5 % of all cells, so they set
+these shares. Across the first 302 tables the figures were
 343.0 billion cells, 20.7 % unsolvable, 27.7 % with a helpmate, and 2.9 %
 of those unique (markers then still counted as unsolvable cells).
 
-The deepest mate is h#17, shared by KBvkqp, KRBvkqp and KRBvkrp. In KBvkqp:
+The deepest mate is <!-- contrib:deepest -->h#17.5<!-- /contrib -->, in KBvkqqp (three positions, White
+to move). h#17 is shared by KBvkqp, KBBvkqp, KBBvkrp, KRBvkqp and KRBvkrp. In
+KBvkqp:
 
 ```
 8/8/1p6/8/8/8/Bq6/1k1K4 b - - 0 1
@@ -114,8 +119,8 @@ Ka1 Ke1 Qc1+ Ke2 Kb2 Kf2 Kc2 Ke2 b5 Kf2 Kd1 Kf1 b4 Kg1 Ke1 Kh1 Kf1 Kh2
 b3 Kh1 b2 Kh2 b1=N Kh1 Nd2 Kh2 Nf3+ Kg3 Kg1 Bc4 Kh1 Bf1 Ng1 Bg2#
 ```
 
-Its count is saturated at 255. That is the pattern everywhere: in all 233
-non-trivial classes the deepest *sound* problem is shallower than the class
+Its count is saturated at 255. That is the pattern everywhere: in all 452
+classes that hold data the deepest *sound* problem is shallower than the class
 maximum, by 4.4 plies on average and by 20 in KRBvkp, whose longest helpmate
 is h#16 and whose longest unique one is h#6. The longest helpmates have
 hundreds of ways to reach mate, which is exactly what disqualifies them as
@@ -144,11 +149,13 @@ checked cheaply.
 
 Seven pieces need about 2 TB resident and an out-of-core generator that does
 not exist. Six pieces need a machine, not a redesign: **<!-- contrib:six-open -->409<!-- /contrib --> six-piece classes
-have never been computed, and <!-- contrib:six-open-p0 -->174<!-- /contrib --> of them fit in 32 GiB and take about a day
-each.** Contributions arrive as pull requests on the dataset
-(`helpmate-tables push --create-pr`), and every merged table is credited.
-Regenerating an existing class and reporting whether the sha256 matches is a
-contribution too. It turns a trusted table into a verified one.
+are still open, and <!-- contrib:six-open-p0 -->174<!-- /contrib --> of them fit in 32 GiB and take about 40
+minutes each on a 16-thread machine.** Contributions arrive as pull requests
+on the dataset (`helpmate-tables push --create-pr`), and every merged table is
+credited. Regenerating an existing class is a contribution too: `verify`
+compares its payload with the published table, and an identical delivery
+turns a trusted table into a verified one. It is credited equally, as an
+independent reproduction (25 tables so far).
 
 - Code, CLI, Python bindings, HTTP API and dashboard:
   https://github.com/osick/helpmate-tablebase
