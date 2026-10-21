@@ -8,11 +8,13 @@ bumps may change behavior).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-21
+
 ### Added
 - `helpmate mine --threads N`: scans the table on N workers, each with its own
-  readers and block caches; the output is identical for every N.
+  readers and block caches; the output is identical for every N (T31M, #77).
 - `helpmate mine --cache-mb N`: one fixed memory budget for decompressed table
-  blocks, shared by all tables and workers.
+  blocks, shared by all tables and workers (T31M, #77).
 - `helpmate-tables verify`: seven checks on a contributed table (PR contents,
   header and identity, zstd blocks, sidecar recomputed from the payload,
   deepest positions, local consistency with successors and sub-tables, and an
@@ -81,6 +83,10 @@ bumps may change behavior).
     `--yes` it stops with a usage error instead of a traceback.
 
 ### Data
+- **The corpus grows from 317 tables and 172.5 GiB to 592 tables and
+  1,204.7 GiB**, contributed by T31M and popeye37 and checked by the new
+  verify/accept pipeline. Six-piece progress, now counted over all 715
+  classes, stands at 306 done (75 of them proven empty) and 409 to go.
 - KQvkrrp (independently reproduced by T31M and popeye37).
 - KQvkrpp (independently reproduced by popeye37 and T31M).
 - KQvkrnp (independently reproduced by T31M and popeye37).
@@ -190,18 +196,28 @@ bumps may change behavior).
   every script, stylesheet, module import and data fetch of the built site.
 
 ### Changed
+- **`helpmate gen` is about 20x faster, with byte-identical tables and
+  sidecars** (T31M, #64; a pawnless six-piece slice, KBvkqrb at 32 threads:
+  4 h 28 min → 13 min 35 s). Compressed predecessor tables are read through a
+  sharded block cache and per-thread block slots; a quiet successor is indexed
+  by changing one digit of its parent's index instead of being re-encoded;
+  solutions are counted during propagation; scans are balanced in coarse
+  tiles; and the finalize step (statistics, sweep, deepest search, block
+  compression) runs on all threads.
 - Corpus counts in README, CONTRIBUTING-TABLES, COOPERATIVE-TABLEBASE and the
   dataset card are generated (`helpmate-tables sync`).
 - `tools/verify_corpus.py` is a wrapper over the package's block check.
 - `mine --starts/--ends` and solution enumeration read only the DTM byte of
   each position they visit, not the count byte in another block: a
-  KBvkqrn `--dtm 14 --count 2 --starts 2 --ends 2` scan is 2.2x faster.
+  KBvkqrn `--dtm 14 --count 2 --starts 2 --ends 2` scan is 2.2x faster
+  (T31M, #77).
 - `mine --starts N` rejects a candidate with fewer than N optimal first moves
   after one ply of lookups, before enumerating its lines: the same scan is
-  another 2.5x faster.
-- Reading a compressed table reuses the buffers of evicted blocks and one zstd
-  context per thread, instead of allocating, zero-filling and freeing both on
-  every block-cache miss.
+  another 2.5x faster (T31M, #77).
+- Reading a compressed table keeps one zstd context per thread and no longer
+  zero-fills a new block, which decompression overwrites completely, instead
+  of creating a context and zero-filling a block on every block-cache miss
+  (T31M, #77).
 
 ## [0.20.0] - 2026-09-26
 
