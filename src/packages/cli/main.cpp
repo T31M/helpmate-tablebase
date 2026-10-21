@@ -89,7 +89,7 @@ void usage() {
                  "                 --progress. stdout stays scriptable.\n"
                  "  --progress     gen: per-pass progress lines on stderr while a slice\n"
                  "                 is being generated (init pass, each scan pass with\n"
-                 "                 cells resolved, each count-sweep depth, with timings)\n"
+                 "                 cells resolved, the finalize steps; timestamped)\n"
                  "  --force-ram    gen: skip the RAM guard (which refuses to start a\n"
                  "                 slice whose planes exceed available memory)\n"
                  "  --compress     gen: write block-compressed tables (v0.7.5+ readers only)\n"

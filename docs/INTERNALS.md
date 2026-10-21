@@ -51,17 +51,23 @@ numbers, and the `compact --compress` conversion mechanics.
   promotion successors), then run an init pass (mark invalid cells; mark dtm=0 for
   every Black-to-move checkmate) followed by forward-scan fixed-point passes: pass
   `d` scans still-unresolved cells, generates their legal moves, and assigns `dtm=d`
-  to any cell with a successor at `dtm=d-1`; passes stop when one assigns nothing. A
-  second sweep in increasing dtm order computes the optimal-line count per cell
-  (`count(p) = Σ count(s)` over exactly the successors achieving the minimal dtm,
-  saturating at 255). Both sweeps parallelize over the index range across worker
-  threads: pass `d` only ever writes into cells that are still unresolved and only
-  ever reads values below `d`, so there is no read/write race between threads working
-  on different chunks of the same pass, and multithreaded output is required to be
-  byte-identical to single-threaded output (enforced by tests).
+  to any cell with a successor at `dtm=d-1`, together with its optimal-line count
+  (`count(p) = Σ count(s)` over exactly those successors, saturating at 255);
+  passes stop when one assigns nothing. Each pass runs on worker threads that take
+  coarse tiles of the index range from a shared cursor: pass `d` only ever writes
+  into cells that are still unresolved and only ever reads values below `d`, so
+  there is no read/write race between threads working on different tiles of the
+  same pass, and multithreaded output is required to be byte-identical to
+  single-threaded output (enforced by tests). A quiet move by a lone piece or a
+  king usually changes one digit of the index, so its successor's index is
+  computed from the parent's instead of re-encoding the position.
 - **Storage/probing** (`src/core/format/`, `src/core/probe/`): tables are written atomically
   (temp file + rename) and read back via mmap, so probing a huge table costs a page
-  fault, not a full load. `Tablebase` lazily loads and caches whatever slices a query
+  fault, not a full load. A compressed table is read through an LRU cache of
+  decompressed blocks (up to 64 MiB per table, split into independently locked
+  shards; `mine --cache-mb` sets one budget for all tables instead), with a few
+  blocks per thread kept in front of it so that repeat probes take no lock.
+  `Tablebase` lazily loads and caches whatever slices a query
   touches, reconstructs optimal lines by greedy descent through the dtm planes (with
   the same EP adjustment applied during descent), and falls back to a color-flip of
   the position when only the flipped slice was generated (e.g. probing `KvkQ` when
@@ -103,11 +109,14 @@ grade its own homework:
 ## Coverage
 
 Measured with `make coverage` (gcovr, GCC `--coverage` instrumentation, fast suite
-only, on `helpmate_core`'s sources under `src/`): **91.6% line coverage** (741/809
-lines), 97.2% function coverage, 61.8% branch coverage. The full per-file HTML report
+only, on `helpmate_core`'s sources under `src/`), as CI's informational coverage job
+runs it on every PR. For 0.21.0: **92.2% line coverage** (3172/3440 lines), 98.2%
+function coverage, 59.6% branch coverage, 379 tests. The full per-file HTML report
 is at `build-cov/coverage/index.html` after running `make coverage`.
 
-The biggest measured gaps: `src/core/format/table_file.cpp` (85%) and `src/core/chess/board.cpp`
+The per-file analysis below is from the first measurement, in the 0.5.x era (91.6%
+of 809 lines, 97.2% of functions, 61.8% of branches). Its biggest gaps:
+`src/core/format/table_file.cpp` (85%) and `src/core/chess/board.cpp`
 (90%) — mostly defensive error paths for malformed/truncated table files and rare
 hash/copy edge cases; `src/core/generator/parallel.h` (68%) — the per-worker
 exception-propagation path, which by design only runs when a worker thread throws,
@@ -127,7 +136,7 @@ warnings on exactly the hot, multithreaded-generator-loop lines in `board.cpp`
 (silenced with `--gcov-ignore-parse-errors=all` to let gcovr complete), which is
 consistent with some genuinely-executed lines in the template-heavy, multithreaded
 `eval.h`/`parallel.h` code losing their counters to the same tool limitation rather
-than never having run. Net effect: the reported 91.6%/97.2%/61.8% numbers are honest
+than never having run. Net effect: the reported numbers are honest
 and unmodified gcovr output, comfortably above the 80% line-coverage bar either way,
 but the two lowest-scoring files specifically should be read with that caveat rather
 than as "half the logic is untested."
@@ -140,7 +149,7 @@ each time — same signature independently diagnosed for a user-reported 5-piece
 across four full `make coverage` attempts, two hit this bug (on a different
 `test_probe.cpp` test each time) and two completed with all 64 fast-suite tests
 passing cleanly end to end — including the run that produced the 91.6%/97.2%/61.8%
-numbers quoted above (one unbroken `cmake` configure → build → `ctest` → `gcovr`
+numbers of that first measurement (one unbroken `cmake` configure → build → `ctest` → `gcovr`
 log, no separate/unlogged steps). The affected tests pass reliably and repeatedly in
 the normal (`-O2`) build; the fix is tracked as a separate follow-up task and
 intentionally not addressed here.
@@ -160,9 +169,9 @@ intentionally not addressed here.
   | pieces | raw table | peak RAM | wall time |
   | --- | --- | --- | --- |
   | 3-4 | KB to MB | trivial | seconds (~0.6 s for `KQvk`) |
-  | 5 | 0.5-1.4 GiB | same | minutes to hours |
-  | 6, pawnless | 28.9 GiB | 28.9 GiB | ~1 day |
-  | 6, with pawns | 35.7-84.7 GiB | same | ~1 day+ |
+  | 5 | 0.5-1.4 GiB | same | seconds to minutes (`KBBvkq`: 3 min on one thread, 23 s on 14) |
+  | 6, pawnless | 28.9 GiB | 28.9 GiB | ~40 min on 16 threads (`KBvkqrb`; 13.5 min on 32) |
+  | 6, with pawns | 35.7-84.7 GiB | same | longer, up to 3x the cells; not timed since 0.21 |
 
   Compression applies to storage only, never to generation: a table is built
   raw in RAM and compressed on the way out. A 96 GiB machine covers every
@@ -185,9 +194,8 @@ intentionally not addressed here.
   intermittent heap corruption in the root-slice generation scan (a SIGSEGV in
   one run, a `map::at` throw in another, on different `test_probe.cpp` cases
   each time), matching a user-reported 5-piece `KNvkqr` crash. It has not been
-  observed since, and the 295-table corpus published today — 220 five-piece
-  and 9 six-piece classes, every one a multi-hour or multi-day run — was
-  generated without a single occurrence. That is strong evidence but not a
+  observed since, and none has been reported for any of the 592 tables published
+  today, most of the six-piece ones computed on contributors' machines. That is strong evidence but not a
   fix: no commit claims to have closed it, and an intermittent fault that
   stops reproducing has not been proven absent. Treat a generation crash as a
   bug worth reporting, not as expected behaviour.

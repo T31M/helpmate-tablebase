@@ -6,7 +6,7 @@
       "hf": "T31M",
       "display": "T31M",
       "anonymous": false,
-      "note": "Computed on a 192-thread, 369 GiB machine; the six-piece pawn tables need about 85 GiB of RAM each. Also made the generator 15 to 19 times faster (GitHub PR #64)."
+      "note": "Computed on a 192-thread, 369 GiB machine; the six-piece pawn tables need about 85 GiB of RAM each. Also made the generator 15 to 19 times faster (GitHub PR #64) and `mine` multithreaded and six times faster on one thread (GitHub PR #77)."
     },
     "popeye37": {
       "github": "popeye37",

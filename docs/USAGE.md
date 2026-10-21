@@ -87,8 +87,10 @@ a length-prefixed JSON metadata blob; what follows the header depends on
   the reader (a byte budget rather than a block count, so it is independent
   of the `block_size` chosen: **64 MB per table since v0.8.1**, capped at the
   table's own logical size, and only ever filled with blocks actually
-  touched). Random access is preserved — a probe decompresses at most one
-  block, not the whole table.
+  touched; under `mine --threads` every worker has its own, and
+  `mine --cache-mb N` replaces them all with one shared budget). Random
+  access is preserved — a probe decompresses at most one block, not the
+  whole table.
 
   **Mining a compressed table used to be much slower than mining the raw
   equivalent. As of the fix described below, it is not.** Measured on a real
@@ -260,7 +262,7 @@ merely copied does not read as one that compressed.
 
 Build per [BUILD.md](BUILD.md); the CLI lands at `./build/helpmate`. Running
 `helpmate --help` prints the full usage text, every flag, and the exit codes;
-`helpmate --version` prints the version (e.g. `helpmate 0.5.0`).
+`helpmate --version` prints the version (e.g. `helpmate 0.21.0`).
 
 Common options (all subcommands): `--tables DIR` — the table directory
 (default `tables`).
@@ -271,21 +273,28 @@ Common options (all subcommands): `--tables DIR` — the table directory
 helpmate gen <MATERIAL> [--tables DIR] [--threads N] [--verbose] [--progress] [--force-ram] [--compress] [--block-size N]
 ```
 
-- `--threads N`: worker threads for generation (default 1). Multithreaded
-  output is byte-identical to single-threaded output (enforced by tests).
+- `--threads N`: worker threads for generation (default 1). The scan passes
+  and the finalize step (statistics, the unsolved sweep, the deepest-position
+  search and block compression) all run on them. Multithreaded output is
+  byte-identical to single-threaded output (enforced by tests).
 - `--verbose`: per-slice lifecycle reporting on **stderr** (stdout stays
   scriptable): the closure summary (which slices, how many are missing, the
   largest missing slice with its cell count and estimated RAM vs. what is
-  available), then per slice either `cached <name> (already on disk)` or
+  available), then per slice `cached <name> (already on disk)`,
+  `pruned <name> (provably no helpmate; marker table written)`, or
   `generating <name> (N cells)...` / `done <name> (max_dtm=D, T seconds)`.
   Implies `--progress`.
 - `--progress`: per-pass progress lines on stderr while a slice is being
   generated: the init pass, every scan pass (`pass d=K resolved M cells
-  (S s)`), and every count-sweep depth, each with its wall time. Reported only
-  at pass boundaries from the coordinating thread, so it adds no per-cell
-  overhead; useful on its own when `--verbose`'s lifecycle lines are too chatty
-  for a script but you still want a heartbeat during multi-hour 5-6 piece
-  passes.
+  (S s)`), then the finalize steps (`unsolved cells marked`, `stats done`,
+  `writing table (N blocks)...`, or `(raw)...` without `--compress`, and
+  `table written (T s, N blocks, B bytes)`). Every line `gen` writes to stderr
+  starts with an ISO-8601 UTC timestamp with milliseconds
+  (`2026-10-21T12:46:07.463Z`), so a log shows where a long run spent its
+  time. Reported only at pass boundaries from the coordinating thread, so it
+  adds no per-cell overhead; useful on its own when `--verbose`'s lifecycle
+  lines are too chatty for a script but you still want a heartbeat during a
+  long six-piece run.
 - `--force-ram`: override the RAM guard. By default `gen` estimates, before
   allocating anything, the memory each missing slice needs (4 one-byte planes
   x plane size) and compares it against `MemAvailable` from `/proc/meminfo`
@@ -315,19 +324,21 @@ lines on stdout as before):
 
 ```
 $ helpmate gen KRvk --tables tt --threads 2 --verbose
-gen KRvk: closure has 2 slice(s): Kvk KRvk
-gen KRvk: 2 slice(s) to build; largest KRvk (29568 cells, ~0.00 GiB RAM; 54.16 GiB available)
-generating Kvk (462 cells)...
-  Kvk: init pass done (0.0 s)
-  Kvk: pass d=1 resolved 0 cells (0.0 s)
-  Kvk: pass d=2 resolved 0 cells (0.0 s)
-done Kvk (max_dtm=255, 0.0 seconds)
-generating KRvk (29568 cells)...
-  KRvk: init pass done (0.0 s)
-  KRvk: pass d=1 resolved 189 cells (0.1 s)
+2026-10-21T12:46:07.463Z gen KRvk: closure has 2 slice(s): Kvk KRvk
+2026-10-21T12:46:07.463Z gen KRvk: 2 slice(s) to build; largest KRvk (29568 cells, ~0.00 GiB RAM; 51.88 GiB available)
+2026-10-21T12:46:07.463Z pruned Kvk (provably no helpmate; marker table written)
+2026-10-21T12:46:07.464Z generating KRvk (29568 cells)...
+2026-10-21T12:46:07.466Z   KRvk: init pass done (0.0 s)
+2026-10-21T12:46:07.469Z   KRvk: pass d=1 resolved 189 cells (0.0 s)
   ...
-  KRvk: count sweep d=14/14 done (0.0 s)
-done KRvk (max_dtm=14, 0.4 seconds)
+2026-10-21T12:46:07.487Z   KRvk: pass d=14 resolved 27 cells (0.0 s)
+2026-10-21T12:46:07.487Z   KRvk: pass d=15 resolved 0 cells (0.0 s)
+2026-10-21T12:46:07.487Z   KRvk: pass d=16 resolved 0 cells (0.0 s)
+2026-10-21T12:46:07.487Z   KRvk: unsolved cells marked (0.0 s)
+2026-10-21T12:46:07.489Z   KRvk: stats done (0.0 s)
+2026-10-21T12:46:07.489Z   KRvk: writing table (raw)...
+2026-10-21T12:46:07.489Z   KRvk: table written (0.0 s, 143531 bytes)
+2026-10-21T12:46:07.490Z done KRvk (max_dtm=14, 0.0 seconds)
 tt/Kvk.hm max_dtm=255
 tt/KRvk.hm max_dtm=14
 ```
@@ -358,8 +369,8 @@ tt/KQvk.hm max_dtm=14
 ```
 
 `Kvk` (king vs king — unconditionally unsolvable, hence `max_dtm=255`) is
-built first because a Black king capturing the queen lands there; `KQvk`
-itself tops out at `max_dtm=14`, i.e. the longest optimal helpmate in this
+written first, as a marker table, because a Black king capturing the queen
+lands there; `KQvk` itself tops out at `max_dtm=14`, i.e. the longest optimal helpmate in this
 material is `h#7`. A re-run prints
 `nothing to do: all tables for KQvk already exist in tt`.
 
@@ -557,18 +568,22 @@ helpmate mine <MATERIAL> --dtm D [--count C] [--starts N] [--ends N] [--theme NA
 - `--threads N`: scan the table on N worker threads (default 1). Each worker
   opens its own readers and block caches, so memory grows by up to 64 MiB of
   block cache per table a worker touches. The output -- order, `--max` cut-off
-  and skipped-position note included -- is identical for every N; only the
-  scan and the per-candidate solution search run in parallel, while the
-  annotation of hits (`--themes`, `--solutions`, `--json`) stays on one thread.
+  and skipped-position note included -- is identical for every N. The scan,
+  the per-candidate solution search and the annotation of hits (`--themes`,
+  `--solutions`, `--json`, `--jsonl` and the `--interactive` shell) all run on
+  the workers; only writing the output stays on one thread. On a 16-thread
+  machine `mine KBvkqrn --dtm 14 --count 2 --starts 2 --ends 2 --max 100`
+  takes 84 s on one thread and 8 s on 14 (533 s in 0.20).
 - `--cache-mb N`: the memory for decompressed table blocks, N MiB in total,
   shared by every table and split equally among the `--threads` workers.
   Without it, each table has its own cache of up to 64 MiB in each worker, so
   the total grows with the tables a query touches and with the thread count.
   A larger budget means fewer block decompressions in the solution search:
-  `mine KBvkqrn --dtm 14 --count 2 --starts 2 --ends 2 --threads 16` takes
-  26.6 s without it and 22.1 s with `--cache-mb 8192` (8 GiB). Beyond that it
-  stopped paying off. The table files themselves are memory-mapped on top of
-  this budget; the kernel can drop those pages again.
+  `mine KBvkqrn --dtm 14 --count 2 --starts 2 --ends 2 --max infinity
+  --threads 16` takes 26.6 s and peaks at 3.2 GiB without it; `--cache-mb 1024`
+  holds it to 1.0 GiB (29.2 s), and `--cache-mb 8192` (8 GiB) brings it to
+  22.1 s. Beyond that it stopped paying off. The table files themselves are
+  memory-mapped on top of this budget; the kernel can drop those pages again.
 
 `--starts`/`--ends` are exact-match filters, evaluated (cheaply) only for
 positions that already matched `--dtm`/`--count` — a position that matches
@@ -1522,8 +1537,8 @@ block size against `--block-size`:
 This means **a block size chosen at generation time is not permanent**: a
 table compressed at 16 KiB can be moved to 64 KiB (or vice versa) with
 `compact --compress --block-size 64` without regenerating it from scratch —
-hours for a 5-piece table, over a day for a 6-piece. Re-blocking only ever
-changes how a table is *stored*; the decompressed content at every cell is
+minutes for a 5-piece table, most of an hour on 16 threads for a pawnless
+6-piece. Re-blocking only ever changes how a table is *stored*; the decompressed content at every cell is
 unchanged (verified: re-blocking a real 462 MiB `KRvkbn` table's 64 KiB
 compressed form down to 16 KiB produced a file `md5sum`-identical to
 compressing the same raw table directly at 16 KiB).
@@ -1650,9 +1665,9 @@ total time/space is the sum over all slices in the closure.
 |---|---|---|---|
 | 3 | well under a second (~0.6 s measured for the whole `KQvk` closure) | ~120 KB per pawnless slice (29,568 cells × 4 planes) | instant to experiment with |
 | 4 | seconds | ~7.6 MB per pawnless slice (462 × 64² cells × 4 planes) | still interactive |
-| 5 | minutes to a couple of hours, material-dependent | ~0.5 GB per pawnless slice (462 × 64³ ≈ 121 M cells × 4 planes) | see the known-bug note below |
-| 6 | multi-day runs | roughly **14-28 GB** of table storage/RAM for a class at the current 1-byte/cell, uncompressed encoding | feasible but heavy; use `--threads` |
-| 7-8 | out of scope for this version | — | the versioned format is designed so a future compressed/out-of-core encoding can be added without invalidating existing tables |
+| 5 | a few minutes on one thread (`KBBvkq` 186 s, `KBPvkp` 582 s), a minute or two at most on 14 | ~0.5 GB per pawnless slice (462 × 64³ ≈ 121 M cells × 4 planes) | see the known-bug note below |
+| 6 | pawnless: about 40 min on 16 threads (`KBvkqrb`; 13.5 min on 32); with pawns up to 3× the cells, not timed since 0.21 | **28.9 GiB** of RAM (raw planes) pawnless, 35.7-84.7 GiB with pawns; 0.5-18 GiB on disk, block-compressed | use `--threads`; the RAM guard checks before anything is allocated |
+| 7-8 | out of scope for this version | ~2 TB resident per class | needs an out-of-core generator that does not exist yet; the versioned format is designed so one can be added without invalidating existing tables |
 
 Pawnful slices index 1806 king-pair classes (×48 per pawn instead of ×64), so
 they are larger per remaining piece than the pawnless numbers above. Tables
@@ -1660,9 +1675,10 @@ are mmap-backed: probing costs a page fault, not a full load, so querying huge
 tables is cheap even when generation was not.
 
 **Known issue**: 5-piece generation has had a known, intermittent crash bug
-(heap corruption in the root-slice generation scan — bug #21); see the
-Limits and Coverage sections of the [README](../README.md) for its current
-status. Re-running `gen` is safe: completed slices are never rewritten, so a
+(heap corruption in the root-slice generation scan — bug #21); see
+[Limits](INTERNALS.md#limits) in INTERNALS.md for its current status. It has
+not been observed since the 0.5.x era, and none of the 592 published tables
+hit it. Re-running `gen` is safe: completed slices are never rewritten, so a
 crashed run resumes where it left off.
 
 ## Python API
@@ -1754,8 +1770,8 @@ Reference:
   note make on their own surfaces. Passing an explicit `max` is treated as
   an intentional override and does not warn.
 - `helpmate.themes()` — the theme registry as a list of `{"name": ...,
-  "doc": ...}` dicts, in display order; the same data `helpmate themes` and
-  `GET /v1/themes` print, generated from the in-build registry so it never
+  "doc": ..., "needs": ..., "parameter": ...}` dicts, in display order; the
+  same data `helpmate themes` and `GET /v1/themes` print, generated from the in-build registry so it never
   drifts from the binary.
 - `tb.stats(material)` — the stats JSON as a Python dict (fields as in the
   [reference](#statsjson-field-reference) above).
@@ -1795,7 +1811,7 @@ material list, the search form: what you manipulate — beside a white
 say. Both surfaces are aliases over the existing palette; no new colours were
 introduced to build the split. Since v0.13.0 that is **one palette, full
 stop** — there is no colour-theme control on this page any more; see
-[Palette](#palette) below.
+**Palette** below.
 
 Five screens on the nav by default; a sixth, Search, only when the server was
 started with `--enable-mine` (see [`--enable-mine`](#api-server) below). Two
@@ -1908,7 +1924,7 @@ hard-coded offset is wrong at one width or the other.
   what the site is without a click.
 - **Technique** (since v0.15.0, no nav button) — how the tables are computed:
   the symmetry-reduced joint king index (462 pawnless / 1806 with pawns), the
-  closure-then-fixed-point generation and the counting sweep, the four byte
+  closure-then-fixed-point generation with its solution counts, the four byte
   planes and the three file versions, what answering a query costs, and the
   verification story (the independent oracle, the exhaustive python-chess
   cross-check, byte-identical multithreaded output, golden compositions).
@@ -2055,7 +2071,8 @@ A small read-only HTTP API (FastAPI + uvicorn) for serving generated tables:
 health/catalog/stats, `probe`/`line`/`mine` as JSON, and transparent
 on-demand fetching of tables that only live in a remote Hugging Face
 dataset. Plus a companion CLI, `helpmate-tables`, for pushing tables to and
-pulling them from that dataset.
+pulling them from that dataset, and for verifying and accepting contributed
+ones.
 
 ### Install
 
@@ -2221,8 +2238,8 @@ $ curl -s http://127.0.0.1:8642/v1/stats
   would otherwise corrupt `max_dtm` and the mate-length histograms. `deepest`
   is the ten materials with the longest mate, ties broken by name.
 - `no_helpmate` lists every material that has no helpmate at all — sorted by
-  name, not counted into any of the histograms above. On the reference
-  corpus this is 67 of 300 tables.
+  name, not counted into any of the histograms above. In the published
+  corpus this is 140 of 592 tables.
 - `generators` tallies each sidecar's `generator_version`, so the spread of
   builds that produced the corpus is visible at a glance.
 
@@ -2516,9 +2533,17 @@ pip install . ./src/packages/api   # same install as the API server
 ```
 
 ```
-helpmate-tables push --tables DIR --repo USER/DATASET [--material NAME ...]
+helpmate-tables push --tables DIR --repo USER/DATASET [--material NAME ...] [--create-pr] [--claim N] [--github LOGIN]
 helpmate-tables pull --tables DIR --repo USER/DATASET [--material NAME ...]
 ```
+
+The same CLI runs the contribution pipeline. `verify` checks tables:
+`--material` before you push your own, `--pr` for a dataset PR. The maintainer
+commands `accept`, `status`, `sync`, `claims`, `pages`, `site-status` and
+`stats-push` merge verified PRs, credit them and publish the results. They
+need the `verify` extra (`pip install './src/packages/api[verify]'`);
+[CONTRIBUTING-TABLES.md](CONTRIBUTING-TABLES.md) walks through it, and
+`helpmate-tables <command> --help` lists every flag.
 
 - `--tables DIR`: local directory to push from / pull into.
 - `--repo USER/DATASET`: a Hugging Face **dataset** repo id.
@@ -2570,7 +2595,7 @@ present).
 | Code | Meaning |
 |---|---|
 | `0` | success. |
-| `1` | operation failed after starting (network error, remote has no manifest on `pull`, sha256 mismatch, upload error) — message on stderr, no traceback. |
+| `1` | operation failed after starting (network error, remote has no manifest on `pull`, sha256 mismatch, upload error), or a check failed (`verify` with a failing check, `accept --plan` with a conflict, `stats-push --check` with stale statistics) — message on stderr, no traceback. |
 | `2` | bad usage (`--tables` not a directory, no subcommand given). |
 
 ### Smoke-testing a running server

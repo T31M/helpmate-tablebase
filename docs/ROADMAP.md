@@ -7,6 +7,17 @@ comes; this file records the agreed order, goals, dependencies, and open
 questions. v0.5.0 (released 2026-07-30) is the baseline: generator to 6
 pieces, probe library, CLI, Python bindings, CI, docs.
 
+## v0.21.0 — faster `gen` and `mine`, contribution pipeline
+
+- **Shipped.** `helpmate gen` about 20× faster with byte-identical tables and
+  sidecars (T31M, #64; KBvkqrb at 32 threads 4 h 28 min → 13 min 35 s).
+- `helpmate mine` faster and multithreaded, `--threads N` and `--cache-mb N`
+  (T31M, #77).
+- Contribution pipeline: `helpmate-tables` `verify`, `accept`, `status`,
+  `sync`, `claims`, `stats-push` and `pages`; batch processing of dataset PRs;
+  equal credit for independent reproductions.
+- Corpus 317 → 592 tables (1,204.7 GiB); six-piece 306 of 715 classes done.
+
 ## v0.18.0 — `mine` result sets: JSON, solutions, `--max infinity`, interactive shell
 
 - **Shipped.** Design: `docs/superpowers/specs/2026-09-10-mine-interactive-design.md`.
@@ -160,10 +171,10 @@ the ctest cases and `tools/`.
 `mem_available_bytes()` (`generator.cpp`) reads `/proc/meminfo` and returns
 `nullopt` when it cannot. The RAM guard that refuses to start a slice whose
 planes exceed memory therefore **disappears silently on any non-Linux
-platform** — exactly where it matters most, since a 6-piece slice is 14-28 GB
-of resident planes. Deciding "Linux only" keeps that guard a guarantee
-instead of a coincidence. Any future port must restore it, not inherit the
-`nullopt`.
+platform** — exactly where it matters most, since a 6-piece slice is 28.9 GiB
+(pawnless) to 84.7 GiB (one pawn) of resident planes. Deciding "Linux only"
+keeps that guard a guarantee instead of a coincidence. Any future port must
+restore it, not inherit the `nullopt`.
 
 ## v0.9 — Seven pieces ("humongous tablebases", part 1)
 
@@ -171,9 +182,10 @@ instead of a coincidence. Any future port must restore it, not inherit the
 (~1.8 TB naive planes — the v0.5.0 RAM guard already computes this), so the
 generator needs an out-of-core redesign: disk-backed planes with streaming
 passes, partial generation (single sub-slices on demand), checkpoint/resume,
-and the deferred perf items (dynamic chunking, thread pool, encode()
-allocation elimination). Distributed generation (several machines splitting
-a closure) is designed here, delivered incrementally.
+and the deferred perf items (a thread pool; #64 delivered dynamic tiles and
+the allocation-free one-digit successor index). Distributed generation
+(several machines splitting a closure) is designed here, delivered
+incrementally.
 
 - Depends on: nothing functionally; benefits from v0.6 storage for
   distributing finished slices
@@ -228,8 +240,8 @@ stop being hand work, while the maintainer still decides when to release.
 ### Query acceleration — indexing so `mine` stops scanning
 
 **Goal:** selective mining queries stop reading a whole plane. 97.1% of the
-corpus's 180,864 `(dtm, count)` buckets match under 0.1% of a plane; we read
-100% of it to find them.
+corpus's 180,864 `(dtm, count)` buckets (2026-08 corpus) match under 0.1% of a
+plane; we read 100% of it to find them.
 
 - Design: **not scheduled** —
   `docs/superpowers/specs/2026-08-08-query-acceleration-design.md`
@@ -247,6 +259,10 @@ corpus's 180,864 `(dtm, count)` buckets match under 0.1% of a plane; we read
   (2) a tiered index whose granularity follows selectivity.
 - Layers 1 and 2 are deliberately gated on Layer 0's measurements, so their
   thresholds get set against an optimised scan rather than today's.
+- Layer 0 is still open (the scan reads both planes). #77 measured the plane
+  scan at 0.04% of a six-piece `--starts/--ends` query; the time went to block
+  decompression in the line search, which #77 cut, and `mine --threads N` now
+  spreads the scan over N workers.
 - Subsumes the `helpmate list <dir>` item below (Layer 1's catalogue) and the
   live-result-count problem the query-surface concept could not solve.
 
@@ -271,10 +287,10 @@ tooling gap, not a naming one.
 ### Major question 1 — smaller tables and leaner generation
 
 Our tables are still too large: 4 bytes per cell (dtm and solution count for both
-sides to move), a pawnless six-piece table is 28.9 GiB raw / ~1–3 GiB compressed,
-a one-pawn one up to ~85 GiB raw / ~12.6 GiB compressed, about half of all cells
-are illegal positions the dense index reserves. Open question: how far can storage
-and generation be condensed? To be answered by a deep analysis that reads the
+sides to move), a pawnless six-piece table is 28.9 GiB raw / 0.5–5.7 GiB compressed,
+a one-pawn one 84.7 GiB raw / up to 18.0 GiB compressed (KRBvkbp), and 62 % of the
+corpus's cells are illegal positions the dense index reserves. Open question: how far
+can storage and generation be condensed? To be answered by a deep analysis that reads the
 other tablebase projects' algorithms carefully (Syzygy WDL/DTZ with one side to
 move, don't-care filling and per-table index ordering; Nalimov; Gaviota;
 Lomonosov; bitbases; checkers databases; Bourzutschky/Konoval) and measures what
@@ -286,14 +302,15 @@ Status: **analysed 2026-10-03** — `docs/research/2026-10-condensed-tables.md`.
 the count planes are 66–80 % of every compressed file; counts as a 2-bit class
 {0, 1, 2, 3+} (exact under the generator's rule), don't-care filling of illegal
 cells and zstd 19 with larger blocks together make tables **4.8–11.6× smaller**
-(corpus ≈ 341 → 45–70 GiB) by conversion, no regeneration; storing only Black to
+(corpus then ≈ 341 → 45–70 GiB; now 1,204.7 GiB, mostly six-piece pawn tables the
+analysis did not measure) by conversion, no regeneration; storing only Black to
 move reaches ~16× at the cost of slower wtm probes and odd-DTM mining. A better
 index helps generation RAM, not disk. Generator: 2-bit counts in RAM (−37 %), then
 a bitmap frontier (~1 B/cell, every six-piece class within 32 GiB).
 Proposed order: zstd-19 re-blocking (no format change) → format v4 with converter
 → optional two download tiers → generator RAM. Open decisions: keep wtm (h#n.5,
 set play) in the default download? exact counts beyond "3+" needed, or on demand?
-Measure one-pawn six-piece tables before committing to v4.
+Measure one-pawn six-piece tables before committing to v4 (76 are published now).
 
 ### Major question 2 — other stipulations
 
@@ -329,16 +346,20 @@ Unprioritised unless noted. Agreed next small PRs are marked **next**.
   and the tool version are unchanged (PR #18 had to be re-verified fully, ~3 h, for one
   table). `accept` keeps trusting only a complete, consistent report.
 - **done (2026-10)** — *Per-table progress lines in `verify`*: long PRs looked stuck.
-- **next** — *Sub-table block cache fix* (analysed 2026-10-03): round the cache capacity
-  up, dtm-only probes in the scan passes, thread-local zstd context (6× on KQvkr), then
-  `gen --subtable-cache auto|0|N` resident sub-tables inside a RAM-guard-counted budget
-  (est. 2–3× for six-piece tables on 64/96 GiB machines). After T31M's performance fork
-  is merged (his PR).
+- **partly done (0.21.0)** — *Sub-table block cache fix* (analysed 2026-10-03): #64
+  sharded the block cache and added per-thread block slots (lock contention was the main
+  cost); #77 added a thread-local zstd context, stopped zero-filling new blocks and moved
+  dtm-only lookups into `mine`'s line search. Still open: round the cache capacity up,
+  and `gen --subtable-cache auto|0|N` resident sub-tables inside a RAM-guard-counted
+  budget; its estimate (2–3× for six-piece tables on 64/96 GiB machines) predates #64
+  and needs re-measuring.
 - `helpmate-tables contribute KBvk???`: one command from claim to dataset PR (fetch only
   the needed sub-tables, generate, verify, push with `--claim`).
 - Pull only a material's sub-table closure instead of the whole corpus.
 - PyPI wheels and a Docker image for contributors (`docker run … contribute X`).
-- Merge T31M's performance fork (1.5–4×; T31M opens the PR).
+- **done (0.21.0)** — *T31M's performance work*: `gen` about 20× faster with
+  byte-identical output (#64; KBvkqrb at 32 threads 4 h 28 min → 13 min 35 s), and
+  `mine --threads/--cache-mb` (#77).
 - Out-of-core generator for seven pieces (see v0.9).
 
 **Trust and provenance**
@@ -360,15 +381,20 @@ Unprioritised unless noted. Agreed next small PRs are marked **next**.
 **Access and reach**
 - Probe in the browser: WASM reader plus HTTP range requests on Hugging Face (only the
   needed blocks), no server.
-- Statistics as Parquet on Hugging Face (all sidecars in one table).
-- Statistics page with charts (DTM distribution, unique share per material).
+- **done (0.21.0)** — *Statistics as Parquet on Hugging Face*: `stats/materials.parquet`
+  and `stats/histogram.parquet`, uploaded by `helpmate-tables stats-push`.
+- **done (0.21.0)** — *Statistics page with charts*: the site's `#/stats` and
+  `#/stats/<material>` (DTM distribution, unique share).
 - A small public API ("is this a helpmate, how deep?") for Lichess and other tools.
 
 **Community**
-- Contributor statistics on the site (tables, CPU hours).
+- Contributor statistics on the site (tables, CPU hours) — **partly done**: contributor
+  cards on the front page (tables, six-piece tables, reproductions) and a contributor
+  filter on the Materials page; CPU hours still missing.
 - Claim expiry with reminder and release — **partly done**: held deliveries and
   `accept --release M`; the bot still only labels stale claims.
-- Write-up of the first community-computed six-piece tables and the h#17 records.
+- Write-up of the first community-computed six-piece tables and the h#17.5 record
+  (KBvkqqp).
 
 ### Compression — promoted to v0.7.5
 
